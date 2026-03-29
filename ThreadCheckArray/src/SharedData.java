@@ -21,8 +21,8 @@ public class SharedData
      * @param array input array of integers (used to initialize internal list)
      * @param b constant value
      */
-    public SharedData(int[] array, int b) {
-	      this.array = new ArrayList<>();
+    public SharedData(ArrayList<Integer> array, int b) {
+	      this.array = array;
 		  this.b = b;
 	}
 

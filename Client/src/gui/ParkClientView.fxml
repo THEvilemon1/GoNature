@@ -1,103 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
-<?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.TextField?>
-<?import javafx.scene.layout.ColumnConstraints?>
-<?import javafx.scene.layout.GridPane?>
-<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.text.Font?>
 
-<VBox xmlns="http://javafx.com/javafx"
-      xmlns:fx="http://javafx.com/fxml"
-      fx:controller="gui.ParkClientController"
-      spacing="16"
-      style="-fx-background-color: #f4f4f4; -fx-font-family: 'System';">
+<AnchorPane prefHeight="300.0" prefWidth="400.0"
+    xmlns="http://javafx.com/javafx/17"
+    xmlns:fx="http://javafx.com/fxml/1"
+    fx:controller="gui.ParkClientController"
+    stylesheets="@ParkClientView.css">
 
-    <padding>
-        <Insets top="20" right="24" bottom="20" left="24"/>
-    </padding>
+    <Label layoutX="100.0" layoutY="40.0" text="Park Management Tool">
+        <font>
+            <Font name="Arial Bold" size="20.0" />
+        </font>
+    </Label>
 
-    <!-- Title -->
-    <Label text="Park Order Manager"
-           style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;"/>
+    <Label layoutX="50.0" layoutY="110.0" text="Enter Order Number:" />
 
-    <!-- Section: Connection -->
-    <Label text="Server Connection"
-           style="-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #555;"/>
+    <TextField fx:id="idtxt" layoutX="50.0" layoutY="135.0" prefWidth="300.0" promptText="e.g. 1001" />
 
-    <GridPane hgap="10" vgap="8">
-        <columnConstraints>
-            <ColumnConstraints minWidth="120" prefWidth="130"/>
-            <ColumnConstraints hgrow="ALWAYS"/>
-        </columnConstraints>
+    <Button fx:id="btnSend" layoutX="130.0" layoutY="190.0" prefWidth="140.0"
+        text="Search Order" onAction="#Send" />
 
-        <Label text="Host:" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
-        <TextField fx:id="hostField" promptText="e.g. 172.20.10.2"
-                   text="172.20.10.2"
-                   GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+    <Button fx:id="btnExit" layoutX="160.0" layoutY="245.0" prefWidth="80.0"
+        text="Exit" onAction="#getExitBtn" />
 
-        <Label text="Port:" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
-        <TextField fx:id="portField" promptText="e.g. 5555"
-                   text="5555"
-                   GridPane.rowIndex="1" GridPane.columnIndex="1"/>
-    </GridPane>
-
-    <Button fx:id="connectButton" text="Connect" onAction="#handleConnect"
-            style="-fx-background-color: #2980b9; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;"
-            prefWidth="120"/>
-
-    <Separator/>
-
-    <!-- Section: Check Order -->
-    <Label text="Step 1 — Check Order"
-           style="-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #555;"/>
-
-    <GridPane hgap="10" vgap="8">
-        <columnConstraints>
-            <ColumnConstraints minWidth="120" prefWidth="130"/>
-            <ColumnConstraints hgrow="ALWAYS"/>
-        </columnConstraints>
-
-        <Label text="Order Number:" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
-        <TextField fx:id="orderNumberField" promptText="Enter order number"
-                   GridPane.rowIndex="0" GridPane.columnIndex="1"/>
-    </GridPane>
-
-    <Button fx:id="checkOrderButton" text="Check Order" onAction="#handleCheckOrder"
-            style="-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;"
-            prefWidth="140"/>
-
-    <Separator/>
-
-    <!-- Section: Update Order -->
-    <Label text="Step 2 — Update Order Details"
-           style="-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #555;"/>
-
-    <GridPane hgap="10" vgap="8">
-        <columnConstraints>
-            <ColumnConstraints minWidth="120" prefWidth="130"/>
-            <ColumnConstraints hgrow="ALWAYS"/>
-        </columnConstraints>
-
-        <Label text="New Date:" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
-        <TextField fx:id="newDateField" promptText="YYYY-MM-DD"
-                   GridPane.rowIndex="0" GridPane.columnIndex="1"/>
-
-        <Label text="Num. of Visitors:" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
-        <TextField fx:id="visitorsField" promptText="e.g. 5"
-                   GridPane.rowIndex="1" GridPane.columnIndex="1"/>
-    </GridPane>
-
-    <Button fx:id="updateOrderButton" text="Update Order" onAction="#handleUpdateOrder"
-            style="-fx-background-color: #e67e22; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;"
-            prefWidth="140"/>
-
-    <Separator/>
-
-    <!-- Status -->
-    <Label fx:id="statusLabel" text="" wrapText="true"
-           style="-fx-font-size: 13px;"/>
-
-</VBox>
+</AnchorPane>

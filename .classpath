@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="src" path="HomeWork2/OCSF/OCSF/src"/>
+	<classpathentry kind="lib" path="HomeWork2/OCSF/__MACOSX/OCSF/lib/._mysql-connector-j-9.5.0.jar"/>
+	<classpathentry kind="lib" path="HomeWork2/OCSF/OCSF/lib/mysql-connector-j-9.5.0.jar"/>
+	<classpathentry kind="output" path="HomeWork2/OCSF/OCSF/bin"/>
+</classpath>

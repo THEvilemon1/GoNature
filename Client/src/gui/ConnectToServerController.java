@@ -62,18 +62,8 @@ public class ConnectToServerController {
                         stage.setTitle("Park Management Tool");
                         stage.setScene(scene);
 
-                        // Handle X button on ParkClientView window too
+                        // Handle X button on
                         stage.setOnCloseRequest(e -> {
-                        	System.out.println("X button pressed");
-                            if (client != null && client.isConnected()) {
-                                try {
-                                	client.setIntentionalDisconnect();
-                                    client.closeConnection();
-                                    Thread.sleep(1000);
-                                } catch (Exception ex) {
-                                    ex.printStackTrace();
-                                }
-                            }
                             System.exit(0);
                         });
 

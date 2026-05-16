@@ -9,8 +9,7 @@
 <AnchorPane prefHeight="300.0" prefWidth="400.0"
     xmlns="http://javafx.com/javafx/17"
     xmlns:fx="http://javafx.com/fxml/1"
-    fx:controller="gui.ParkClientController"
-    stylesheets="@ParkClientView.css">
+    fx:controller="gui.ParkClientController">
 
     <Label layoutX="100.0" layoutY="40.0" text="Park Management Tool">
         <font>
@@ -22,10 +21,13 @@
 
     <TextField fx:id="idtxt" layoutX="50.0" layoutY="135.0" prefWidth="300.0" promptText="e.g. 1001" />
 
-    <Button fx:id="btnSend" layoutX="130.0" layoutY="190.0" prefWidth="140.0"
+    <!-- Status label -->
+    <Label fx:id="lblStatus" layoutX="50.0" layoutY="168.0" prefWidth="300.0" text="" />
+
+    <Button fx:id="btnSend" layoutX="130.0" layoutY="200.0" prefWidth="140.0"
         text="Search Order" onAction="#Send" />
 
-    <Button fx:id="btnExit" layoutX="160.0" layoutY="245.0" prefWidth="80.0"
+    <Button fx:id="btnExit" layoutX="160.0" layoutY="250.0" prefWidth="80.0"
         text="Exit" onAction="#getExitBtn" />
 
 </AnchorPane>

@@ -13,6 +13,7 @@ import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.Pane;
 import javafx.stage.Stage;
@@ -21,29 +22,29 @@ public class ParkClientController {
 
     private ParkClient client;
 
-    @FXML
-    private Button btnExit = null;
-
-    @FXML
-    private Button btnSend = null;
-
-    @FXML
-    private TextField idtxt;
+    @FXML private Button btnExit = null;
+    @FXML private Button btnSend = null;
+    @FXML private TextField idtxt;
+    @FXML private Label lblStatus;
 
     private String getID() {
         return idtxt.getText();
     }
 
-    // Called once when this screen starts, to pass in the connected client
     public void setClient(ParkClient parkClient) {
         this.client = parkClient;
     }
 
     public void Send(ActionEvent event) throws Exception {
+        // Clear previous status
+        lblStatus.setText("");
+        lblStatus.setStyle("");
+
         String orderNumberStr = getID().trim();
 
         if (orderNumberStr.isEmpty()) {
-            System.out.println("You must enter an order number");
+            lblStatus.setText("You must enter an order number.");
+            lblStatus.setStyle("-fx-text-fill: red;");
             return;
         }
 
@@ -51,19 +52,21 @@ public class ParkClientController {
         try {
             orderNumber = Integer.parseInt(orderNumberStr);
         } catch (NumberFormatException e) {
-            System.out.println("Order number must be a number");
+            lblStatus.setText("Order number must be a number.");
+            lblStatus.setStyle("-fx-text-fill: red;");
             return;
         }
 
-        // Set up listener to handle server response
+        lblStatus.setText("Searching...");
+        lblStatus.setStyle("-fx-text-fill: orange;");
+
         client.setListener(new ServerResponseListener() {
             @Override
             public void onOrderExistsResult(boolean exists) {
                 Platform.runLater(() -> {
                     if (!exists) {
-                        System.out.println("ERROR: Order number " + orderNumber + " does not exist.");
-                    } else {
-                        System.out.println("Order found — waiting for order data...");
+                        lblStatus.setText("Order not found.");
+                        lblStatus.setStyle("-fx-text-fill: red;");
                     }
                 });
             }
@@ -73,7 +76,6 @@ public class ParkClientController {
                 Platform.runLater(() -> {
                     try {
                         ((Node) event.getSource()).getScene().getWindow().hide();
-                        Stage primaryStage = new Stage();
                         FXMLLoader loader = new FXMLLoader();
                         Pane root = loader.load(
                             getClass().getResource("/gui/OrderForm.fxml").openStream()
@@ -81,12 +83,17 @@ public class ParkClientController {
                         OrderFormController orderFormController = loader.getController();
                         orderFormController.loadOrder(order, client);
 
+                        Stage primaryStage = new Stage();
                         Scene scene = new Scene(root);
-                        scene.getStylesheets().add(
-                            getClass().getResource("/gui/OrderForm.css").toExternalForm()
-                        );
+                        java.net.URL css = getClass().getResource("/gui/OrderForm.css");
+                        if (css != null) scene.getStylesheets().add(css.toExternalForm());
                         primaryStage.setTitle("Order Management Tool");
                         primaryStage.setScene(scene);
+
+                        primaryStage.setOnCloseRequest(e -> {
+                            System.exit(0);
+                        });
+
                         primaryStage.show();
                     } catch (Exception e) {
                         e.printStackTrace();
@@ -99,17 +106,18 @@ public class ParkClientController {
 
             @Override
             public void onError(String errorMsg) {
-                Platform.runLater(() -> System.out.println("Server error: " + errorMsg));
+                Platform.runLater(() -> {
+                    lblStatus.setText("Order not found.");
+                    lblStatus.setStyle("-fx-text-fill: red;");
+                });
             }
         });
 
-        // Send request to server
         client.sendToServer(new Message("GET_ORDER", orderNumber));
     }
 
     public void start(Stage primaryStage) throws Exception {
         Parent root = FXMLLoader.load(getClass().getResource("/gui/ParkClientView.fxml"));
-
         Scene scene = new Scene(root);
         scene.getStylesheets().add(getClass().getResource("/gui/ParkClientView.css").toExternalForm());
         primaryStage.setTitle("Park Management Tool");
@@ -118,9 +126,6 @@ public class ParkClientController {
     }
 
     public void getExitBtn(ActionEvent event) throws Exception {
-        if (client != null && client.isConnected()) {
-            client.closeConnection();
-        }
         System.exit(0);
     }
 }

@@ -18,31 +18,33 @@ public class ParkServer extends AbstractServer {
 
     @Override
     protected void clientConnected(ConnectionToClient client) {
-        String clientInfo = client.getInetAddress().getHostAddress();
-        client.setInfo("IP", clientInfo); // save IP immediately
+        String ip = client.getInetAddress().getHostAddress();
+        String host = client.getInetAddress().getHostName();
+        String clientInfo = "IP: " + ip + " | Host: " + host;
+        client.setInfo("IP", clientInfo);
         System.out.println("Client connected: " + clientInfo);
         if (ServerPortFrameController.instance != null)
             ServerPortFrameController.instance.clientConnected(clientInfo);
     }
 
-    // Case 1: Orderly disconnect — called manually or by OCSF
+    // Case 1: Orderly disconnect — client called closeConnection()
     @Override
     synchronized protected void clientDisconnected(ConnectionToClient client) {
         handleDisconnection(client, "orderly disconnect");
     }
 
-    // Case 2: OCSF always calls this when connection is lost (orderly or abrupt)
+    // Case 2: Abrupt disconnect — client crashed or closed window
     @Override
     synchronized protected void clientException(ConnectionToClient client, Throwable exception) {
         handleDisconnection(client, "connection lost");
     }
 
+    // Shared handler — flag prevents double processing
     private synchronized void handleDisconnection(ConnectionToClient client, String reason) {
-        System.out.println("handleDisconnection called! reason: " + reason);
         if (client.getInfo("Disconnected") == null) {
             client.setInfo("Disconnected", true);
 
-            // Get saved IP instead of reading from socket (which may be closed)
+            // Use saved IP since socket may already be closed
             String clientInfo = "unknown";
             Object savedIP = client.getInfo("IP");
             if (savedIP != null)

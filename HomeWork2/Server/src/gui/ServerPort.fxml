@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.text.Font?>
+
+<AnchorPane prefHeight="560.0" prefWidth="550.0"
+    xmlns="http://javafx.com/javafx/17"
+    xmlns:fx="http://javafx.com/fxml/1"
+    fx:controller="gui.ServerPortFrameController">
+
+    <!-- Title -->
+    <Label layoutX="170.0" layoutY="15.0" text="Park Server Control">
+        <font><Font name="Arial Bold" size="20.0" /></font>
+    </Label>
+
+    <!-- Start/Exit buttons -->
+    <Button fx:id="btnDone" layoutX="155.0" layoutY="55.0" prefWidth="110.0"
+        text="Start Server" onAction="#Done" />
+    <Button fx:id="btnExit" layoutX="285.0" layoutY="55.0" prefWidth="80.0"
+        text="Exit" onAction="#getExitBtn" />
+
+    <!-- Server Status -->
+    <Label layoutX="30.0" layoutY="105.0" text="Server Status:">
+        <font><Font name="Arial Bold" size="13.0" /></font>
+    </Label>
+    <Label fx:id="lblServerStatus" layoutX="140.0" layoutY="105.0"
+        text="Stopped" style="-fx-text-fill: red; -fx-font-weight: bold;" />
+
+    <!-- DB Status -->
+    <Label layoutX="30.0" layoutY="130.0" text="DB Status:">
+        <font><Font name="Arial Bold" size="13.0" /></font>
+    </Label>
+    <Label fx:id="lblDBStatus" layoutX="140.0" layoutY="130.0"
+        text="Disconnected" style="-fx-text-fill: red; -fx-font-weight: bold;" />
+
+    <!-- Uptime -->
+    <Label layoutX="30.0" layoutY="155.0" text="Uptime:">
+        <font><Font name="Arial Bold" size="13.0" /></font>
+    </Label>
+    <Label fx:id="lblUptime" layoutX="140.0" layoutY="155.0" text="00:00:00" />
+
+    <!-- Connected Clients -->
+    <Label layoutX="30.0" layoutY="195.0" text="Connected Clients:">
+        <font><Font name="Arial Bold" size="13.0" /></font>
+    </Label>
+    <ListView fx:id="lstClients" layoutX="30.0" layoutY="220.0"
+        prefWidth="490.0" prefHeight="120.0" />
+
+    <!-- Activity Log -->
+    <Label layoutX="30.0" layoutY="355.0" text="Activity Log:">
+        <font><Font name="Arial Bold" size="13.0" /></font>
+    </Label>
+    <TextArea fx:id="txtLog" layoutX="30.0" layoutY="378.0"
+        prefWidth="490.0" prefHeight="150.0"
+        editable="false" wrapText="true" />
+
+</AnchorPane>

@@ -3,6 +3,9 @@ package server;
 import java.io.IOException;
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 import common.Message;
 import common.Order;
@@ -11,6 +14,10 @@ import ocsf.server.AbstractServer;
 import ocsf.server.ConnectionToClient;
 
 public class ParkServer extends AbstractServer {
+
+    // Thread-safe set to track disconnected clients
+    private final Set<ConnectionToClient> disconnectedClients =
+        Collections.synchronizedSet(new HashSet<>());
 
     public ParkServer(int port) {
         super(port);
@@ -39,12 +46,10 @@ public class ParkServer extends AbstractServer {
         handleDisconnection(client, "connection lost");
     }
 
-    // Shared handler — flag prevents double processing
-    private synchronized void handleDisconnection(ConnectionToClient client, String reason) {
-        if (client.getInfo("Disconnected") == null) {
-            client.setInfo("Disconnected", true);
-
-            // Use saved IP since socket may already be closed
+    // Shared handler — uses a Set to prevent double processing
+    private void handleDisconnection(ConnectionToClient client, String reason) {
+        // disconnectedClients.add() returns false if already in set — prevents double processing
+        if (disconnectedClients.add(client)) {
             String clientInfo = "unknown";
             Object savedIP = client.getInfo("IP");
             if (savedIP != null)
@@ -54,7 +59,6 @@ public class ParkServer extends AbstractServer {
 
             if (ServerPortFrameController.instance != null) {
                 ServerPortFrameController.instance.clientDisconnected(clientInfo);
-                ServerPortFrameController.instance.log("Client disconnected (" + reason + "): " + clientInfo);
             }
         }
     }

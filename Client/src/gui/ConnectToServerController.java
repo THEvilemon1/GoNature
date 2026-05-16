@@ -40,8 +40,6 @@ public class ConnectToServerController {
             try {
                 ParkClient client = new ParkClient(ip, PORT);
                 client.openConnection();
-
-                // Save client globally so ParkClientMain can close it on exit
                 ParkClientMain.client = client;
 
                 Platform.runLater(() -> {
@@ -62,10 +60,8 @@ public class ConnectToServerController {
                         stage.setTitle("Park Management Tool");
                         stage.setScene(scene);
 
-                        // Handle X button on
-                        stage.setOnCloseRequest(e -> {
-                            System.exit(0);
-                        });
+                        // X button — Case 2: abrupt disconnect
+                        stage.setOnCloseRequest(e -> System.exit(0));
 
                         stage.show();
                     } catch (Exception e) {
@@ -86,7 +82,16 @@ public class ConnectToServerController {
         }).start();
     }
 
+    // Exit button — Case 1: orderly disconnect via closeConnection()
     public void exit(ActionEvent event) {
+        if (ParkClientMain.client != null && ParkClientMain.client.isConnected()) {
+            try {
+                ParkClientMain.client.setIntentionalDisconnect();
+                ParkClientMain.client.closeConnection();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
         System.exit(0);
     }
 }

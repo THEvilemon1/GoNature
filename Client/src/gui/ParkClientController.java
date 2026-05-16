@@ -36,7 +36,6 @@ public class ParkClientController {
     }
 
     public void Send(ActionEvent event) throws Exception {
-        // Clear previous status
         lblStatus.setText("");
         lblStatus.setStyle("");
 
@@ -90,9 +89,8 @@ public class ParkClientController {
                         primaryStage.setTitle("Order Management Tool");
                         primaryStage.setScene(scene);
 
-                        primaryStage.setOnCloseRequest(e -> {
-                            System.exit(0);
-                        });
+                        // X button — Case 2: abrupt disconnect
+                        primaryStage.setOnCloseRequest(e -> System.exit(0));
 
                         primaryStage.show();
                     } catch (Exception e) {
@@ -125,7 +123,12 @@ public class ParkClientController {
         primaryStage.show();
     }
 
+    // Exit button — Case 1: orderly disconnect via closeConnection()
     public void getExitBtn(ActionEvent event) throws Exception {
+        if (client != null && client.isConnected()) {
+            client.setIntentionalDisconnect();
+            client.closeConnection();
+        }
         System.exit(0);
     }
 }

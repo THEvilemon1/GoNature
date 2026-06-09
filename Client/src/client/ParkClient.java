@@ -16,7 +16,14 @@ public class ParkClient extends AbstractClient {
     public ParkClient(String host, int port) throws IOException {
         super(host, port);
     }
+    
+    private static ParkClient instance;
+    public static void connect(String host, int port) throws IOException {
+        instance = new ParkClient(host, port);
+        instance.openConnection();
+    }
 
+    public static ParkClient getInstance() { return instance; }
     public void setListener(ServerResponseListener listener) {
         this.listener = listener;
     }

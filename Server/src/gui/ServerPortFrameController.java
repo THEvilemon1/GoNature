@@ -46,7 +46,7 @@ public class ServerPortFrameController implements Initializable {
     }
 
     public void Done(ActionEvent event) throws Exception {
-        ParkServerMain.runServer(String.valueOf(PORT));
+//        ParkServerMain.runServer(String.valueOf(PORT));
         serverStartTime = LocalTime.now();
 
         Platform.runLater(() -> {

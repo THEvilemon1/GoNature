@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.image.*?>
+<?import javafx.geometry.Insets?>
+
+<!--
+    LoginPage.fxml
+    ~~~~~~~~~~~~~~
+    The login screen for GoNature.
+
+    Layout structure:
+      ┌─────────────────────────────────┐
+      │        [GoNature Logo]          │  ← branding strip
+      │    Welcome to GoNature Parks    │
+      ├─────────────────────────────────┤
+      │  [ Employee ]  [ Visitor ]      │  ← role toggle bar
+      ├─────────────────────────────────┤
+      │  Employee ID  [______________]  │  ← employee section (or)
+      │  Password     [______________]  │
+      │  ── OR ──                       │
+      │  Israeli ID   [______________]  │  ← traveler section
+      ├─────────────────────────────────┤
+      │          [ Login ]              │
+      │  [status / error message]       │
+      └─────────────────────────────────┘
+
+    Stylesheet: LoginPage.css
+    Controller: gui.LoginPageController
+-->
+
+<StackPane xmlns="http://javafx.com/javafx/17"
+           xmlns:fx="http://javafx.com/fxml/1"
+           fx:controller="gui.login.LoginPageController"
+           styleClass="root-pane"
+           stylesheets="@LoginPage.css">
+
+    <!-- Full-screen background gradient (handled in CSS via .root-pane) -->
+
+    <!-- Centered card -->
+    <VBox styleClass="login-card" alignment="TOP_CENTER" maxWidth="420">
+
+        <!-- ── Branding ─────────────────────────────────────────── -->
+        <VBox styleClass="branding" alignment="CENTER" spacing="6">
+            <Label styleClass="app-name" text="GoNature" />
+            <Label styleClass="app-tagline" text="National Parks Reservation System" />
+        </VBox>
+
+        <!-- ── Role toggle bar ──────────────────────────────────── -->
+        <HBox styleClass="toggle-bar" alignment="CENTER" spacing="0">
+            <ToggleButton fx:id="btnEmployee"
+                          styleClass="toggle-btn, toggle-left"
+                          text="🏢  Employee"
+                          selected="true" />
+            <ToggleButton fx:id="btnTraveler"
+                          styleClass="toggle-btn, toggle-right"
+                          text="🌿  Visitor" />
+        </HBox>
+
+        <!-- Separator -->
+        <Separator styleClass="card-sep" />
+
+        <!-- ── Employee section ─────────────────────────────────── -->
+        <VBox fx:id="employeeSection" styleClass="fields-section" spacing="14">
+
+            <VBox styleClass="field-group" spacing="4">
+                <Label styleClass="field-label" text="Employee ID" />
+                <TextField fx:id="txtEmployeeId"
+                           styleClass="field-input"
+                           promptText="Enter your numeric employee ID" />
+            </VBox>
+
+            <VBox styleClass="field-group" spacing="4">
+                <Label styleClass="field-label" text="Password" />
+                <PasswordField fx:id="txtPassword"
+                               styleClass="field-input"
+                               promptText="Enter your password" />
+            </VBox>
+
+        </VBox>
+
+        <!-- ── Traveler section (hidden by default) ─────────────── -->
+        <VBox fx:id="travelerSection" styleClass="fields-section" spacing="14"
+              visible="false" managed="false">
+
+            <Label styleClass="section-hint"
+                   text="Enter your Israeli ID number to log in or register automatically." />
+
+            <VBox styleClass="field-group" spacing="4">
+                <Label styleClass="field-label" text="Israeli ID Number" />
+                <TextField fx:id="txtTravelerId"
+                           styleClass="field-input"
+                           promptText="9-digit Israeli ID (e.g. 123456789)" />
+            </VBox>
+
+        </VBox>
+
+        <!-- ── Login button ─────────────────────────────────────── -->
+        <Button fx:id="btnLogin"
+                styleClass="btn-login"
+                text="Log In"
+                onAction="#handleLogin"
+                maxWidth="Infinity" />
+
+        <!-- ── Status / error message ───────────────────────────── -->
+        <Label fx:id="lblMessage"
+               styleClass="lbl-message"
+               wrapText="true"
+               visible="false" />
+
+        <!-- ── Footer ───────────────────────────────────────────── -->
+        <Label styleClass="footer-text"
+               text="GoNature © 2024 — All rights reserved" />
+
+    </VBox>
+</StackPane>

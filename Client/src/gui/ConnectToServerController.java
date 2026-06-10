@@ -38,32 +38,39 @@ public class ConnectToServerController {
         new Thread(() -> {
             try {
                 ParkClient.connect(ip, PORT);
-                ParkClient client = ParkClient.getInstance();
 
                 Platform.runLater(() -> {
                     try {
                         ((Node) event.getSource()).getScene().getWindow().hide();
                         FXMLLoader loader = new FXMLLoader(
-                            getClass().getResource("/gui/ParkClientView.fxml")
+                            getClass().getResource("/gui/login/LoginPage.fxml")
                         );
                         Parent root = loader.load();
 
-                        ParkClientController controller = loader.getController();
-                        controller.setClient(client);
-
                         Stage stage = new Stage();
                         Scene scene = new Scene(root);
-                        java.net.URL css = getClass().getResource("/gui/ParkClientView.css");
+                        java.net.URL css = getClass().getResource("/gui/login/LoginPage.css");
                         if (css != null) scene.getStylesheets().add(css.toExternalForm());
-                        stage.setTitle("Park Management Tool");
+                        stage.setTitle("GoNature - Login");
                         stage.setScene(scene);
 
                         // X button — Case 2: abrupt disconnect
-                        stage.setOnCloseRequest(e -> System.exit(0));
+                        stage.setOnCloseRequest(e -> {
+                            try {
+                                ParkClient parkClient = ParkClient.getInstance();
+                                if (parkClient != null && parkClient.isConnected()) {
+                                    parkClient.setIntentionalDisconnect();
+                                    parkClient.closeConnection();
+                                }
+                            } catch (Exception ex) {
+                                ex.printStackTrace();
+                            }
+                            System.exit(0);
+                        });
 
                         stage.show();
                     } catch (Exception e) {
-                        lblStatus.setText("Failed to open client window.");
+                        lblStatus.setText("Failed to open login window.");
                         lblStatus.setStyle("-fx-text-fill: red;");
                         btnConnect.setDisable(false);
                         e.printStackTrace();
@@ -72,7 +79,7 @@ public class ConnectToServerController {
 
             } catch (Exception e) {
                 Platform.runLater(() -> {
-                    lblStatus.setText("Could not connect to " + ip);
+                    lblStatus.setText("Could not connect to " + ip + ": " + e.getMessage());
                     lblStatus.setStyle("-fx-text-fill: red;");
                     btnConnect.setDisable(false);
                 });

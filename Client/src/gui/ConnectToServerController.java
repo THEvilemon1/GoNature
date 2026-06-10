@@ -1,7 +1,6 @@
 package gui;
 
 import client.ParkClient;
-import client.ParkClientMain;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -38,9 +37,8 @@ public class ConnectToServerController {
 
         new Thread(() -> {
             try {
-                ParkClient client = new ParkClient(ip, PORT);
-                client.openConnection();
-                ParkClientMain.client = client;
+                ParkClient.connect(ip, PORT);
+                ParkClient client = ParkClient.getInstance();
 
                 Platform.runLater(() -> {
                     try {
@@ -84,10 +82,11 @@ public class ConnectToServerController {
 
     // Exit button — Case 1: orderly disconnect via closeConnection()
     public void exit(ActionEvent event) {
-        if (ParkClientMain.client != null && ParkClientMain.client.isConnected()) {
+        ParkClient client = ParkClient.getInstance();
+        if (client != null && client.isConnected()) {
             try {
-                ParkClientMain.client.setIntentionalDisconnect();
-                ParkClientMain.client.closeConnection();
+                client.setIntentionalDisconnect();
+                client.closeConnection();
             } catch (Exception e) {
                 e.printStackTrace();
             }

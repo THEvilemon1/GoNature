@@ -1,0 +1,37 @@
+.visitor-root {
+    -fx-background-color: #f8f6f0;
+}
+
+.visitor-title {
+    -fx-font-size: 28px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #2e7d32;
+}
+
+.visitor-details {
+    -fx-font-size: 13px;
+    -fx-text-fill: #374151;
+}
+
+.visitor-mode {
+    -fx-font-size: 15px;
+    -fx-text-fill: #1f2937;
+}
+
+.primary-action {
+    -fx-background-color: #2e7d32;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-pref-height: 40;
+    -fx-padding: 0 18;
+}
+
+.secondary-action {
+    -fx-background-color: white;
+    -fx-text-fill: #2e7d32;
+    -fx-border-color: #2e7d32;
+    -fx-border-width: 1;
+    -fx-font-weight: bold;
+    -fx-pref-height: 40;
+    -fx-padding: 0 18;
+}

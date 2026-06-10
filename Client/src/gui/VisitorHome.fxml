@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox prefHeight="480.0" prefWidth="720.0"
+      xmlns="http://javafx.com/javafx/17"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="gui.VisitorHomeController"
+      styleClass="visitor-root"
+      stylesheets="@VisitorHome.css"
+      spacing="18">
+    <padding>
+        <Insets top="32" right="40" bottom="32" left="40" />
+    </padding>
+
+    <Label fx:id="lblTitle" styleClass="visitor-title" text="Visitor Bookings" />
+    <Label fx:id="lblVisitorDetails" styleClass="visitor-details" text="" />
+    <Label fx:id="lblMode" styleClass="visitor-mode" text="" wrapText="true" />
+
+    <HBox spacing="12">
+        <Button fx:id="btnPrimaryAction" styleClass="primary-action" text="Book Visit" />
+        <Button fx:id="btnSecondaryAction" styleClass="secondary-action" text="My Bookings" />
+    </HBox>
+</VBox>

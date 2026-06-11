@@ -4,6 +4,7 @@ import boundaries.login.EmployeeLogin;
 import boundaries.login.TravelerLoginAndRegister;
 import client.ParkClient;
 import client.ServerResponseListener;
+import client.SessionManager;
 import client.loginController;
 import common.Order;
 import common.VisitorLoginResult;
@@ -148,6 +149,9 @@ public class LoginPageController implements Initializable {
 
     private void openVisitorHome(javafx.event.ActionEvent event, VisitorLoginResult result) {
         try {
+            // Save user to session
+            SessionManager.getInstance().setCurrentUser(result);
+            
             ((Node) event.getSource()).getScene().getWindow().hide();
 
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/gui/VisitorHome.fxml"));

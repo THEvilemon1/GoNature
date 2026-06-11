@@ -11,3 +11,4 @@ public interface ServerResponseListener {
 
     default void onVisitorLoginResult(VisitorLoginResult result) {}
 }
+

@@ -10,12 +10,17 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextArea;
-import javafx.stage.Stage;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
+import javafx.scene.control.Alert;
 import server.ParkServerMain;
 
+import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.net.URL;
 import java.time.Duration;
 import java.time.LocalTime;
+import java.util.Enumeration;
 import java.util.ResourceBundle;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -29,6 +34,8 @@ public class ServerPortFrameController implements Initializable {
     @FXML private Label lblServerStatus;
     @FXML private Label lblDBStatus;
     @FXML private Label lblUptime;
+    @FXML private Label lblServerIP;
+    @FXML private Button btnCopyIP;
     @FXML private ListView<String> lstClients;
     @FXML private TextArea txtLog;
 
@@ -44,6 +51,9 @@ public class ServerPortFrameController implements Initializable {
         instance = this;
         lstClients.setItems(clientList);
         log("Server ready. Click Start Server to begin.");
+        
+        // Load and display WiFi IPv4 address
+        loadServerIP();
     }
 
     public void Done(ActionEvent event) throws Exception {
@@ -96,6 +106,114 @@ public class ServerPortFrameController implements Initializable {
         Platform.runLater(() -> {
             String time = LocalTime.now().toString().substring(0, 8);
             txtLog.appendText("[" + time + "] " + message + "\n");
+        });
+    }
+
+    /**
+     * Get the server's WiFi IPv4 address
+     */
+    private void loadServerIP() {
+        try {
+            String ipAddress = getWiFiIPAddress();
+            if (ipAddress != null && !ipAddress.isEmpty()) {
+                lblServerIP.setText(ipAddress);
+            } else {
+                lblServerIP.setText("Unable to determine IP");
+                lblServerIP.setStyle("-fx-text-fill: #ff6600; -fx-font-weight: bold;");
+            }
+        } catch (Exception e) {
+            lblServerIP.setText("Error: " + e.getMessage());
+            lblServerIP.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+            System.err.println("Error loading server IP: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Get WiFi IPv4 address by checking all network interfaces
+     */
+    private String getWiFiIPAddress() throws Exception {
+        Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+        
+        while (interfaces.hasMoreElements()) {
+            NetworkInterface networkInterface = interfaces.nextElement();
+            
+            // Skip loopback and inactive interfaces
+            if (networkInterface.isLoopback() || !networkInterface.isUp()) {
+                continue;
+            }
+            
+            // Prefer WiFi/WLAN interfaces
+            String interfaceName = networkInterface.getName().toLowerCase();
+            if (interfaceName.contains("en") || interfaceName.contains("wlan") || 
+                interfaceName.contains("wifi")) {
+                
+                Enumeration<InetAddress> addresses = networkInterface.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    InetAddress address = addresses.nextElement();
+                    // Check for IPv4 addresses (not IPv6)
+                    if (!address.isLoopbackAddress() && address.getHostAddress().contains(".")) {
+                        return address.getHostAddress();
+                    }
+                }
+            }
+        }
+        
+        // Fallback: get first non-loopback IPv4 address
+        Enumeration<NetworkInterface> fallbackInterfaces = NetworkInterface.getNetworkInterfaces();
+        while (fallbackInterfaces.hasMoreElements()) {
+            NetworkInterface networkInterface = fallbackInterfaces.nextElement();
+            
+            if (networkInterface.isLoopback() || !networkInterface.isUp()) {
+                continue;
+            }
+            
+            Enumeration<InetAddress> addresses = networkInterface.getInetAddresses();
+            while (addresses.hasMoreElements()) {
+                InetAddress address = addresses.nextElement();
+                if (!address.isLoopbackAddress() && address.getHostAddress().contains(".")) {
+                    return address.getHostAddress();
+                }
+            }
+        }
+        
+        return null;
+    }
+
+    /**
+     * Copy the server IP address to clipboard
+     */
+    public void copyIPToClipboard(ActionEvent event) {
+        String ip = lblServerIP.getText();
+        
+        if (ip.equals("Loading...") || ip.equals("Unable to determine IP") || ip.startsWith("Error:")) {
+            showAlert("Cannot Copy", "IP address is not available");
+            return;
+        }
+        
+        try {
+            Clipboard clipboard = Clipboard.getSystemClipboard();
+            ClipboardContent content = new ClipboardContent();
+            content.putString(ip);
+            clipboard.setContent(content);
+            
+            log("Server IP copied to clipboard: " + ip);
+            showAlert("Success", "Server IP copied to clipboard:\n" + ip);
+        } catch (Exception e) {
+            log("Error copying IP to clipboard: " + e.getMessage());
+            showAlert("Error", "Failed to copy IP address");
+        }
+    }
+
+    /**
+     * Show a simple alert dialog
+     */
+    private void showAlert(String title, String message) {
+        Platform.runLater(() -> {
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle(title);
+            alert.setHeaderText(null);
+            alert.setContentText(message);
+            alert.showAndWait();
         });
     }
 

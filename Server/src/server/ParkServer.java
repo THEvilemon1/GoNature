@@ -58,6 +58,9 @@ public class ParkServer extends AbstractServer {
                 clientInfo = (String) savedIP;
 
             System.out.println("Processing disconnection for: " + clientInfo + " reason: " + reason);
+            
+            // Remove this connection from active sessions
+            UserSessionManager.getInstance().removeConnection(client);
 
             if (ServerPortFrameController.instance != null) {
                 ServerPortFrameController.instance.clientDisconnected(clientInfo);
@@ -108,7 +111,30 @@ public class ParkServer extends AbstractServer {
                 case "TRAVELER_LOGIN":
                     String nationalId = (String) message.getData();
                     VisitorLoginResult loginResult = loginOrRegisterVisitor(nationalId);
+                    
+                    // Check if this user is already logged in from another computer
+                    ConnectionToClient oldConnection = UserSessionManager.getInstance()
+                        .loginUser(loginResult.getTravelerId(), client);
+                    
+                    if (oldConnection != null) {
+                        // User already logged in elsewhere — force logout the old connection
+                        try {
+                            oldConnection.sendToClient(new Message("FORCE_LOGOUT", 
+                                "You have logged in from another computer."));
+                            oldConnection.close();
+                        } catch (IOException e) {
+                            System.out.println("Error disconnecting old session: " + e.getMessage());
+                        }
+                    }
+                    
                     client.sendToClient(new Message("VISITOR_LOGIN_RESULT", loginResult));
+                    break;
+
+                case "TRAVELER_LOGOUT":
+                    String travelerIdToLogout = (String) message.getData();
+                    UserSessionManager.getInstance().logoutUser(travelerIdToLogout);
+                    System.out.println("[ParkServer] User " + travelerIdToLogout + " logged out from client.");
+                    client.sendToClient(new Message("LOGOUT_RESULT", true));
                     break;
 
                 default:

@@ -66,6 +66,10 @@ public class ParkClient extends AbstractClient {
                 case "VISITOR_LOGIN_RESULT":
                     listener.onVisitorLoginResult((VisitorLoginResult) message.getData());
                     break;
+                case "FORCE_LOGOUT":
+                    // User was logged in from another computer
+                    handleForceLogout((String) message.getData());
+                    break;
                 case "ERROR":
                     listener.onError((String) message.getData());
                     break;
@@ -100,6 +104,29 @@ public class ParkClient extends AbstractClient {
             alert.setHeaderText("Connection Lost");
             alert.setContentText(reason + "\nPlease restart the client.");
             alert.showAndWait();
+            System.exit(0);
+        });
+    }
+
+    /**
+     * Handle forced logout when the same user logs in from another computer.
+     */
+    private void handleForceLogout(String reason) {
+        Platform.runLater(() -> {
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle("Logged Out");
+            alert.setHeaderText("You have been logged out");
+            alert.setContentText(reason + "\nPlease log in again.");
+            alert.showAndWait();
+            
+            // Clear session and close connection
+            SessionManager.getInstance().logout();
+            this.setIntentionalDisconnect();
+            try {
+                this.closeConnection();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
             System.exit(0);
         });
     }

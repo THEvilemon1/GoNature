@@ -26,4 +26,6 @@ public class VisitorLoginResult implements Serializable {
     public boolean isNewVisitor() {
         return newVisitor;
     }
+    
+    
 }

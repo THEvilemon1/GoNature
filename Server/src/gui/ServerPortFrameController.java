@@ -35,6 +35,7 @@ public class ServerPortFrameController implements Initializable {
     private ObservableList<String> clientList = FXCollections.observableArrayList();
     private Timer uptimeTimer;
     private LocalTime serverStartTime;
+    private boolean serverStarted = false;
 
     public static ServerPortFrameController instance;
 
@@ -46,7 +47,13 @@ public class ServerPortFrameController implements Initializable {
     }
 
     public void Done(ActionEvent event) throws Exception {
-//        ParkServerMain.runServer(String.valueOf(PORT));
+        if (serverStarted) {
+            log("Server is already running on port " + PORT);
+            return;
+        }
+
+        ParkServerMain.runServer(String.valueOf(PORT));
+        serverStarted = true;
         serverStartTime = LocalTime.now();
 
         Platform.runLater(() -> {

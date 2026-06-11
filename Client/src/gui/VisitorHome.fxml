@@ -22,7 +22,7 @@
     <Label fx:id="lblMode" styleClass="visitor-mode" text="" wrapText="true" />
 
     <HBox spacing="12">
-        <Button fx:id="btnPrimaryAction" styleClass="primary-action" text="Book Visit" />
-        <Button fx:id="btnSecondaryAction" styleClass="secondary-action" text="My Bookings" />
+        <Button fx:id="btnPrimaryAction" styleClass="primary-action" text="Book Visit" onAction="#handlePrimaryAction" />
+        <Button fx:id="btnSecondaryAction" styleClass="secondary-action" text="My Bookings" onAction="#handleSecondaryAction" />
     </HBox>
 </VBox>

@@ -4,6 +4,7 @@ import java.io.IOException;
 
 import common.Message;
 import common.Order;
+import common.VisitorLoginResult;
 import javafx.application.Platform;
 import javafx.scene.control.Alert;
 import ocsf.client.AbstractClient;
@@ -19,16 +20,26 @@ public class ParkClient extends AbstractClient {
     
     private static ParkClient instance;
     
-    public static void connect(String host, int port) throws IOException {
-        if (instance == null) {
-            instance = new ParkClient(host, port);
-            instance.openConnection();
+    public static synchronized void connect(String host, int port) throws IOException {
+        if (instance != null && instance.isConnected()) {
+            return;
         }
+
+        ParkClient newInstance = new ParkClient(host, port);
+        newInstance.openConnection();
+        instance = newInstance;
     }
 
     public static ParkClient getInstance() { 
         return instance; 
     }
+
+    private static synchronized void clearInstance(ParkClient client) {
+        if (instance == client) {
+            instance = null;
+        }
+    }
+
     public void setListener(ServerResponseListener listener) {
         this.listener = listener;
     }
@@ -52,6 +63,9 @@ public class ParkClient extends AbstractClient {
                 case "UPDATE_ORDER_RESULT":
                     listener.onUpdateOrderResult((boolean) message.getData());
                     break;
+                case "VISITOR_LOGIN_RESULT":
+                    listener.onVisitorLoginResult((VisitorLoginResult) message.getData());
+                    break;
                 case "ERROR":
                     listener.onError((String) message.getData());
                     break;
@@ -62,6 +76,7 @@ public class ParkClient extends AbstractClient {
     // Case 1: Orderly disconnect — don't show alert if we closed it ourselves
     @Override
     protected void connectionClosed() {
+        clearInstance(this);
         if (!intentionalDisconnect) {
             System.out.println("Server closed the connection.");
             showServerDisconnectedAlert("The server has shut down.");
@@ -71,6 +86,7 @@ public class ParkClient extends AbstractClient {
     // Case 2: Server crashed or lost connection abruptly
     @Override
     protected void connectionException(Exception exception) {
+        clearInstance(this);
         if (!intentionalDisconnect) {
             System.out.println("Lost connection to server: " + exception.getMessage());
             showServerDisconnectedAlert("Connection to server was lost.");

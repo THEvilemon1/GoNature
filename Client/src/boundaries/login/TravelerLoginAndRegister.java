@@ -1,5 +1,10 @@
 package boundaries.login;
 
+import java.io.IOException;
+
+import client.ParkClient;
+import common.Message;
+
 /**
  * TravelerLoginAndRegister (ECB - Boundary Layer)
  *
@@ -49,9 +54,17 @@ public class TravelerLoginAndRegister implements Login {
     @Override
     public void logInUser() {
         System.out.println("[TravelerLoginAndRegister] Sending traveler login/register request for ID: " + travelerId);
-        // TODO: Build a Message object and send via client:
-        //   Message msg = new Message("TRAVELER_LOGIN", travelerId);
-        //   ParkClient.getClient().sendToServer(msg);
+        ParkClient client = ParkClient.getInstance();
+        if (client == null || !client.isConnected()) {
+            System.out.println("[TravelerLoginAndRegister] Failed to send traveler login request: client is not connected.");
+            return;
+        }
+
+        try {
+            client.sendToServer(new Message("TRAVELER_LOGIN", travelerId));
+        } catch (IOException e) {
+            System.out.println("[TravelerLoginAndRegister] Failed to send traveler login request: " + e.getMessage());
+        }
     }
 
     // -------------------------------------------------------------------------

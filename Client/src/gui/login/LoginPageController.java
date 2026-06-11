@@ -2,12 +2,22 @@ package gui.login;
 
 import boundaries.login.EmployeeLogin;
 import boundaries.login.TravelerLoginAndRegister;
+import client.ParkClient;
+import client.ServerResponseListener;
 import client.loginController;
+import common.Order;
+import common.VisitorLoginResult;
 
+import javafx.application.Platform;
 import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
+import javafx.scene.Node;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
 
 import java.net.URL;
 import java.util.ResourceBundle;
@@ -71,7 +81,7 @@ public class LoginPageController implements Initializable {
      * Builds the correct Login strategy and delegates to loginController.
      */
     @FXML
-    private void handleLogin() {
+    private void handleLogin(javafx.event.ActionEvent event) {
         clearMessage();
 
         loginController controller;
@@ -86,8 +96,14 @@ public class LoginPageController implements Initializable {
         } else {
             // --- Traveler login / register path ---
             String id = txtTravelerId.getText().trim();
+            ParkClient client = ParkClient.getInstance();
+            if (client == null || !client.isConnected()) {
+                showError("Client is not connected to the server.");
+                return;
+            }
 
             controller = new loginController(new TravelerLoginAndRegister(id));
+            registerTravelerLoginListener(event);
         }
 
         boolean proceeded = controller.login();
@@ -98,6 +114,57 @@ public class LoginPageController implements Initializable {
         } else {
             showSuccess("Connecting to server…");
             // TODO: disable the button while awaiting server response
+        }
+    }
+
+    private void registerTravelerLoginListener(javafx.event.ActionEvent event) {
+        ParkClient client = ParkClient.getInstance();
+        if (client == null || !client.isConnected()) {
+            showError("Client is not connected to the server.");
+            return;
+        }
+
+        client.setListener(new ServerResponseListener() {
+            @Override
+            public void onOrderExistsResult(boolean exists) {}
+
+            @Override
+            public void onOrderResult(Order order) {}
+
+            @Override
+            public void onUpdateOrderResult(boolean success) {}
+
+            @Override
+            public void onVisitorLoginResult(VisitorLoginResult result) {
+                Platform.runLater(() -> openVisitorHome(event, result));
+            }
+
+            @Override
+            public void onError(String errorMessage) {
+                Platform.runLater(() -> showError(errorMessage));
+            }
+        });
+    }
+
+    private void openVisitorHome(javafx.event.ActionEvent event, VisitorLoginResult result) {
+        try {
+            ((Node) event.getSource()).getScene().getWindow().hide();
+
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/gui/VisitorHome.fxml"));
+            Parent root = loader.load();
+            gui.VisitorHomeController controller = loader.getController();
+            controller.loadVisitor(result);
+
+            Stage stage = new Stage();
+            Scene scene = new Scene(root);
+            java.net.URL css = getClass().getResource("/gui/VisitorHome.css");
+            if (css != null) scene.getStylesheets().add(css.toExternalForm());
+            stage.setTitle("GoNature - Visitor");
+            stage.setScene(scene);
+            stage.show();
+        } catch (Exception e) {
+            showError("Failed to open visitor screen.");
+            e.printStackTrace();
         }
     }
 

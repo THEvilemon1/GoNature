@@ -6,9 +6,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 import common.Message;
 import common.Order;
+import common.VisitorLoginResult;
 import gui.ServerPortFrameController;
 import ocsf.server.AbstractServer;
 import ocsf.server.ConnectionToClient;
@@ -103,6 +105,12 @@ public class ParkServer extends AbstractServer {
                     client.sendToClient(new Message("UPDATE_ORDER_RESULT", updated));
                     break;
 
+                case "TRAVELER_LOGIN":
+                    String nationalId = (String) message.getData();
+                    VisitorLoginResult loginResult = loginOrRegisterVisitor(nationalId);
+                    client.sendToClient(new Message("VISITOR_LOGIN_RESULT", loginResult));
+                    break;
+
                 default:
                     client.sendToClient(new Message("ERROR", "Unknown command"));
             }
@@ -165,5 +173,53 @@ public class ParkServer extends AbstractServer {
         ps.setInt(2, order.getNumberOfVisitors());
         ps.setInt(3, order.getOrderNumber());
         return ps.executeUpdate() > 0;
+    }
+
+    private VisitorLoginResult loginOrRegisterVisitor(String nationalId) throws SQLException {
+        Connection conn = DBConnection.getStaticConnection();
+        int nationalIdNumber = Integer.parseInt(nationalId);
+
+        String selectSql = "SELECT traveler_id FROM traveler WHERE nationalId = ?";
+        PreparedStatement selectPs = conn.prepareStatement(selectSql);
+        selectPs.setInt(1, nationalIdNumber);
+        ResultSet rs = selectPs.executeQuery();
+        if (rs.next()) {
+            return new VisitorLoginResult(rs.getString("traveler_id"), nationalId, false);
+        }
+
+        String travelerId = UUID.randomUUID().toString();
+        boolean previousAutoCommit = conn.getAutoCommit();
+        conn.setAutoCommit(false);
+
+        try {
+            String insertUserSql = "INSERT INTO `user` (user_id, firstName, lastName, email, phoneNumber) VALUES (?, ?, ?, ?, ?)";
+            PreparedStatement insertUserPs = conn.prepareStatement(insertUserSql);
+            System.out.println("Registering new visitor user_id: " + travelerId);
+            insertUserPs.setString(1, travelerId);
+            insertUserPs.setString(2, "Visitor");
+            insertUserPs.setString(3, "Guest");
+            insertUserPs.setString(4, "visitor-" + travelerId + "@gonature.local");
+            insertUserPs.setNull(5, Types.VARCHAR);
+            insertUserPs.executeUpdate();
+            System.out.println("Inserted user row for visitor: " + travelerId);
+
+            String insertTravelerSql = "INSERT INTO traveler (traveler_id, nationalId, guide, clubMember) VALUES (?, ?, ?, ?)";
+            PreparedStatement insertTravelerPs = conn.prepareStatement(insertTravelerSql);
+            System.out.println("Registering traveler details for national ID: " + nationalId);
+            insertTravelerPs.setString(1, travelerId);
+            insertTravelerPs.setInt(2, nationalIdNumber);
+            insertTravelerPs.setBoolean(3, false);
+            insertTravelerPs.setBoolean(4, false);
+            insertTravelerPs.executeUpdate();
+            System.out.println("Inserted traveler row for visitor: " + travelerId);
+
+            conn.commit();
+            return new VisitorLoginResult(travelerId, nationalId, true);
+        } catch (SQLException e) {
+            conn.rollback();
+            throw e;
+        } finally {
+            conn.setAutoCommit(previousAutoCommit);
+        }
     }
 }

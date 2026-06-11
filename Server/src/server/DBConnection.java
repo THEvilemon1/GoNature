@@ -16,9 +16,9 @@ public class DBConnection {
     private Timer timer;
 
     private static final long TIMEOUT  = 30*1000; // 30 seconds
-    private static final String URL      = "jdbc:mysql://localhost:3306/gonature?serverTimezone=UTC";
+    private static final String URL      = "jdbc:mysql://localhost:3306/gonaturedb?allowLoadLocalInfile=true&serverTimezone=Asia/Jerusalem&useSSL=false";
     private static final String USER     = "root";
-    private static final String PASSWORD = "amerhmysql";
+    private static final String PASSWORD = "319Benan@@";
 
     private DBConnection() throws SQLException {
         openConnection();

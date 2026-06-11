@@ -2,59 +2,52 @@ package gui;
 
 import common.VisitorLoginResult;
 import javafx.fxml.FXML;
-import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.layout.VBox;
 
 public class VisitorHomeController {
 
-    @FXML private Label lblTitle;
+    @FXML private VBox viewMain;
+    @FXML private VBox viewDetail;
     @FXML private Label lblVisitorDetails;
-    @FXML private Label lblMode;
-    @FXML private Button btnPrimaryAction;
-    @FXML private Button btnSecondaryAction;
-
-    private VisitorLoginResult visitor;
+    @FXML private Label lblDetailTitle;
 
     public void loadVisitor(VisitorLoginResult result) {
-        this.visitor = result;
-        lblVisitorDetails.setText("Traveler ID: " + result.getTravelerId()
-            + "   National ID: " + result.getNationalId());
-
-        if (result.isNewVisitor()) showBookingMode();
-        else showManageMode();
+        lblVisitorDetails.setText(
+            "Traveler ID: " + result.getTravelerId()
+            + "   ·   National ID: " + result.getNationalId()
+        );
     }
 
     @FXML
     private void handlePrimaryAction() {
-        showBookingMode();
+        lblDetailTitle.setText("Book a Visit");
+        showDetail();
     }
 
     @FXML
     private void handleSecondaryAction() {
-        showManageMode();
+        lblDetailTitle.setText("My Bookings");
+        showDetail();
     }
 
-    private void showBookingMode() {
-        lblTitle.setText("Book a Visit");
-        lblMode.setText(visitor != null && visitor.isNewVisitor()
-            ? "A visitor account was created for this national ID. You can continue with a new booking."
-            : "Create a new booking for this visitor.");
-        btnPrimaryAction.setText("Booking a Visit");
-        btnPrimaryAction.setDisable(true);
-        btnSecondaryAction.setText("Managing Bookings");
-        btnSecondaryAction.setDisable(false);
-        btnSecondaryAction.setVisible(true);
-        btnSecondaryAction.setManaged(true);
+    @FXML
+    private void handleBack() {
+        showMain();
     }
 
-    private void showManageMode() {
-        lblTitle.setText("Manage My Bookings");
-        lblMode.setText("Welcome back. You can manage existing bookings or create a new one.");
-        btnPrimaryAction.setText("Booking a Visit");
-        btnPrimaryAction.setDisable(false);
-        btnSecondaryAction.setText("Managing Bookings");
-        btnSecondaryAction.setDisable(true);
-        btnSecondaryAction.setVisible(true);
-        btnSecondaryAction.setManaged(true);
+    private void showDetail() {
+        viewMain.setVisible(false);
+        viewMain.setManaged(false);
+        viewDetail.setVisible(true);
+        viewDetail.setManaged(true);
+    }
+
+    private void showMain() {
+        viewDetail.setVisible(false);
+        viewDetail.setManaged(false);
+        viewMain.setVisible(true);
+        viewMain.setManaged(true);
     }
 }
+

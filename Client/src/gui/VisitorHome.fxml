@@ -2,35 +2,27 @@
 
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.DatePicker?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.Spinner?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 
-<!--
-    VisitorHome.fxml
-    ════════════════
-    Design language: "Forest Clarity" (matches LoginPage.css)
-      • Dark gradient background
-      • Warm off-white card
-      • Two action cards side-by-side
-      • Detail panel shown in-place when an action card is clicked
--->
 <StackPane xmlns="http://javafx.com/javafx/17"
            xmlns:fx="http://javafx.com/fxml/1"
            fx:controller="gui.VisitorHomeController"
            styleClass="root-pane"
            stylesheets="@VisitorHome.css">
 
-    <!-- ══ MAIN VIEW ═══════════════════════════════════════════════ -->
     <VBox fx:id="viewMain" alignment="CENTER">
         <VBox styleClass="visitor-card" maxWidth="620">
-
-            <!-- Header -->
             <VBox styleClass="card-header" spacing="4">
-                <Label styleClass="app-name" text="🌿  GoNature" />
+                <Label styleClass="app-name" text="GoNature" />
                 <Label styleClass="app-tagline" text="National Parks Reservation System" />
                 <Label fx:id="lblVisitorDetails" styleClass="visitor-details" text="" />
             </VBox>
@@ -39,42 +31,36 @@
                 <VBox.margin><Insets top="4" bottom="16" /></VBox.margin>
             </Separator>
 
-            <!-- Action cards -->
             <HBox spacing="16" alignment="CENTER">
-                <!-- Book a Visit -->
                 <VBox styleClass="action-card" spacing="10">
-                    <Label styleClass="card-icon" text="🗓" />
+                    <Label styleClass="card-icon" text="+" />
                     <Label styleClass="card-title" text="Book a Visit" />
                     <Label styleClass="card-desc"
                            text="Plan your next national park experience and secure your spot."
                            wrapText="true" />
                     <Region VBox.vgrow="ALWAYS" />
-                    <Button styleClass="card-btn-primary" text="Book Now →"
+                    <Button styleClass="card-btn-primary" text="Book Now"
                             onAction="#handlePrimaryAction" maxWidth="Infinity" />
                 </VBox>
 
-                <!-- My Bookings -->
                 <VBox styleClass="action-card" spacing="10">
-                    <Label styleClass="card-icon" text="📋" />
+                    <Label styleClass="card-icon" text="#" />
                     <Label styleClass="card-title" text="My Bookings" />
                     <Label styleClass="card-desc"
                            text="View, edit, or cancel your existing park reservations."
                            wrapText="true" />
                     <Region VBox.vgrow="ALWAYS" />
-                    <Button styleClass="card-btn-secondary" text="View →"
+                    <Button styleClass="card-btn-secondary" text="View"
                             onAction="#handleSecondaryAction" maxWidth="Infinity" />
                 </VBox>
             </HBox>
         </VBox>
     </VBox>
 
-    <!-- ══ DETAIL VIEW ══════════════════════════════════════════════ -->
     <VBox fx:id="viewDetail" visible="false" managed="false" alignment="CENTER">
         <VBox styleClass="visitor-card" maxWidth="620">
-
-            <!-- Back + title row -->
             <HBox alignment="CENTER_LEFT" spacing="14">
-                <Button styleClass="btn-back" text="← Back" onAction="#handleBack" />
+                <Button styleClass="btn-back" text="Back" onAction="#handleBack" />
                 <Label fx:id="lblDetailTitle" styleClass="detail-title" text="" />
             </HBox>
 
@@ -82,30 +68,42 @@
                 <VBox.margin><Insets top="14" bottom="14" /></VBox.margin>
             </Separator>
 
-            <!-- Dummy info rows -->
-            <VBox styleClass="detail-body" spacing="14">
-                <HBox styleClass="info-row">
-                    <Label styleClass="info-label" text="Park" />
-                    <Label styleClass="info-value" text="National Park North" />
+            <VBox fx:id="bookingForm" styleClass="detail-body" spacing="14">
+                <VBox spacing="5">
+                    <Label styleClass="field-label" text="Visitors" />
+                    <Spinner fx:id="spnVisitors" editable="true" maxWidth="120" />
+                </VBox>
+
+                <VBox spacing="5">
+                    <Label styleClass="field-label" text="Park" />
+                    <ComboBox fx:id="cmbPark" maxWidth="Infinity" promptText="Choose a park" />
+                </VBox>
+
+                <HBox spacing="12">
+                    <VBox spacing="5" HBox.hgrow="ALWAYS">
+                        <Label styleClass="field-label" text="Date" />
+                        <DatePicker fx:id="dateVisit" maxWidth="Infinity" />
+                    </VBox>
+                    <VBox spacing="5" HBox.hgrow="ALWAYS">
+                        <Label styleClass="field-label" text="Time" />
+                        <ComboBox fx:id="cmbTime" maxWidth="Infinity" promptText="Choose time" />
+                    </VBox>
                 </HBox>
-                <HBox styleClass="info-row">
-                    <Label styleClass="info-label" text="Date" />
-                    <Label styleClass="info-value" text="2026-06-15" />
+
+                <Label fx:id="lblBookingMessage" styleClass="booking-message" text="" wrapText="true" visible="false" />
+
+                <HBox spacing="10" alignment="CENTER_RIGHT">
+                    <Button styleClass="card-btn-secondary" text="Cancel" onAction="#handleCancelForm" />
+                    <Button fx:id="btnSubmitBooking" styleClass="card-btn-primary" text="Submit Booking" onAction="#handleSubmitBooking" />
                 </HBox>
-                <HBox styleClass="info-row">
-                    <Label styleClass="info-label" text="Visitors" />
-                    <Label styleClass="info-value" text="4" />
-                </HBox>
-                <HBox styleClass="info-row">
-                    <Label styleClass="info-label" text="Order #" />
-                    <Label styleClass="info-value" text="88421" />
-                </HBox>
-                <HBox styleClass="info-row">
-                    <Label styleClass="info-label" text="Status" />
-                    <Label styleClass="info-value status-confirmed" text="✓  Confirmed" />
-                </HBox>
+            </VBox>
+
+            <VBox fx:id="bookingsListView" visible="false" managed="false" spacing="12">
+                <Label fx:id="lblBookingsMessage" styleClass="booking-message" text="" wrapText="true" visible="false" />
+                <ScrollPane fitToWidth="true" hbarPolicy="NEVER" prefHeight="330" styleClass="bookings-scroll">
+                    <VBox fx:id="bookingsList" spacing="10" />
+                </ScrollPane>
             </VBox>
         </VBox>
     </VBox>
-
 </StackPane>

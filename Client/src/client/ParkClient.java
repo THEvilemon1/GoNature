@@ -1,7 +1,9 @@
 package client;
 
 import java.io.IOException;
+import java.util.ArrayList;
 
+import common.Booking;
 import common.Message;
 import common.Order;
 import common.VisitorLoginResult;
@@ -65,6 +67,18 @@ public class ParkClient extends AbstractClient {
                     break;
                 case "VISITOR_LOGIN_RESULT":
                     listener.onVisitorLoginResult((VisitorLoginResult) message.getData());
+                    break;
+                case "TRAVELER_BOOKINGS_RESULT":
+                    listener.onTravelerBookingsResult((ArrayList<Booking>) message.getData());
+                    break;
+                case "CREATE_BOOKING_RESULT":
+                    listener.onCreateBookingResult((Booking) message.getData());
+                    break;
+                case "UPDATE_BOOKING_RESULT":
+                    listener.onUpdateBookingResult((boolean) message.getData());
+                    break;
+                case "CANCEL_BOOKING_RESULT":
+                    listener.onCancelBookingResult((boolean) message.getData());
                     break;
                 case "FORCE_LOGOUT":
                     // User was logged in from another computer

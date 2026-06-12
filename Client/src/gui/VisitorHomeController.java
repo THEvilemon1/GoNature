@@ -1,48 +1,102 @@
 package gui;
 
+import java.io.IOException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+
 import client.ParkClient;
+import client.ServerResponseListener;
 import client.SessionManager;
+import common.Booking;
 import common.Message;
+import common.Order;
 import common.VisitorLoginResult;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.DateCell;
+import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
+import javafx.scene.control.Spinner;
+import javafx.scene.control.SpinnerValueFactory;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
-public class VisitorHomeController {
+public class VisitorHomeController implements ServerResponseListener {
+
+    private static final DateTimeFormatter DATE_TIME_FORMAT =
+        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     @FXML private VBox viewMain;
     @FXML private VBox viewDetail;
+    @FXML private VBox bookingForm;
+    @FXML private VBox bookingsListView;
+    @FXML private VBox bookingsList;
     @FXML private Label lblVisitorDetails;
     @FXML private Label lblDetailTitle;
+    @FXML private Label lblBookingMessage;
+    @FXML private Label lblBookingsMessage;
+    @FXML private Spinner<Integer> spnVisitors;
+    @FXML private ComboBox<ParkOption> cmbPark;
+    @FXML private DatePicker dateVisit;
+    @FXML private ComboBox<String> cmbTime;
+    @FXML private Button btnSubmitBooking;
 
     private VisitorLoginResult currentUser;
+    private Booking editingBooking;
+
+    @FXML
+    private void initialize() {
+        spnVisitors.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, 15, 1));
+        spnVisitors.getEditor().textProperty().addListener((obs, oldValue, newValue) -> clampVisitorEditor());
+
+        cmbPark.getItems().setAll(
+            new ParkOption(1, "Banias Nature Reserve"),
+            new ParkOption(2, "Tel Dan Nature Reserve"),
+            new ParkOption(3, "Hula Nature Reserve"),
+            new ParkOption(4, "Achziv National Park")
+        );
+
+        dateVisit.setDayCellFactory(picker -> new DateCell() {
+            @Override
+            public void updateItem(LocalDate date, boolean empty) {
+                super.updateItem(date, empty);
+                setDisable(empty || date.isBefore(LocalDate.now()));
+            }
+        });
+        dateVisit.valueProperty().addListener((obs, oldValue, newValue) -> refreshTimeOptions());
+        dateVisit.setValue(LocalDate.now());
+        refreshTimeOptions();
+    }
 
     public void loadVisitor(VisitorLoginResult result) {
         this.currentUser = result;
+        ParkClient client = ParkClient.getInstance();
+        if (client != null) {
+            client.setListener(this);
+        }
+
         lblVisitorDetails.setText(
             "Traveler ID: " + result.getTravelerId()
-            + "   ·   National ID: " + result.getNationalId()
+            + "   -   National ID: " + result.getNationalId()
         );
-        
-        // Set up window close handler to logout when user exits
+
         setupWindowCloseHandler();
     }
 
-    /**
-     * Set up the window close event handler to send logout message to server.
-     */
     private void setupWindowCloseHandler() {
-        // Find the stage and attach close handler
         Platform.runLater(() -> {
             try {
                 Stage stage = (Stage) viewMain.getScene().getWindow();
                 if (stage != null) {
-                    stage.setOnCloseRequest(e -> {
-                        handleLogout();
-                    });
+                    stage.setOnCloseRequest(e -> handleLogout());
                 }
             } catch (Exception e) {
                 System.out.println("Could not set up window close handler: " + e.getMessage());
@@ -50,12 +104,8 @@ public class VisitorHomeController {
         });
     }
 
-    /**
-     * Handle logout: send message to server and clear session.
-     */
     private void handleLogout() {
         if (currentUser != null) {
-            // Send logout message to server
             ParkClient client = ParkClient.getInstance();
             if (client != null && client.isConnected()) {
                 try {
@@ -66,15 +116,13 @@ public class VisitorHomeController {
                 }
             }
         }
-        
-        // Clear local session
+
         SessionManager.getInstance().logout();
     }
 
     @FXML
     private void handleLogoutButton(javafx.event.ActionEvent event) {
         handleLogout();
-        // Close the window after logout
         try {
             ((Node) event.getSource()).getScene().getWindow().hide();
         } catch (Exception e) {
@@ -85,18 +133,335 @@ public class VisitorHomeController {
     @FXML
     private void handlePrimaryAction() {
         lblDetailTitle.setText("Book a Visit");
+        showBookingForm(null);
         showDetail();
     }
 
     @FXML
     private void handleSecondaryAction() {
         lblDetailTitle.setText("My Bookings");
+        showBookingsList();
+        requestTravelerBookings();
         showDetail();
     }
 
     @FXML
     private void handleBack() {
         showMain();
+    }
+
+    @FXML
+    private void handleCancelForm() {
+        resetForm();
+        showMain();
+    }
+
+    @FXML
+    private void handleSubmitBooking() {
+        try {
+            Booking booking = buildBookingFromForm();
+            ParkClient client = ParkClient.getInstance();
+            if (client == null || !client.isConnected()) {
+                showBookingMessage("Client is not connected to the server.", true);
+                return;
+            }
+
+            String command = editingBooking == null ? "CREATE_BOOKING" : "UPDATE_BOOKING";
+            client.sendToServer(new Message(command, booking));
+            btnSubmitBooking.setDisable(true);
+        } catch (IllegalArgumentException e) {
+            showBookingMessage(e.getMessage(), true);
+        } catch (IOException e) {
+            showBookingMessage("Failed to send booking request: " + e.getMessage(), true);
+        }
+    }
+
+    @Override
+    public void onOrderExistsResult(boolean exists) {}
+
+    @Override
+    public void onOrderResult(Order order) {}
+
+    @Override
+    public void onUpdateOrderResult(boolean success) {}
+
+    @Override
+    public void onTravelerBookingsResult(ArrayList<Booking> bookings) {
+        Platform.runLater(() -> renderBookings(bookings));
+    }
+
+    @Override
+    public void onCreateBookingResult(Booking booking) {
+        Platform.runLater(() -> {
+            btnSubmitBooking.setDisable(false);
+            resetForm();
+            lblDetailTitle.setText("My Bookings");
+            showBookingsList();
+            showBookingsMessage("Booking submitted and waiting for approval.", false);
+            requestTravelerBookings();
+        });
+    }
+
+    @Override
+    public void onUpdateBookingResult(boolean success) {
+        Platform.runLater(() -> {
+            btnSubmitBooking.setDisable(false);
+            if (success) {
+                resetForm();
+                lblDetailTitle.setText("My Bookings");
+                showBookingsList();
+                showBookingsMessage("Booking updated and waiting for approval.", false);
+                requestTravelerBookings();
+            } else {
+                showBookingMessage("Booking could not be updated.", true);
+            }
+        });
+    }
+
+    @Override
+    public void onCancelBookingResult(boolean success) {
+        Platform.runLater(() -> {
+            showBookingsMessage(success ? "Booking cancelled." : "Booking could not be cancelled.", !success);
+            requestTravelerBookings();
+        });
+    }
+
+    @Override
+    public void onError(String errorMessage) {
+        Platform.runLater(() -> {
+            btnSubmitBooking.setDisable(false);
+            if (bookingForm.isVisible()) {
+                showBookingMessage(errorMessage, true);
+            } else {
+                showBookingsMessage(errorMessage, true);
+            }
+        });
+    }
+
+    private Booking buildBookingFromForm() {
+        if (currentUser == null) {
+            throw new IllegalArgumentException("No traveler is logged in.");
+        }
+        ParkOption park = cmbPark.getValue();
+        if (park == null) {
+            throw new IllegalArgumentException("Please choose a park.");
+        }
+        LocalDate date = dateVisit.getValue();
+        if (date == null) {
+            throw new IllegalArgumentException("Please choose a date.");
+        }
+        String timeText = cmbTime.getValue();
+        if (timeText == null || timeText.isBlank()) {
+            throw new IllegalArgumentException("Please choose a time.");
+        }
+
+        int visitors = getVisitorCount();
+        LocalDateTime visitorTime = LocalDateTime.of(date, LocalTime.parse(timeText));
+        if (!visitorTime.isAfter(LocalDateTime.now())) {
+            throw new IllegalArgumentException("Booking date and time must be in the future.");
+        }
+
+        String bookingId = editingBooking == null ? null : editingBooking.getBookingId();
+        return new Booking(bookingId, currentUser.getTravelerId(), park.getId(), visitors,
+            visitorTime, Booking.STATUS_PENDING, false, 0);
+    }
+
+    private int getVisitorCount() {
+        clampVisitorEditor();
+        return spnVisitors.getValue();
+    }
+
+    private void clampVisitorEditor() {
+        if (spnVisitors.getValueFactory() == null) {
+            return;
+        }
+        String text = spnVisitors.getEditor().getText();
+        try {
+            int value = Integer.parseInt(text);
+            if (value < 1) value = 1;
+            if (value > 15) value = 15;
+            spnVisitors.getValueFactory().setValue(value);
+            if (!String.valueOf(value).equals(text)) {
+                spnVisitors.getEditor().setText(String.valueOf(value));
+            }
+        } catch (NumberFormatException e) {
+            spnVisitors.getValueFactory().setValue(1);
+            spnVisitors.getEditor().setText("1");
+        }
+    }
+
+    private void refreshTimeOptions() {
+        String selected = cmbTime.getValue();
+        cmbTime.getItems().clear();
+        LocalDate selectedDate = dateVisit.getValue();
+        if (selectedDate == null) {
+            return;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        for (int hour = 8; hour <= 18; hour++) {
+            LocalTime time = LocalTime.of(hour, 0);
+            LocalDateTime slot = LocalDateTime.of(selectedDate, time);
+            if (slot.isAfter(now)) {
+                cmbTime.getItems().add(time.toString());
+            }
+        }
+
+        if (selected != null && cmbTime.getItems().contains(selected)) {
+            cmbTime.setValue(selected);
+        } else if (!cmbTime.getItems().isEmpty()) {
+            cmbTime.setValue(cmbTime.getItems().get(0));
+        }
+    }
+
+    private void requestTravelerBookings() {
+        if (currentUser == null) {
+            return;
+        }
+        ParkClient client = ParkClient.getInstance();
+        if (client == null || !client.isConnected()) {
+            showBookingsMessage("Client is not connected to the server.", true);
+            return;
+        }
+        try {
+            client.sendToServer(new Message("GET_TRAVELER_BOOKINGS", currentUser.getTravelerId()));
+        } catch (IOException e) {
+            showBookingsMessage("Failed to load bookings: " + e.getMessage(), true);
+        }
+    }
+
+    private void renderBookings(ArrayList<Booking> bookings) {
+        bookingsList.getChildren().clear();
+        if (bookings == null || bookings.isEmpty()) {
+            showBookingsMessage("No bookings yet.", false);
+            return;
+        }
+
+        hideBookingsMessage();
+        int visibleBookings = 0;
+        for (Booking booking : bookings) {
+            if (Booking.STATUS_CANCELLED.equals(booking.getStatus())) {
+                continue;
+            }
+            bookingsList.getChildren().add(createBookingRow(booking));
+            visibleBookings++;
+        }
+
+        if (visibleBookings == 0) {
+            showBookingsMessage("No bookings yet.", false);
+        }
+    }
+
+    private Node createBookingRow(Booking booking) {
+        VBox row = new VBox(8);
+        row.getStyleClass().add("booking-row");
+
+        Label title = new Label(getParkName(booking.getParkId()));
+        title.getStyleClass().add("booking-row-title");
+
+        Label details = new Label(
+            booking.getVisitorTime().format(DATE_TIME_FORMAT)
+            + " | Visitors: " + booking.getNumberOfVisitors()
+            + " | Price: " + booking.getPrice()
+            + " | Status: " + booking.getStatus()
+        );
+        details.getStyleClass().add("booking-row-details");
+
+        Button edit = new Button("Edit");
+        edit.getStyleClass().add("small-action-btn");
+        edit.setDisable(Booking.STATUS_CANCELLED.equals(booking.getStatus()));
+        edit.setOnAction(e -> {
+            lblDetailTitle.setText("Edit Booking");
+            showBookingForm(booking);
+        });
+
+        Button cancel = new Button("Cancel Booking");
+        cancel.getStyleClass().add("small-danger-btn");
+        cancel.setDisable(Booking.STATUS_CANCELLED.equals(booking.getStatus()));
+        cancel.setOnAction(e -> confirmAndCancelBooking(booking));
+
+        HBox actions = new HBox(8, edit, cancel);
+        row.getChildren().addAll(title, details, actions);
+        return row;
+    }
+
+    private void confirmAndCancelBooking(Booking booking) {
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Cancel Booking");
+        alert.setHeaderText("Cancel this booking?");
+        alert.setContentText(getParkName(booking.getParkId()) + " on " + booking.getVisitorTime().format(DATE_TIME_FORMAT));
+        alert.showAndWait().ifPresent(result -> {
+            if (result == javafx.scene.control.ButtonType.OK) {
+                sendCancelBooking(booking);
+            }
+        });
+    }
+
+    private void sendCancelBooking(Booking booking) {
+        ParkClient client = ParkClient.getInstance();
+        if (client == null || !client.isConnected()) {
+            showBookingsMessage("Client is not connected to the server.", true);
+            return;
+        }
+        try {
+            client.sendToServer(new Message("CANCEL_BOOKING", booking));
+        } catch (IOException e) {
+            showBookingsMessage("Failed to cancel booking: " + e.getMessage(), true);
+        }
+    }
+
+    private void showBookingForm(Booking booking) {
+        editingBooking = booking;
+        bookingForm.setVisible(true);
+        bookingForm.setManaged(true);
+        bookingsListView.setVisible(false);
+        bookingsListView.setManaged(false);
+        hideBookingMessage();
+
+        if (booking == null) {
+            resetForm();
+            btnSubmitBooking.setText("Submit Booking");
+            return;
+        }
+
+        spnVisitors.getValueFactory().setValue(booking.getNumberOfVisitors());
+        cmbPark.setValue(findParkOption(booking.getParkId()));
+        dateVisit.setValue(booking.getVisitorTime().toLocalDate());
+        refreshTimeOptions();
+        cmbTime.setValue(booking.getVisitorTime().toLocalTime().toString());
+        btnSubmitBooking.setText("Update Booking");
+    }
+
+    private void showBookingsList() {
+        bookingForm.setVisible(false);
+        bookingForm.setManaged(false);
+        bookingsListView.setVisible(true);
+        bookingsListView.setManaged(true);
+    }
+
+    private void resetForm() {
+        editingBooking = null;
+        btnSubmitBooking.setDisable(false);
+        btnSubmitBooking.setText("Submit Booking");
+        spnVisitors.getValueFactory().setValue(1);
+        cmbPark.setValue(null);
+        dateVisit.setValue(LocalDate.now());
+        refreshTimeOptions();
+        hideBookingMessage();
+    }
+
+    private ParkOption findParkOption(int parkId) {
+        for (ParkOption option : cmbPark.getItems()) {
+            if (option.getId() == parkId) {
+                return option;
+            }
+        }
+        return null;
+    }
+
+    private String getParkName(int parkId) {
+        ParkOption option = findParkOption(parkId);
+        return option == null ? "Park #" + parkId : option.getName();
     }
 
     private void showDetail() {
@@ -112,5 +477,46 @@ public class VisitorHomeController {
         viewMain.setVisible(true);
         viewMain.setManaged(true);
     }
-}
 
+    private void showBookingMessage(String message, boolean error) {
+        lblBookingMessage.setText(message);
+        lblBookingMessage.getStyleClass().removeAll("msg-error", "msg-success");
+        lblBookingMessage.getStyleClass().add(error ? "msg-error" : "msg-success");
+        lblBookingMessage.setVisible(true);
+    }
+
+    private void hideBookingMessage() {
+        lblBookingMessage.setText("");
+        lblBookingMessage.setVisible(false);
+    }
+
+    private void showBookingsMessage(String message, boolean error) {
+        lblBookingsMessage.setText(message);
+        lblBookingsMessage.getStyleClass().removeAll("msg-error", "msg-success");
+        lblBookingsMessage.getStyleClass().add(error ? "msg-error" : "msg-success");
+        lblBookingsMessage.setVisible(true);
+    }
+
+    private void hideBookingsMessage() {
+        lblBookingsMessage.setText("");
+        lblBookingsMessage.setVisible(false);
+    }
+
+    private static class ParkOption {
+        private final int id;
+        private final String name;
+
+        ParkOption(int id, String name) {
+            this.id = id;
+            this.name = name;
+        }
+
+        int getId() { return id; }
+        String getName() { return name; }
+
+        @Override
+        public String toString() {
+            return name;
+        }
+    }
+}

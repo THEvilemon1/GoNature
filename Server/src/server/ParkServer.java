@@ -2,12 +2,14 @@ package server;
 
 import java.io.IOException;
 import java.sql.*;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
+import common.Booking;
 import common.Message;
 import common.Order;
 import common.VisitorLoginResult;
@@ -108,6 +110,27 @@ public class ParkServer extends AbstractServer {
                     client.sendToClient(new Message("UPDATE_ORDER_RESULT", updated));
                     break;
 
+                case "CREATE_BOOKING":
+                    Booking bookingToCreate = (Booking) message.getData();
+                    Booking createdBooking = createBooking(bookingToCreate);
+                    client.sendToClient(new Message("CREATE_BOOKING_RESULT", createdBooking));
+                    break;
+
+                case "GET_TRAVELER_BOOKINGS":
+                    String travelerId = (String) message.getData();
+                    client.sendToClient(new Message("TRAVELER_BOOKINGS_RESULT", getTravelerBookings(travelerId)));
+                    break;
+
+                case "UPDATE_BOOKING":
+                    Booking bookingToUpdate = (Booking) message.getData();
+                    client.sendToClient(new Message("UPDATE_BOOKING_RESULT", updateBooking(bookingToUpdate)));
+                    break;
+
+                case "CANCEL_BOOKING":
+                    Booking bookingToCancel = (Booking) message.getData();
+                    client.sendToClient(new Message("CANCEL_BOOKING_RESULT", cancelBooking(bookingToCancel)));
+                    break;
+
                 case "TRAVELER_LOGIN":
                     String nationalId = (String) message.getData();
                     VisitorLoginResult loginResult = loginOrRegisterVisitor(nationalId);
@@ -199,6 +222,124 @@ public class ParkServer extends AbstractServer {
         ps.setInt(2, order.getNumberOfVisitors());
         ps.setInt(3, order.getOrderNumber());
         return ps.executeUpdate() > 0;
+    }
+
+    private Booking createBooking(Booking booking) throws SQLException {
+        validateBooking(booking);
+
+        Connection conn = DBConnection.getStaticConnection();
+        String bookingId = UUID.randomUUID().toString();
+        int price = calculatePrice(conn, booking.getParkId(), booking.getNumberOfVisitors());
+
+        String sql = "INSERT INTO booking (booking_id, traveler_id, park_id, numberOfVisitors, visitorTime, status, organizedBooking, price) "
+            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setString(1, bookingId);
+        ps.setString(2, booking.getTravelerId());
+        ps.setInt(3, booking.getParkId());
+        ps.setInt(4, booking.getNumberOfVisitors());
+        ps.setTimestamp(5, Timestamp.valueOf(booking.getVisitorTime()));
+        ps.setString(6, Booking.STATUS_PENDING);
+        ps.setBoolean(7, false);
+        ps.setInt(8, price);
+        ps.executeUpdate();
+
+        return new Booking(bookingId, booking.getTravelerId(), booking.getParkId(),
+            booking.getNumberOfVisitors(), booking.getVisitorTime(), Booking.STATUS_PENDING, false, price);
+    }
+
+    private ArrayList<Booking> getTravelerBookings(String travelerId) throws SQLException {
+        ArrayList<Booking> bookings = new ArrayList<>();
+        Connection conn = DBConnection.getStaticConnection();
+        String sql = "SELECT * FROM booking WHERE traveler_id = ? ORDER BY visitorTime";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setString(1, travelerId);
+        ResultSet rs = ps.executeQuery();
+
+        while (rs.next()) {
+            bookings.add(mapBooking(rs));
+        }
+
+        return bookings;
+    }
+
+    private boolean updateBooking(Booking booking) throws SQLException {
+        validateBooking(booking);
+
+        Connection conn = DBConnection.getStaticConnection();
+        int price = calculatePrice(conn, booking.getParkId(), booking.getNumberOfVisitors());
+
+        String sql = "UPDATE booking SET park_id = ?, numberOfVisitors = ?, visitorTime = ?, status = ?, price = ? "
+            + "WHERE booking_id = ? AND traveler_id = ? AND status <> ?";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setInt(1, booking.getParkId());
+        ps.setInt(2, booking.getNumberOfVisitors());
+        ps.setTimestamp(3, Timestamp.valueOf(booking.getVisitorTime()));
+        ps.setString(4, Booking.STATUS_PENDING);
+        ps.setInt(5, price);
+        ps.setString(6, booking.getBookingId());
+        ps.setString(7, booking.getTravelerId());
+        ps.setString(8, Booking.STATUS_CANCELLED);
+        return ps.executeUpdate() > 0;
+    }
+
+    private boolean cancelBooking(Booking booking) throws SQLException {
+        if (booking == null || booking.getBookingId() == null || booking.getTravelerId() == null) {
+            throw new IllegalArgumentException("Booking details are missing.");
+        }
+
+        Connection conn = DBConnection.getStaticConnection();
+        String sql = "UPDATE booking SET status = ? WHERE booking_id = ? AND traveler_id = ?";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setString(1, Booking.STATUS_CANCELLED);
+        ps.setString(2, booking.getBookingId());
+        ps.setString(3, booking.getTravelerId());
+        return ps.executeUpdate() > 0;
+    }
+
+    private void validateBooking(Booking booking) {
+        if (booking == null) {
+            throw new IllegalArgumentException("Booking details are missing.");
+        }
+        if (booking.getTravelerId() == null || booking.getTravelerId().isBlank()) {
+            throw new IllegalArgumentException("Traveler is missing.");
+        }
+        if (booking.getParkId() < 1 || booking.getParkId() > 4) {
+            throw new IllegalArgumentException("Please choose a valid park.");
+        }
+        if (booking.getNumberOfVisitors() < 1 || booking.getNumberOfVisitors() > 15) {
+            throw new IllegalArgumentException("Visitors must be between 1 and 15.");
+        }
+        if (booking.getVisitorTime() == null || !booking.getVisitorTime().isAfter(LocalDateTime.now())) {
+            throw new IllegalArgumentException("Booking date and time must be in the future.");
+        }
+    }
+
+    private int calculatePrice(Connection conn, int parkId, int numberOfVisitors) throws SQLException {
+        String sql = "SELECT pricePerPerson FROM park WHERE park_id = ?";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setInt(1, parkId);
+        ResultSet rs = ps.executeQuery();
+
+        if (!rs.next()) {
+            throw new IllegalArgumentException("Selected park does not exist in the database.");
+        }
+
+        return rs.getInt("pricePerPerson") * numberOfVisitors;
+    }
+
+    private Booking mapBooking(ResultSet rs) throws SQLException {
+        Timestamp visitorTimestamp = rs.getTimestamp("visitorTime");
+        return new Booking(
+            rs.getString("booking_id"),
+            rs.getString("traveler_id"),
+            rs.getInt("park_id"),
+            rs.getInt("numberOfVisitors"),
+            visitorTimestamp.toLocalDateTime(),
+            rs.getString("status"),
+            rs.getBoolean("organizedBooking"),
+            rs.getInt("price")
+        );
     }
 
     private VisitorLoginResult loginOrRegisterVisitor(String nationalId) throws SQLException {

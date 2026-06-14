@@ -10,8 +10,11 @@ import java.util.Set;
 import java.util.UUID;
 
 import common.Booking;
+import common.Employee;
 import common.Message;
 import common.Order;
+import common.WalkInRequest;
+import common.ExitRequest;
 import common.VisitorLoginResult;
 import gui.ServerPortFrameController;
 import ocsf.server.AbstractServer;
@@ -67,6 +70,10 @@ public class ParkServer extends AbstractServer {
             if (ServerPortFrameController.instance != null) {
                 ServerPortFrameController.instance.clientDisconnected(clientInfo);
             }
+        }
+        Object employeeUsername = client.getInfo("EMPLOYEE_USERNAME");
+        if (employeeUsername != null) {
+            EmployeeLoginRepository.logoutEmployee((String) employeeUsername);
         }
     }
 
@@ -159,6 +166,61 @@ public class ParkServer extends AbstractServer {
                     System.out.println("[ParkServer] User " + travelerIdToLogout + " logged out from client.");
                     client.sendToClient(new Message("LOGOUT_RESULT", true));
                     break;
+                    
+                case "EMPLOYEE_LOGIN":
+                    String[] credentials = (String[]) message.getData();
+                    Object loginResult1 = EmployeeLoginRepository.loginEmployee(credentials[0], credentials[1]);
+                    if (loginResult1 == null) {
+                        client.sendToClient(new Message("EMPLOYEE_LOGIN_FAILED", "Invalid username or password."));
+                    } else if (loginResult1.equals("ALREADY_LOGGED_IN")) {
+                        client.sendToClient(new Message("EMPLOYEE_LOGIN_FAILED", "This user is already logged in."));
+                    } else {
+                        client.setInfo("EMPLOYEE_USERNAME", ((Employee) loginResult1).getUsername());
+                        client.sendToClient(new Message("EMPLOYEE_LOGIN_SUCCESS", loginResult1));
+                    }
+                    break;
+
+                case "EMPLOYEE_LOGOUT":
+                    String logoutUsername = (String) message.getData();
+                    EmployeeLoginRepository.logoutEmployee(logoutUsername);
+                    break;
+
+
+                 case "GET_PARK_CURRENT_VISITORS":
+                     int parkIdForVisitors = (int) message.getData();
+                     int currentVisitors = getParkCurrentVisitors(parkIdForVisitors);
+                     client.sendToClient(new Message("PARK_VISITORS_RESULT", currentVisitors));
+                     break;
+
+                 case "GET_EFFECTIVE_AVAILABLE_SPOTS":
+                     int parkIdForSpots = (int) message.getData();
+                     int effectiveSpots = getEffectiveAvailableSpots(parkIdForSpots);
+                     client.sendToClient(new Message("EFFECTIVE_AVAILABLE_SPOTS_RESULT", effectiveSpots));
+                     break;
+
+                 case "GET_BOOKING_BY_ID":
+                     String bookingIdToFind = (String) message.getData();
+                     Booking foundBooking = getBookingById(bookingIdToFind);
+                     client.sendToClient(new Message("BOOKING_RESULT", foundBooking));
+                     break;
+
+                 case "CHECK_IN_VISITOR":
+                     Booking bookingToCheckIn = (Booking) message.getData();
+                     boolean checkInSuccess = checkInVisitor(bookingToCheckIn);
+                     client.sendToClient(new Message("CHECK_IN_RESULT", checkInSuccess));
+                     break;
+
+                 case "CHECK_OUT_VISITOR":
+                     ExitRequest exitRequest = (ExitRequest) message.getData();
+                     boolean checkOutSuccess = checkOutVisitor(exitRequest);
+                     client.sendToClient(new Message("CHECK_OUT_RESULT", checkOutSuccess));
+                     break;
+
+                 case "WALK_IN_VISITOR":
+                     WalkInRequest walkInRequest = (WalkInRequest) message.getData();
+                     Booking walkInBooking = processWalkIn(walkInRequest);
+                     client.sendToClient(new Message("WALK_IN_RESULT", walkInBooking));
+                     break;
 
                 default:
                     client.sendToClient(new Message("ERROR", "Unknown command"));
@@ -359,15 +421,14 @@ public class ParkServer extends AbstractServer {
         conn.setAutoCommit(false);
 
         try {
-            String insertUserSql = "INSERT INTO `user` (user_id, firstName, lastName, email, phoneNumber) VALUES (?, ?, ?, ?, ?)";
-            PreparedStatement insertUserPs = conn.prepareStatement(insertUserSql);
-            System.out.println("Registering new visitor user_id: " + travelerId);
-            insertUserPs.setString(1, travelerId);
-            insertUserPs.setString(2, "Visitor");
-            insertUserPs.setString(3, "Guest");
-            insertUserPs.setString(4, "visitor-" + travelerId + "@gonature.local");
-            insertUserPs.setNull(5, Types.VARCHAR);
-            insertUserPs.executeUpdate();
+        	// Don't insert user_id — let AUTO_INCREMENT handle it
+        	String insertUserSql = "INSERT INTO `user` (firstName, lastName, email, phoneNumber) VALUES (?, ?, ?, ?)";
+        	PreparedStatement insertUserPs = conn.prepareStatement(insertUserSql);
+        	insertUserPs.setString(1, "Visitor");
+        	insertUserPs.setString(2, "Guest");
+        	insertUserPs.setString(3, "visitor-" + nationalId + "@gonature.local");
+        	insertUserPs.setNull(4, Types.VARCHAR);
+        	insertUserPs.executeUpdate();
             System.out.println("Inserted user row for visitor: " + travelerId);
 
             String insertTravelerSql = "INSERT INTO traveler (traveler_id, nationalId, guide, clubMember) VALUES (?, ?, ?, ?)";
@@ -388,5 +449,165 @@ public class ParkServer extends AbstractServer {
         } finally {
             conn.setAutoCommit(previousAutoCommit);
         }
+    }
+ 
+
+    private int getParkCurrentVisitors(int parkId) throws SQLException {
+        Connection conn = DBConnection.getStaticConnection();
+        String sql = "SELECT currentVisitors FROM park WHERE park_id = ?";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setInt(1, parkId);
+        ResultSet rs = ps.executeQuery();
+        if (rs.next()) return rs.getInt("currentVisitors");
+        return 0;
+    }
+
+    private int getEffectiveAvailableSpots(int parkId) throws SQLException {
+        Connection conn = DBConnection.getStaticConnection();
+
+        // Get maxCapacity and currentVisitors
+        String parkSql = "SELECT maxCapacity, currentVisitors FROM park WHERE park_id = ?";
+        PreparedStatement parkPs = conn.prepareStatement(parkSql);
+        parkPs.setInt(1, parkId);
+        ResultSet parkRs = parkPs.executeQuery();
+        if (!parkRs.next()) return 0;
+
+        int maxCapacity = parkRs.getInt("maxCapacity");
+        int currentVisitors = parkRs.getInt("currentVisitors");
+
+        // Sum visitors in bookings for the next 4 hours
+        String bookingSql = "SELECT COALESCE(SUM(numberOfVisitors), 0) AS bookedVisitors " +
+            "FROM booking WHERE park_id = ? " +
+            "AND status NOT IN ('CANCELLED', 'CHECKED_IN') " +
+            "AND visitorTime BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 4 HOUR)";
+        PreparedStatement bookingPs = conn.prepareStatement(bookingSql);
+        bookingPs.setInt(1, parkId);
+        ResultSet bookingRs = bookingPs.executeQuery();
+        int bookedVisitors = 0;
+        if (bookingRs.next()) bookedVisitors = bookingRs.getInt("bookedVisitors");
+
+        int effectiveAvailable = maxCapacity - currentVisitors - bookedVisitors;
+        return Math.max(0, effectiveAvailable);
+    }
+
+    private Booking getBookingById(String bookingId) throws SQLException {
+        Connection conn = DBConnection.getStaticConnection();
+        String sql = "SELECT * FROM booking WHERE booking_id = ?";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setString(1, bookingId);
+        ResultSet rs = ps.executeQuery();
+        if (rs.next()) return mapBooking(rs);
+        return null;
+    }
+
+
+    private boolean checkInVisitor(Booking booking) throws SQLException {
+        Connection conn = DBConnection.getStaticConnection();
+
+        // Update booking status to CHECKED_IN and set visitorsInside = numberOfVisitors
+        String updateBooking = "UPDATE booking SET status = 'CHECKED_IN', visitorsInside = numberOfVisitors " +
+                               "WHERE booking_id = ? AND status = 'PENDING'";
+        PreparedStatement ps = conn.prepareStatement(updateBooking);
+        ps.setString(1, booking.getBookingId());
+        int rows = ps.executeUpdate();
+
+        if (rows == 0) return false;
+
+        // Increase currentVisitors in park
+        String updatePark = "UPDATE park SET currentVisitors = currentVisitors + ? WHERE park_id = ?";
+        PreparedStatement parkPs = conn.prepareStatement(updatePark);
+        parkPs.setInt(1, booking.getNumberOfVisitors());
+        parkPs.setInt(2, booking.getParkId());
+        parkPs.executeUpdate();
+
+        return true;
+    }
+
+ 
+ private boolean checkOutVisitor(ExitRequest request) throws SQLException {
+     Connection conn = DBConnection.getStaticConnection();
+
+     // Get current visitorsInside for this booking
+     String getSql = "SELECT visitorsInside, status FROM booking WHERE booking_id = ?";
+     PreparedStatement getPs = conn.prepareStatement(getSql);
+     getPs.setString(1, request.getBookingId());
+     ResultSet rs = getPs.executeQuery();
+
+     if (!rs.next()) {
+         throw new IllegalArgumentException("Booking not found.");
+     }
+
+     int visitorsInside = rs.getInt("visitorsInside");
+     String status = rs.getString("status");
+
+     // Only checked-in bookings can have visitors exit
+     if (!"CHECKED_IN".equals(status)) {
+         throw new IllegalArgumentException(
+             "This booking is not checked in. Status: " + status);
+     }
+
+     // Validate the number leaving doesn't exceed those still inside
+     if (request.getVisitorsLeaving() > visitorsInside) {
+         throw new IllegalArgumentException(
+             "Cannot exit " + request.getVisitorsLeaving() + " visitors. " +
+             "Only " + visitorsInside + " visitor(s) from this booking are still inside."
+         );
+     }
+
+     int remaining = visitorsInside - request.getVisitorsLeaving();
+
+     // Update booking: reduce visitorsInside, set CHECKED_OUT if everyone left
+     String newStatus = (remaining == 0) ? "CHECKED_OUT" : "CHECKED_IN";
+     String updateBooking = "UPDATE booking SET visitorsInside = ?, status = ? WHERE booking_id = ?";
+     PreparedStatement updatePs = conn.prepareStatement(updateBooking);
+     updatePs.setInt(1, remaining);
+     updatePs.setString(2, newStatus);
+     updatePs.setString(3, request.getBookingId());
+     updatePs.executeUpdate();
+
+     // Decrease currentVisitors in park
+     String updatePark = "UPDATE park SET currentVisitors = GREATEST(0, currentVisitors - ?) WHERE park_id = ?";
+     PreparedStatement parkPs = conn.prepareStatement(updatePark);
+     parkPs.setInt(1, request.getVisitorsLeaving());
+     parkPs.setInt(2, request.getParkId());
+     parkPs.executeUpdate();
+
+     return true;
+ }
+
+    private Booking processWalkIn(WalkInRequest request) throws SQLException {
+        // Check effective available spots first
+        int available = getEffectiveAvailableSpots(request.getParkId());
+        if (available < request.getNumberOfVisitors()) {
+            throw new IllegalArgumentException("Not enough spots available. Available: " + available);
+        }
+
+        Connection conn = DBConnection.getStaticConnection();
+
+        // Calculate price (full price for walk-in, no discount)
+        int price = calculatePrice(conn, request.getParkId(), request.getNumberOfVisitors());
+
+        // Create booking record with CHECKED_IN status
+        String bookingId = UUID.randomUUID().toString();
+        String sql = "INSERT INTO booking (booking_id, traveler_id, park_id, numberOfVisitors, visitorTime, status, organizedBooking, price) " +
+            "VALUES (?, ?, ?, ?, NOW(), 'CHECKED_IN', false, ?)";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setString(1, bookingId);
+        ps.setString(2, request.getNationalId()); // use national ID as traveler reference
+        ps.setInt(3, request.getParkId());
+        ps.setInt(4, request.getNumberOfVisitors());
+        ps.setInt(5, price);
+        ps.executeUpdate();
+
+        // Increase currentVisitors in park
+        String updatePark = "UPDATE park SET currentVisitors = currentVisitors + ? WHERE park_id = ?";
+        PreparedStatement parkPs = conn.prepareStatement(updatePark);
+        parkPs.setInt(1, request.getNumberOfVisitors());
+        parkPs.setInt(2, request.getParkId());
+        parkPs.executeUpdate();
+
+        return new Booking(bookingId, request.getNationalId(), request.getParkId(),
+            request.getNumberOfVisitors(), java.time.LocalDateTime.now(),
+            Booking.STATUS_CONFIRMED, false, price);
     }
 }

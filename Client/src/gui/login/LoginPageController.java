@@ -6,6 +6,8 @@ import client.ParkClient;
 import client.ServerResponseListener;
 import client.SessionManager;
 import client.loginController;
+import common.Booking;
+import common.Employee;
 import common.Order;
 import common.VisitorLoginResult;
 
@@ -21,101 +23,189 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.ResourceBundle;
 
-/**
- * LoginPageController (JavaFX / GUI Layer)
- *
- * The bridge between LoginPage.fxml and the ECB control layer.
- *
- * How it works:
- *  1. The user picks a role (Employee or Traveler) via the ToggleGroup.
- *  2. The relevant input section slides into view (employee fields vs traveler field).
- *  3. On "Login" click, this controller builds the right Login strategy,
- *     hands it to loginController, and lets the controller drive the rest.
- */
 public class LoginPageController implements Initializable {
 
-    // -------------------------------------------------------------------------
-    // FXML injected nodes
-    // -------------------------------------------------------------------------
-
-    /** Role selector toggle buttons */
     @FXML private ToggleButton btnEmployee;
     @FXML private ToggleButton btnTraveler;
 
-    /** Employee-specific fields */
     @FXML private VBox         employeeSection;
-    @FXML private TextField    txtEmployeeId;
+    @FXML private TextField    txtEmployeeUsername;
     @FXML private PasswordField txtPassword;
 
-    /** Traveler-specific fields */
     @FXML private VBox         travelerSection;
     @FXML private TextField    txtTravelerId;
 
-    /** Action buttons */
     @FXML private Button       btnLogin;
-
-    /** Feedback label shown below the form */
     @FXML private Label        lblMessage;
-
-    // -------------------------------------------------------------------------
-    // Initializable
-    // -------------------------------------------------------------------------
 
     @Override
     public void initialize(URL url, ResourceBundle rb) {
-        // Default: Employee tab is selected, traveler section is hidden
         showEmployeeSection();
-
-        // Wire toggle buttons to section visibility
         btnEmployee.setOnAction(e -> showEmployeeSection());
         btnTraveler.setOnAction(e -> showTravelerSection());
     }
 
-    // -------------------------------------------------------------------------
-    // FXML action handlers
-    // -------------------------------------------------------------------------
-
-    /**
-     * Called when the user presses the "Login" button.
-     * Builds the correct Login strategy and delegates to loginController.
-     */
     @FXML
     private void handleLogin(javafx.event.ActionEvent event) {
         clearMessage();
 
-        loginController controller;
-
         if (btnEmployee.isSelected()) {
-            // --- Employee login path ---
-            String id  = txtEmployeeId.getText().trim();
-            String pwd = txtPassword.getText();
-
-            controller = new loginController(new EmployeeLogin(id, pwd));
-
+            handleEmployeeLogin(event);
         } else {
-            // --- Traveler login / register path ---
-            String id = txtTravelerId.getText().trim();
-            ParkClient client = ParkClient.getInstance();
-            if (client == null || !client.isConnected()) {
-                showError("Client is not connected to the server.");
-                return;
-            }
-
-            controller = new loginController(new TravelerLoginAndRegister(id));
-            registerTravelerLoginListener(event);
+            handleTravelerLogin(event);
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // Employee Login
+    // -------------------------------------------------------------------------
+
+    private void handleEmployeeLogin(javafx.event.ActionEvent event) {
+        String username = txtEmployeeUsername.getText().trim();
+        String password = txtPassword.getText();
+
+        loginController controller = new loginController(new EmployeeLogin(username, password));
 
         boolean proceeded = controller.login();
-
         if (!proceeded) {
-            // Validation failed — show a user-friendly hint
             showError("Please fill in all fields correctly before logging in.");
-        } else {
-            showSuccess("Connecting to server…");
-            // TODO: disable the button while awaiting server response
+            return;
         }
+
+        showSuccess("Connecting to server…");
+        btnLogin.setDisable(true);
+
+        // Register listener for server response
+        ParkClient client = ParkClient.getInstance();
+        if (client == null || !client.isConnected()) {
+            showError("Client is not connected to the server.");
+            btnLogin.setDisable(false);
+            return;
+        }
+
+        client.setListener(new ServerResponseListener() {
+            @Override
+            public void onEmployeeLoginSuccess(Employee employee) {
+                Platform.runLater(() -> openEmployeeScreen(event, employee));
+            }
+
+            @Override
+            public void onEmployeeLoginFailed(String reason) {
+                Platform.runLater(() -> {
+                    showError(reason);
+                    btnLogin.setDisable(false);
+                });
+            }
+
+            @Override
+            public void onError(String errorMessage) {
+                Platform.runLater(() -> {
+                    showError(errorMessage);
+                    btnLogin.setDisable(false);
+                });
+            }
+
+            @Override public void onOrderExistsResult(boolean exists) {}
+            @Override public void onOrderResult(Order order) {}
+            @Override public void onUpdateOrderResult(boolean success) {}
+        });
+    }
+
+    private void openEmployeeScreen(javafx.event.ActionEvent event, Employee employee) {
+        try {
+            String fxmlFile;
+            String title;
+
+            switch (employee.getRole()) {
+                case Employee.ROLE_PARK_WORKER:
+                    fxmlFile = "/gui/employee/BookingManagementView.fxml";
+                    title = "Booking Management";
+                    break;
+                case Employee.ROLE_PARK_MANAGER:
+                    fxmlFile = "/gui/employee/ParkControlView.fxml";
+                    title = "Park Control";
+                    break;
+                case Employee.ROLE_DEPARTMENT_MANAGER:
+                    fxmlFile = "/gui/employee/DepartmentOverviewView.fxml";
+                    title = "Department Overview";
+                    break;
+                case Employee.ROLE_SERVICE_REP:
+                    fxmlFile = "/gui/employee/TravelerRegistrationView.fxml";
+                    title = "Traveler Registration";
+                    break;
+                default:
+                    showError("Unknown role: " + employee.getRole());
+                    btnLogin.setDisable(false);
+                    return;
+            }
+
+            ((Node) event.getSource()).getScene().getWindow().hide();
+
+            FXMLLoader loader = new FXMLLoader(getClass().getResource(fxmlFile));
+            Parent root = loader.load();
+
+            // Pass employee to next controller
+            Object controller = loader.getController();
+            if (controller instanceof EmployeeAwareController) {
+                ((EmployeeAwareController) controller).setEmployee(employee);
+            }
+
+            Stage stage = new Stage();
+            stage.setTitle(title);
+            stage.setScene(new Scene(root));
+
+            // X button — logout employee and exit
+            stage.setOnCloseRequest(e -> {
+                sendEmployeeLogout(employee.getUsername());
+                System.exit(0);
+            });
+
+            stage.show();
+
+        } catch (Exception e) {
+            showError("Failed to open screen: " + e.getMessage());
+            btnLogin.setDisable(false);
+            e.printStackTrace();
+        }
+    }
+
+    private void sendEmployeeLogout(String username) {
+        ParkClient client = ParkClient.getInstance();
+        if (client != null && client.isConnected()) {
+            try {
+                client.sendToServer(new common.Message("EMPLOYEE_LOGOUT", username));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Traveler Login
+    // -------------------------------------------------------------------------
+
+    private void handleTravelerLogin(javafx.event.ActionEvent event) {
+        String id = txtTravelerId.getText().trim();
+        ParkClient client = ParkClient.getInstance();
+        if (client == null || !client.isConnected()) {
+            showError("Client is not connected to the server.");
+            return;
+        }
+
+        loginController controller = new loginController(new TravelerLoginAndRegister(id));
+
+        boolean proceeded = controller.login();
+        if (!proceeded) {
+            showError("Please fill in all fields correctly before logging in.");
+            return;
+        }
+
+        showSuccess("Connecting to server…");
+        btnLogin.setDisable(true);
+        registerTravelerLoginListener(event);
     }
 
     private void registerTravelerLoginListener(javafx.event.ActionEvent event) {
@@ -127,31 +217,28 @@ public class LoginPageController implements Initializable {
 
         client.setListener(new ServerResponseListener() {
             @Override
-            public void onOrderExistsResult(boolean exists) {}
-
-            @Override
-            public void onOrderResult(Order order) {}
-
-            @Override
-            public void onUpdateOrderResult(boolean success) {}
-
-            @Override
             public void onVisitorLoginResult(VisitorLoginResult result) {
                 Platform.runLater(() -> openVisitorHome(event, result));
             }
 
             @Override
             public void onError(String errorMessage) {
-                Platform.runLater(() -> showError(errorMessage));
+                Platform.runLater(() -> {
+                    showError(errorMessage);
+                    btnLogin.setDisable(false);
+                });
             }
+
+            @Override public void onOrderExistsResult(boolean exists) {}
+            @Override public void onOrderResult(Order order) {}
+            @Override public void onUpdateOrderResult(boolean success) {}
         });
     }
 
     private void openVisitorHome(javafx.event.ActionEvent event, VisitorLoginResult result) {
         try {
-            // Save user to session
             SessionManager.getInstance().setCurrentUser(result);
-            
+
             ((Node) event.getSource()).getScene().getWindow().hide();
 
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/gui/VisitorHome.fxml"));
@@ -168,6 +255,7 @@ public class LoginPageController implements Initializable {
             stage.show();
         } catch (Exception e) {
             showError("Failed to open visitor screen.");
+            btnLogin.setDisable(false);
             e.printStackTrace();
         }
     }
@@ -181,11 +269,8 @@ public class LoginPageController implements Initializable {
         employeeSection.setManaged(true);
         travelerSection.setVisible(false);
         travelerSection.setManaged(false);
-
-        // Keep toggle state consistent
         btnEmployee.setSelected(true);
         btnTraveler.setSelected(false);
-
         clearMessage();
         clearAllFields();
     }
@@ -195,17 +280,11 @@ public class LoginPageController implements Initializable {
         travelerSection.setManaged(true);
         employeeSection.setVisible(false);
         employeeSection.setManaged(false);
-
         btnTraveler.setSelected(true);
         btnEmployee.setSelected(false);
-
         clearMessage();
         clearAllFields();
     }
-
-    // -------------------------------------------------------------------------
-    // Feedback helpers
-    // -------------------------------------------------------------------------
 
     private void showError(String message) {
         lblMessage.setText(message);
@@ -227,7 +306,7 @@ public class LoginPageController implements Initializable {
     }
 
     private void clearAllFields() {
-        txtEmployeeId.clear();
+        txtEmployeeUsername.clear();
         txtPassword.clear();
         txtTravelerId.clear();
     }

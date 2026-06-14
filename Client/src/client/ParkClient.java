@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 
 import common.Booking;
+import common.Employee;
 import common.Message;
 import common.Order;
 import common.VisitorLoginResult;
@@ -19,21 +20,20 @@ public class ParkClient extends AbstractClient {
     private ParkClient(String host, int port) throws IOException {
         super(host, port);
     }
-    
+
     private static ParkClient instance;
-    
+
     public static synchronized void connect(String host, int port) throws IOException {
         if (instance != null && instance.isConnected()) {
             return;
         }
-
         ParkClient newInstance = new ParkClient(host, port);
         newInstance.openConnection();
         instance = newInstance;
     }
 
-    public static ParkClient getInstance() { 
-        return instance; 
+    public static ParkClient getInstance() {
+        return instance;
     }
 
     private static synchronized void clearInstance(ParkClient client) {
@@ -46,7 +46,6 @@ public class ParkClient extends AbstractClient {
         this.listener = listener;
     }
 
-    // Call this before closing intentionally so we don't show the alert
     public void setIntentionalDisconnect() {
         this.intentionalDisconnect = true;
     }
@@ -80,18 +79,41 @@ public class ParkClient extends AbstractClient {
                 case "CANCEL_BOOKING_RESULT":
                     listener.onCancelBookingResult((boolean) message.getData());
                     break;
+                case "EMPLOYEE_LOGIN_SUCCESS":
+                    listener.onEmployeeLoginSuccess((Employee) message.getData());
+                    break;
+                case "EMPLOYEE_LOGIN_FAILED":
+                    listener.onEmployeeLoginFailed((String) message.getData());
+                    break;
                 case "FORCE_LOGOUT":
-                    // User was logged in from another computer
                     handleForceLogout((String) message.getData());
                     break;
                 case "ERROR":
                     listener.onError((String) message.getData());
                     break;
+
+                case "PARK_VISITORS_RESULT":
+                    listener.onParkVisitorsResult((int) message.getData());
+                    break;
+                case "EFFECTIVE_AVAILABLE_SPOTS_RESULT":
+                    listener.onEffectiveAvailableSpotsResult((int) message.getData());
+                    break;
+                case "BOOKING_RESULT":
+                    listener.onBookingResult((common.Booking) message.getData());
+                    break;
+                case "CHECK_IN_RESULT":
+                    listener.onCheckInResult((boolean) message.getData());
+                    break;
+                case "CHECK_OUT_RESULT":
+                    listener.onCheckOutResult((boolean) message.getData());
+                    break;
+                case "WALK_IN_RESULT":
+                    listener.onWalkInResult((common.Booking) message.getData());
+                    break;
             }
         }
     }
 
-    // Case 1: Orderly disconnect — don't show alert if we closed it ourselves
     @Override
     protected void connectionClosed() {
         clearInstance(this);
@@ -101,7 +123,6 @@ public class ParkClient extends AbstractClient {
         }
     }
 
-    // Case 2: Server crashed or lost connection abruptly
     @Override
     protected void connectionException(Exception exception) {
         clearInstance(this);
@@ -122,9 +143,6 @@ public class ParkClient extends AbstractClient {
         });
     }
 
-    /**
-     * Handle forced logout when the same user logs in from another computer.
-     */
     private void handleForceLogout(String reason) {
         Platform.runLater(() -> {
             Alert alert = new Alert(Alert.AlertType.INFORMATION);
@@ -132,8 +150,7 @@ public class ParkClient extends AbstractClient {
             alert.setHeaderText("You have been logged out");
             alert.setContentText(reason + "\nPlease log in again.");
             alert.showAndWait();
-            
-            // Clear session and close connection
+
             SessionManager.getInstance().logout();
             this.setIntentionalDisconnect();
             try {

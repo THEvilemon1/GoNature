@@ -1,70 +1,65 @@
 package boundaries.login;
 
+import java.io.IOException;
+import client.ParkClient;
+import common.Message;
+
 /**
  * EmployeeLogin (ECB - Boundary Layer)
  *
  * Handles login logic specifically for park employees.
- * Employees authenticate with their employee ID and password.
+ * Employees authenticate with their username and password.
  * Implements the Login interface.
  */
 public class EmployeeLogin implements Login {
 
-    private final String employeeId;
+    private final String username;
     private final String password;
 
-    /**
-     * @param employeeId the employee's unique identifier
-     * @param password   the employee's password (plaintext; hashing done server-side)
-     */
-    public EmployeeLogin(String employeeId, String password) {
-        this.employeeId = employeeId;
-        this.password   = password;
+    public EmployeeLogin(String username, String password) {
+        this.username = username;
+        this.password = password;
     }
-
-    // -------------------------------------------------------------------------
-    // Login interface implementation
-    // -------------------------------------------------------------------------
 
     /**
      * Employee validation rules:
-     *  - employeeId must not be blank
+     *  - username must not be blank
      *  - password must not be blank
-     *  - employeeId must be numeric (employees have numeric IDs in GoNature)
      */
     @Override
     public boolean validateFields() {
-        if (employeeId == null || employeeId.isBlank()) {
-            System.out.println("[EmployeeLogin] Validation failed: employee ID is empty.");
+        if (username == null || username.isBlank()) {
+            System.out.println("[EmployeeLogin] Validation failed: username is empty.");
             return false;
         }
         if (password == null || password.isBlank()) {
             System.out.println("[EmployeeLogin] Validation failed: password is empty.");
             return false;
         }
-        if (!employeeId.matches("\\d+")) {
-            System.out.println("[EmployeeLogin] Validation failed: employee ID must be numeric.");
-            return false;
-        }
         return true;
     }
 
     /**
-     * Sends an employee login request to the server via the message bus.
-     * The actual network call is delegated to loginController, which holds
-     * a reference to the OCSF client.
+     * Sends an employee login request to the server.
+     * Sends username and password as a String array inside a Message.
      */
     @Override
     public void logInUser() {
-        System.out.println("[EmployeeLogin] Sending employee login request for ID: " + employeeId);
-        // TODO: Build a Message object and send via client:
-        //   Message msg = new Message("EMPLOYEE_LOGIN", employeeId, password);
-        //   ParkClient.getClient().sendToServer(msg);
+        System.out.println("[EmployeeLogin] Sending employee login request for username: " + username);
+        ParkClient client = ParkClient.getInstance();
+        if (client == null || !client.isConnected()) {
+            System.out.println("[EmployeeLogin] Failed: client is not connected.");
+            return;
+        }
+
+        try {
+            String[] credentials = {username, password};
+            client.sendToServer(new Message("EMPLOYEE_LOGIN", credentials));
+        } catch (IOException e) {
+            System.out.println("[EmployeeLogin] Failed to send login request: " + e.getMessage());
+        }
     }
 
-    // -------------------------------------------------------------------------
-    // Getters (read-only; fields are set once via constructor)
-    // -------------------------------------------------------------------------
-
-    public String getEmployeeId() { return employeeId; }
-    public String getPassword()   { return password;   }
+    public String getUsername() { return username; }
+    public String getPassword() { return password; }
 }

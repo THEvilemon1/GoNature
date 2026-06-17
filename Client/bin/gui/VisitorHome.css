@@ -1,0 +1,244 @@
+/*
+ * VisitorHome.css — GoNature Visitor Dashboard
+ * ══════════════════════════════════════════════════════════════════
+ * Design language: "Forest Clarity"  (mirrors LoginPage.css)
+ *  • Deep forest gradient background
+ *  • Warm off-white card, rounded corners, soft shadow
+ *  • Action cards with hover lift effect
+ *  • Detail view with labeled info rows
+ * ══════════════════════════════════════════════════════════════════
+ */
+
+
+/* ── Root / background ─────────────────────────────────────────── */
+
+.root-pane {
+    -fx-background-color: linear-gradient(to bottom right, #1a2e1a, #2d4a2d);
+    -fx-padding: 40;
+}
+
+
+/* ── Main card ─────────────────────────────────────────────────── */
+
+.visitor-card {
+    -fx-background-color: #f8f6f0;
+    -fx-background-radius: 16;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.45), 24, 0, 0, 6);
+    -fx-padding: 36 40 36 40;
+    -fx-spacing: 0;
+}
+
+
+/* ── Header ────────────────────────────────────────────────────── */
+
+.card-header { -fx-spacing: 4; }
+
+.app-name {
+    -fx-font-size: 26px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #2e7d32;
+    -fx-font-family: "Arial";
+}
+
+.app-tagline {
+    -fx-font-size: 12px;
+    -fx-text-fill: #6b7280;
+}
+
+.visitor-details {
+    -fx-font-size: 12px;
+    -fx-text-fill: #6b7280;
+    -fx-padding: 6 0 0 0;
+}
+
+
+/* ── Separator ─────────────────────────────────────────────────── */
+
+.card-sep .line {
+    -fx-border-color: #d1d5db;
+    -fx-border-width: 1 0 0 0;
+}
+
+
+/* ── Action cards ──────────────────────────────────────────────── */
+
+.action-card {
+    -fx-background-color: #f0f5f0;
+    -fx-background-radius: 12;
+    -fx-border-color: #c8ddc8;
+    -fx-border-radius: 12;
+    -fx-border-width: 1.5;
+    -fx-padding: 22 20 20 20;
+    -fx-pref-width: 240;
+    -fx-min-height: 180;
+}
+
+.action-card:hover {
+    -fx-background-color: #e6f0e6;
+    -fx-border-color: #2e7d32;
+    -fx-effect: dropshadow(gaussian, rgba(46,125,50,0.18), 10, 0, 0, 3);
+}
+
+.card-icon  { -fx-font-size: 30px; }
+
+.card-title {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1c1c1e;
+}
+
+.card-desc {
+    -fx-font-size: 12px;
+    -fx-text-fill: #6b7280;
+    -fx-pref-width: 200;
+}
+
+.card-btn-primary {
+    -fx-background-color: #2e7d32;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-font-size: 13px;
+    -fx-background-radius: 8;
+    -fx-pref-height: 36;
+    -fx-cursor: hand;
+}
+
+.card-btn-primary:hover { -fx-background-color: #1b5e20; }
+
+.card-btn-secondary {
+    -fx-background-color: white;
+    -fx-text-fill: #2e7d32;
+    -fx-border-color: #2e7d32;
+    -fx-border-width: 1.5;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-font-weight: bold;
+    -fx-font-size: 13px;
+    -fx-pref-height: 36;
+    -fx-cursor: hand;
+}
+
+.card-btn-secondary:hover { -fx-background-color: #f0f9f0; }
+
+
+/* ── Detail view ───────────────────────────────────────────────── */
+
+.btn-back {
+    -fx-background-color: transparent;
+    -fx-text-fill: #2e7d32;
+    -fx-font-weight: bold;
+    -fx-font-size: 13px;
+    -fx-cursor: hand;
+    -fx-border-color: #2e7d32;
+    -fx-border-width: 1.5;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 4 14;
+}
+
+.btn-back:hover { -fx-background-color: #f0f9f0; }
+
+.detail-title {
+    -fx-font-size: 19px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1c1c1e;
+}
+
+.detail-body { -fx-padding: 0; }
+
+.field-label {
+    -fx-font-size: 13px;
+    -fx-text-fill: #6b7280;
+    -fx-font-weight: bold;
+}
+
+.combo-box,
+.date-picker,
+.spinner {
+    -fx-background-radius: 8;
+    -fx-border-color: #d1d5db;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+}
+
+.booking-message {
+    -fx-font-size: 12px;
+    -fx-padding: 8 10;
+    -fx-background-radius: 8;
+}
+
+.msg-error {
+    -fx-text-fill: #991b1b;
+    -fx-background-color: #fee2e2;
+    -fx-border-color: #fca5a5;
+    -fx-border-radius: 8;
+}
+
+.msg-success {
+    -fx-text-fill: #166534;
+    -fx-background-color: #dcfce7;
+    -fx-border-color: #86efac;
+    -fx-border-radius: 8;
+}
+
+.bookings-scroll {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+}
+
+.booking-row {
+    -fx-background-color: #f0f5f0;
+    -fx-border-color: #c8ddc8;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 12;
+}
+
+.booking-row-title {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1c1c1e;
+}
+
+.booking-row-details {
+    -fx-font-size: 12px;
+    -fx-text-fill: #4b5563;
+}
+
+.small-action-btn {
+    -fx-background-color: white;
+    -fx-text-fill: #2e7d32;
+    -fx-border-color: #2e7d32;
+    -fx-border-width: 1;
+    -fx-border-radius: 7;
+    -fx-background-radius: 7;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+}
+
+.small-danger-btn {
+    -fx-background-color: white;
+    -fx-text-fill: #b91c1c;
+    -fx-border-color: #b91c1c;
+    -fx-border-width: 1;
+    -fx-border-radius: 7;
+    -fx-background-radius: 7;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+}
+
+.info-row { -fx-alignment: CENTER_LEFT; }
+
+.info-label {
+    -fx-font-size: 13px;
+    -fx-text-fill: #6b7280;
+    -fx-pref-width: 90;
+}
+
+.info-value {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1c1c1e;
+}
+
+.status-confirmed { -fx-text-fill: #2e7d32; }

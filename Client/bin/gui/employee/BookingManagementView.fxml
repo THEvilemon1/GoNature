@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<StackPane xmlns="http://javafx.com/javafx/17"
+           xmlns:fx="http://javafx.com/fxml/1"
+           fx:controller="gui.employee.BookingManagementViewController"
+           styleClass="root-pane"
+           stylesheets="@EmployeeScreens.css">
+
+    <VBox styleClass="screen-card" maxWidth="500" alignment="TOP_CENTER">
+
+        <!-- Top bar -->
+        <HBox styleClass="top-bar" alignment="CENTER_LEFT" spacing="0">
+            <Label styleClass="screen-title" text="Booking Management" />
+            <Region HBox.hgrow="ALWAYS" minWidth="20" />
+            <Label fx:id="lblCurrentVisitors" styleClass="top-bar-info" text="Current Visitors: --" />
+        </HBox>
+
+        <!-- Content -->
+        <VBox styleClass="content-area" spacing="20">
+
+            <Label fx:id="lblWelcome" styleClass="welcome-label" text="Welcome!" />
+
+            <Separator styleClass="card-sep" />
+
+            <!-- Main action buttons -->
+            <HBox spacing="16" alignment="CENTER">
+                <Button styleClass="btn-big, btn-primary" text="Enter Visitor"
+                        onAction="#handleEnterVisitor" prefWidth="200" />
+                <Button styleClass="btn-big, btn-danger" text="Exit Visitor"
+                        onAction="#handleExitVisitor" prefWidth="200" />
+            </HBox>
+
+            <Separator styleClass="card-sep" />
+
+            <!-- Logout -->
+            <HBox alignment="CENTER_LEFT">
+                <Button styleClass="btn-secondary" text="Logout"
+                        onAction="#handleLogout" prefWidth="100" />
+            </HBox>
+
+        </VBox>
+    </VBox>
+</StackPane>

@@ -1,0 +1,195 @@
+/*
+ * EmployeeScreens.css — GoNature Employee Screens
+ * Matches the "Forest Clarity" design language from LoginPage.css
+ */
+
+/* ── Root / background ─────────────────────────────────────────── */
+.root-pane {
+    -fx-background-color: linear-gradient(to bottom right, #1a2e1a, #2d4a2d);
+    -fx-padding: 30;
+}
+
+/* ── Card ──────────────────────────────────────────────────────── */
+.screen-card {
+    -fx-background-color: #f8f6f0;
+    -fx-background-radius: 16;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.5), 24, 0, 0, 6);
+    -fx-padding: 0 0 28 0;
+    -fx-spacing: 0;
+}
+
+/* ── Top bar ────────────────────────────────────────────────────── */
+.top-bar {
+    -fx-background-color: #2e7d32;
+    -fx-background-radius: 16 16 0 0;
+    -fx-padding: 16 24 16 24;
+}
+
+.screen-title {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-text-fill: white;
+    -fx-font-family: "Arial";
+}
+
+.top-bar-info {
+    -fx-font-size: 13px;
+    -fx-text-fill: rgba(255,255,255,0.85);
+    -fx-font-family: "Arial";
+}
+
+/* ── Content area ──────────────────────────────────────────────── */
+.content-area {
+    -fx-padding: 24 32 24 32;
+    -fx-spacing: 16;
+}
+
+/* ── Welcome label ──────────────────────────────────────────────── */
+.welcome-label {
+    -fx-font-size: 13px;
+    -fx-text-fill: #6b7280;
+    -fx-font-family: "Arial";
+}
+
+/* ── Section labels ─────────────────────────────────────────────── */
+.field-label {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #374151;
+    -fx-font-family: "Arial";
+}
+
+/* ── Input fields ───────────────────────────────────────────────── */
+.field-input {
+    -fx-pref-height: 40;
+    -fx-font-size: 14px;
+    -fx-background-color: white;
+    -fx-background-radius: 8;
+    -fx-border-color: #d1d5db;
+    -fx-border-radius: 8;
+    -fx-border-width: 1.5;
+    -fx-padding: 0 12 0 12;
+    -fx-text-fill: #1c1c1e;
+}
+
+.field-input:focused {
+    -fx-border-color: #2e7d32;
+    -fx-effect: dropshadow(gaussian, rgba(46,125,50,0.25), 6, 0, 0, 0);
+}
+
+/* ── Primary button (green) ─────────────────────────────────────── */
+.btn-primary {
+    -fx-pref-height: 44;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-background-color: #2e7d32;
+    -fx-text-fill: white;
+    -fx-background-radius: 10;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(46,125,50,0.4), 8, 0, 0, 3);
+}
+
+.btn-primary:hover {
+    -fx-background-color: #1b5e20;
+}
+
+/* ── Action button (amber - for enter/check-in) ─────────────────── */
+.btn-action {
+    -fx-pref-height: 44;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-background-color: #e65100;
+    -fx-text-fill: white;
+    -fx-background-radius: 10;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(230,81,0,0.4), 8, 0, 0, 3);
+}
+
+.btn-action:hover {
+    -fx-background-color: #bf360c;
+}
+
+/* ── Danger button (red - for exit) ─────────────────────────────── */
+.btn-danger {
+    -fx-pref-height: 44;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-background-color: #c62828;
+    -fx-text-fill: white;
+    -fx-background-radius: 10;
+    -fx-cursor: hand;
+}
+
+.btn-danger:hover {
+    -fx-background-color: #8e0000;
+}
+
+/* ── Secondary button (grey - back/logout) ──────────────────────── */
+.btn-secondary {
+    -fx-pref-height: 38;
+    -fx-font-size: 13px;
+    -fx-background-color: #e8ede8;
+    -fx-text-fill: #374151;
+    -fx-background-radius: 8;
+    -fx-cursor: hand;
+}
+
+.btn-secondary:hover {
+    -fx-background-color: #d4e6d4;
+    -fx-text-fill: #2e7d32;
+}
+
+/* ── Big action buttons (main screen) ──────────────────────────── */
+.btn-big {
+    -fx-pref-height: 90;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 12;
+    -fx-cursor: hand;
+}
+
+/* ── Status messages ────────────────────────────────────────────── */
+.lbl-message {
+    -fx-font-size: 13px;
+    -fx-padding: 10 14 10 14;
+    -fx-background-radius: 8;
+    -fx-wrap-text: true;
+}
+
+.msg-error {
+    -fx-background-color: #fef2f2;
+    -fx-text-fill: #b91c1c;
+    -fx-border-color: #fca5a5;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+}
+
+.msg-success {
+    -fx-background-color: #f0fdf4;
+    -fx-text-fill: #15803d;
+    -fx-border-color: #86efac;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+}
+
+/* ── Booking details box ─────────────────────────────────────────── */
+.details-box {
+    -fx-background-color: white;
+    -fx-background-radius: 10;
+    -fx-border-color: #d1d5db;
+    -fx-border-radius: 10;
+    -fx-border-width: 1.5;
+    -fx-padding: 14;
+    -fx-spacing: 6;
+}
+
+.details-label {
+    -fx-font-size: 13px;
+    -fx-text-fill: #374151;
+}
+
+/* ── Separator ──────────────────────────────────────────────────── */
+.card-sep .line {
+    -fx-border-color: #d1d5db;
+    -fx-border-width: 1 0 0 0;
+}

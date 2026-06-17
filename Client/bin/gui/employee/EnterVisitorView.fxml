@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<StackPane xmlns="http://javafx.com/javafx/17"
+           xmlns:fx="http://javafx.com/fxml/1"
+           fx:controller="gui.employee.EnterVisitorViewController"
+           styleClass="root-pane"
+           stylesheets="@EmployeeScreens.css">
+
+    <VBox styleClass="screen-card" maxWidth="500" alignment="TOP_CENTER">
+
+        <!-- Top bar -->
+        <HBox styleClass="top-bar" alignment="CENTER_LEFT" spacing="0">
+            <Label styleClass="screen-title" text="Enter Visitor" />
+            <Region HBox.hgrow="ALWAYS" minWidth="20" />
+            <Label fx:id="lblAvailableSpots" styleClass="top-bar-info" text="Available Spots: --" />
+        </HBox>
+
+        <!-- Content -->
+        <VBox styleClass="content-area" spacing="16">
+
+            <!-- Booking search -->
+            <VBox spacing="6">
+                <Label styleClass="field-label" text="Booking ID" />
+                <HBox spacing="10" alignment="CENTER_LEFT">
+                    <TextField fx:id="txtBookingId" styleClass="field-input"
+                               promptText="Enter booking ID" HBox.hgrow="ALWAYS" />
+                    <Button styleClass="btn-primary" text="Search"
+                            onAction="#handleSearchBooking" prefWidth="90" prefHeight="40" />
+                </HBox>
+            </VBox>
+
+            <!-- Status -->
+            <Label fx:id="lblStatus" styleClass="lbl-message" text="" wrapText="true" visible="false" />
+
+            <!-- Booking details box -->
+            <VBox fx:id="detailsBox" styleClass="details-box" visible="false" managed="false" spacing="6">
+                <Label fx:id="lblBookingDetails" styleClass="details-label" wrapText="true" />
+            </VBox>
+
+            <Separator styleClass="card-sep" />
+
+            <!-- Action buttons -->
+            <HBox spacing="12">
+                <Button fx:id="btnCheckIn" styleClass="btn-primary" text="Check In"
+                        onAction="#handleCheckIn" prefWidth="150" visible="false" />
+                <Button styleClass="btn-action" text="Walk-in Visitor"
+                        onAction="#handleWalkIn" prefWidth="160" />
+            </HBox>
+
+            <Separator styleClass="card-sep" />
+
+            <Button styleClass="btn-secondary" text="← Back"
+                    onAction="#handleBack" prefWidth="100" />
+
+        </VBox>
+    </VBox>
+</StackPane>

@@ -20,7 +20,6 @@ public class EndOfDayScheduler {
     private static final long DAY_SECONDS = TimeUnit.DAYS.toSeconds(1);
 
     private static final String SAFE_STATUS =
-        "'" + Booking.STATUS_PAID          + "'," +
         "'CHECKED_IN','CHECKED_OUT',"              +
         "'" + Booking.STATUS_CANCELLED     + "'," +
         "'" + Booking.STATUS_SYSTEM_CANCEL + "'";

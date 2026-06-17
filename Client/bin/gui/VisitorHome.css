@@ -194,6 +194,12 @@
     -fx-padding: 12;
 }
 
+.booking-row-locked {
+    -fx-background-color: #e5e7eb;
+    -fx-border-color: #cbd5e1;
+    -fx-opacity: 0.72;
+}
+
 .booking-row-title {
     -fx-font-size: 14px;
     -fx-font-weight: bold;

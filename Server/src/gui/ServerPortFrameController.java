@@ -197,7 +197,6 @@ public class ServerPortFrameController implements Initializable {
             clipboard.setContent(content);
             
             log("Server IP copied to clipboard: " + ip);
-            showAlert("Success", "Server IP copied to clipboard:\n" + ip);
         } catch (Exception e) {
             log("Error copying IP to clipboard: " + e.getMessage());
             showAlert("Error", "Failed to copy IP address");

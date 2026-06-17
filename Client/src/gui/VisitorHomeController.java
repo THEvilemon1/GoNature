@@ -49,7 +49,6 @@ public class VisitorHomeController implements ServerResponseListener {
     @FXML private Label lblBookingMessage;
     @FXML private Label lblBookingsMessage;
     @FXML private Label lblSelectedParkPrice;
-    @FXML private Label lblParkPricesList;
     @FXML private Label lblPricePerPerson;
     @FXML private Label lblTotalPrice;
     @FXML private Spinner<Integer> spnVisitors;
@@ -329,8 +328,6 @@ public class VisitorHomeController implements ServerResponseListener {
             return;
         }
 
-        updateParkPricesList();
-
         ParkOption park = cmbPark == null ? null : cmbPark.getValue();
         if (park == null) {
             lblSelectedParkPrice.setText("Select a park to see its price per person.");
@@ -353,26 +350,6 @@ public class VisitorHomeController implements ServerResponseListener {
         lblSelectedParkPrice.setText(park.getName() + ": " + pricePerPerson + " ILS per person.");
         lblPricePerPerson.setText("Price per person: " + pricePerPerson + " ILS");
         lblTotalPrice.setText("Total: " + totalPrice + " ILS");
-    }
-
-    private void updateParkPricesList() {
-        if (lblParkPricesList == null || cmbPark == null) {
-            return;
-        }
-        if (pricesByParkId.isEmpty()) {
-            lblParkPricesList.setText("");
-            return;
-        }
-
-        StringBuilder text = new StringBuilder("Park prices per person:\n");
-        for (ParkOption option : cmbPark.getItems()) {
-            Integer price = pricesByParkId.get(option.getId());
-            text.append(option.getName())
-                .append(": ")
-                .append(price == null ? "--" : price + " ILS")
-                .append("\n");
-        }
-        lblParkPricesList.setText(text.toString().trim());
     }
 
     private void refreshTimeOptions() {

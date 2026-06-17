@@ -91,9 +91,6 @@
 
                     <VBox styleClass="price-summary" spacing="6" prefWidth="260">
                         <Label styleClass="price-summary-title" text="Booking Price" />
-                        <Label fx:id="lblParkPricesList" styleClass="price-summary-line"
-                               text=""
-                               wrapText="true" />
                         <Label fx:id="lblPricePerPerson" styleClass="price-summary-line"
                                text="Price per person: --" />
                         <Label fx:id="lblTotalPrice" styleClass="price-summary-total"

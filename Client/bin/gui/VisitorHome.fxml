@@ -20,10 +20,15 @@
            stylesheets="@VisitorHome.css">
 
     <VBox fx:id="viewMain" alignment="CENTER">
-        <VBox styleClass="visitor-card" maxWidth="620">
+        <VBox styleClass="visitor-card" prefWidth="900" maxWidth="980">
             <VBox styleClass="card-header" spacing="4">
-                <Label styleClass="app-name" text="GoNature" />
-                <Label styleClass="app-tagline" text="National Parks Reservation System" />
+                <HBox alignment="CENTER_LEFT" spacing="12">
+                    <VBox spacing="4" HBox.hgrow="ALWAYS">
+                        <Label styleClass="app-name" text="GoNature" />
+                        <Label styleClass="app-tagline" text="National Parks Reservation System" />
+                    </VBox>
+                    <Button styleClass="btn-back" text="Logout" onAction="#handleLogoutButton" />
+                </HBox>
                 <Label fx:id="lblVisitorDetails" styleClass="visitor-details" text="" />
             </VBox>
 
@@ -31,9 +36,8 @@
                 <VBox.margin><Insets top="4" bottom="16" /></VBox.margin>
             </Separator>
 
-            <HBox spacing="16" alignment="CENTER">
-                <VBox styleClass="action-card" spacing="10">
-                    <Label styleClass="card-icon" text="+" />
+            <HBox spacing="18" alignment="CENTER">
+                <VBox styleClass="action-card" spacing="12" HBox.hgrow="ALWAYS" maxWidth="Infinity">
                     <Label styleClass="card-title" text="Book a Visit" />
                     <Label styleClass="card-desc"
                            text="Plan your next national park experience and secure your spot."
@@ -43,8 +47,7 @@
                             onAction="#handlePrimaryAction" maxWidth="Infinity" />
                 </VBox>
 
-                <VBox styleClass="action-card" spacing="10">
-                    <Label styleClass="card-icon" text="#" />
+                <VBox styleClass="action-card" spacing="12" HBox.hgrow="ALWAYS" maxWidth="Infinity">
                     <Label styleClass="card-title" text="My Bookings" />
                     <Label styleClass="card-desc"
                            text="View, edit, or cancel your existing park reservations."
@@ -58,7 +61,7 @@
     </VBox>
 
     <VBox fx:id="viewDetail" visible="false" managed="false" alignment="CENTER">
-        <VBox styleClass="visitor-card" maxWidth="620">
+        <VBox styleClass="visitor-card" prefWidth="900" maxWidth="980" maxHeight="Infinity">
             <HBox alignment="CENTER_LEFT" spacing="14">
                 <Button styleClass="btn-back" text="Back" onAction="#handleBack" />
                 <Label fx:id="lblDetailTitle" styleClass="detail-title" text="" />
@@ -72,12 +75,31 @@
                 <VBox spacing="5">
                     <Label styleClass="field-label" text="Visitors" />
                     <Spinner fx:id="spnVisitors" editable="true" maxWidth="120" />
+                    <Label styleClass="field-help"
+                           text="Choose between 1 and 15 visitors."
+                           wrapText="true" />
                 </VBox>
 
-                <VBox spacing="5">
-                    <Label styleClass="field-label" text="Park" />
-                    <ComboBox fx:id="cmbPark" maxWidth="Infinity" promptText="Choose a park" />
-                </VBox>
+                <HBox spacing="16" alignment="TOP_LEFT">
+                    <VBox spacing="5" HBox.hgrow="ALWAYS">
+                        <Label styleClass="field-label" text="Park" />
+                        <ComboBox fx:id="cmbPark" maxWidth="Infinity" promptText="Choose a park" />
+                        <Label fx:id="lblSelectedParkPrice" styleClass="field-help"
+                               text="Select a park to see its price per person."
+                               wrapText="true" />
+                    </VBox>
+
+                    <VBox styleClass="price-summary" spacing="6" prefWidth="260">
+                        <Label styleClass="price-summary-title" text="Booking Price" />
+                        <Label fx:id="lblParkPricesList" styleClass="price-summary-line"
+                               text=""
+                               wrapText="true" />
+                        <Label fx:id="lblPricePerPerson" styleClass="price-summary-line"
+                               text="Price per person: --" />
+                        <Label fx:id="lblTotalPrice" styleClass="price-summary-total"
+                               text="Total: --" />
+                    </VBox>
+                </HBox>
 
                 <HBox spacing="12">
                     <VBox spacing="5" HBox.hgrow="ALWAYS">
@@ -100,7 +122,7 @@
 
             <VBox fx:id="bookingsListView" visible="false" managed="false" spacing="12">
                 <Label fx:id="lblBookingsMessage" styleClass="booking-message" text="" wrapText="true" visible="false" />
-                <ScrollPane fitToWidth="true" hbarPolicy="NEVER" prefHeight="330" styleClass="bookings-scroll">
+                <ScrollPane fitToWidth="true" hbarPolicy="NEVER" prefHeight="520" VBox.vgrow="ALWAYS" styleClass="bookings-scroll">
                     <VBox fx:id="bookingsList" spacing="10" />
                 </ScrollPane>
             </VBox>

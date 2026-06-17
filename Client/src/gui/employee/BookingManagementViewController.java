@@ -2,6 +2,7 @@ package gui.employee;
 
 import client.ParkClient;
 import client.ServerResponseListener;
+import client.WindowUtil;
 import common.Booking;
 import common.Employee;
 import common.Message;
@@ -74,7 +75,7 @@ public class BookingManagementViewController implements EmployeeAwareController,
         stage.setTitle("Enter Visitor");
         stage.setScene(new Scene(root));
         stage.setOnCloseRequest(e -> System.exit(0));
-        stage.show();
+        WindowUtil.showMaximized(stage);
     }
 
     @FXML
@@ -91,7 +92,7 @@ public class BookingManagementViewController implements EmployeeAwareController,
         stage.setTitle("Exit Visitor");
         stage.setScene(new Scene(root));
         stage.setOnCloseRequest(e -> System.exit(0));
-        stage.show();
+        WindowUtil.showMaximized(stage);
     }
 
     @FXML
@@ -118,6 +119,6 @@ public class BookingManagementViewController implements EmployeeAwareController,
         stage.setTitle("GoNature - Login");
         stage.setScene(scene);
         stage.setOnCloseRequest(e -> System.exit(0));
-        stage.show();
+        WindowUtil.showMaximized(stage);
     }
 }

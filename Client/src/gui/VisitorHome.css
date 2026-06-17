@@ -14,7 +14,7 @@
 
 .root-pane {
     -fx-background-color: linear-gradient(to bottom right, #1a2e1a, #2d4a2d);
-    -fx-padding: 40;
+    -fx-padding: 32;
 }
 
 
@@ -24,7 +24,7 @@
     -fx-background-color: #f8f6f0;
     -fx-background-radius: 16;
     -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.45), 24, 0, 0, 6);
-    -fx-padding: 36 40 36 40;
+    -fx-padding: 42 52 42 52;
     -fx-spacing: 0;
 }
 
@@ -68,9 +68,9 @@
     -fx-border-color: #c8ddc8;
     -fx-border-radius: 12;
     -fx-border-width: 1.5;
-    -fx-padding: 22 20 20 20;
-    -fx-pref-width: 240;
-    -fx-min-height: 180;
+    -fx-padding: 30 28 26 28;
+    -fx-pref-width: 360;
+    -fx-min-height: 210;
 }
 
 .action-card:hover {
@@ -79,18 +79,16 @@
     -fx-effect: dropshadow(gaussian, rgba(46,125,50,0.18), 10, 0, 0, 3);
 }
 
-.card-icon  { -fx-font-size: 30px; }
-
 .card-title {
-    -fx-font-size: 15px;
+    -fx-font-size: 18px;
     -fx-font-weight: bold;
     -fx-text-fill: #1c1c1e;
 }
 
 .card-desc {
-    -fx-font-size: 12px;
+    -fx-font-size: 13px;
     -fx-text-fill: #6b7280;
-    -fx-pref-width: 200;
+    -fx-pref-width: 280;
 }
 
 .card-btn-primary {
@@ -152,6 +150,36 @@
     -fx-font-weight: bold;
 }
 
+.field-help {
+    -fx-font-size: 11px;
+    -fx-text-fill: #6b7280;
+}
+
+.price-summary {
+    -fx-background-color: white;
+    -fx-border-color: #d7e7d7;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 12 14;
+}
+
+.price-summary-title {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1f2937;
+}
+
+.price-summary-line {
+    -fx-font-size: 12px;
+    -fx-text-fill: #4b5563;
+}
+
+.price-summary-total {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #2e7d32;
+}
+
 .combo-box,
 .date-picker,
 .spinner {
@@ -184,20 +212,41 @@
 .bookings-scroll {
     -fx-background-color: transparent;
     -fx-background: transparent;
+    -fx-pref-height: 520;
+}
+
+.booking-section {
+    -fx-padding: 0 0 8 0;
+}
+
+.booking-section-title {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1f2937;
+}
+
+.booking-section-desc {
+    -fx-font-size: 11px;
+    -fx-text-fill: #6b7280;
 }
 
 .booking-row {
-    -fx-background-color: #f0f5f0;
-    -fx-border-color: #c8ddc8;
+    -fx-background-color: white;
+    -fx-border-color: #d7e7d7;
     -fx-border-radius: 8;
     -fx-background-radius: 8;
-    -fx-padding: 12;
+    -fx-padding: 13 14 13 14;
+    -fx-effect: dropshadow(gaussian, rgba(31,41,55,0.08), 8, 0, 0, 2);
 }
 
 .booking-row-locked {
-    -fx-background-color: #e5e7eb;
+    -fx-background-color: #f3f4f6;
     -fx-border-color: #cbd5e1;
-    -fx-opacity: 0.72;
+    -fx-effect: none;
+}
+
+.booking-row-header {
+    -fx-alignment: CENTER_LEFT;
 }
 
 .booking-row-title {
@@ -209,6 +258,57 @@
 .booking-row-details {
     -fx-font-size: 12px;
     -fx-text-fill: #4b5563;
+}
+
+.booking-row-description {
+    -fx-font-size: 11px;
+    -fx-text-fill: #6b7280;
+}
+
+.booking-status-badge {
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-padding: 4 8;
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-border-width: 1;
+}
+
+.status-pending {
+    -fx-text-fill: #92400e;
+    -fx-background-color: #fef3c7;
+    -fx-border-color: #f59e0b;
+}
+
+.status-confirmed {
+    -fx-text-fill: #166534;
+    -fx-background-color: #dcfce7;
+    -fx-border-color: #86efac;
+}
+
+.status-cancelled,
+.status-system-cancel {
+    -fx-text-fill: #991b1b;
+    -fx-background-color: #fee2e2;
+    -fx-border-color: #fca5a5;
+}
+
+.status-checked-in {
+    -fx-text-fill: #1d4ed8;
+    -fx-background-color: #dbeafe;
+    -fx-border-color: #93c5fd;
+}
+
+.status-checked-out {
+    -fx-text-fill: #374151;
+    -fx-background-color: #e5e7eb;
+    -fx-border-color: #cbd5e1;
+}
+
+.status-unknown {
+    -fx-text-fill: #4b5563;
+    -fx-background-color: #f3f4f6;
+    -fx-border-color: #d1d5db;
 }
 
 .small-action-btn {
@@ -246,5 +346,3 @@
     -fx-font-weight: bold;
     -fx-text-fill: #1c1c1e;
 }
-
-.status-confirmed { -fx-text-fill: #2e7d32; }

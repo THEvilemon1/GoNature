@@ -39,7 +39,7 @@
     <!-- Full-screen background gradient (handled in CSS via .root-pane) -->
 
     <!-- Centered card -->
-    <VBox styleClass="login-card" alignment="TOP_CENTER" maxWidth="420">
+    <VBox styleClass="login-card" alignment="TOP_CENTER" prefWidth="520" maxWidth="640">
 
         <!-- ── Branding ─────────────────────────────────────────── -->
         <VBox styleClass="branding" alignment="CENTER" spacing="6">
@@ -51,11 +51,13 @@
         <HBox styleClass="toggle-bar" alignment="CENTER" spacing="0">
             <ToggleButton fx:id="btnEmployee"
                           styleClass="toggle-btn, toggle-left"
-                          text="🏢  Employee"
+                          HBox.hgrow="ALWAYS"
+                          text="Employee"
                           selected="true" />
             <ToggleButton fx:id="btnTraveler"
                           styleClass="toggle-btn, toggle-right"
-                          text="🌿  Visitor" />
+                          HBox.hgrow="ALWAYS"
+                          text="Visitor" />
         </HBox>
 
         <!-- Separator -->
@@ -115,3 +117,4 @@
 
     </VBox>
 </StackPane>
+

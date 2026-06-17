@@ -1,6 +1,7 @@
 package gui;
 
 import client.ParkClient;
+import client.WindowUtil;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -68,7 +69,7 @@ public class ConnectToServerController {
                             System.exit(0);
                         });
 
-                        stage.show();
+                        WindowUtil.showMaximized(stage);
                     } catch (Exception e) {
                         lblStatus.setText("Failed to open login window.");
                         lblStatus.setStyle("-fx-text-fill: red;");

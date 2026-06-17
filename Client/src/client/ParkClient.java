@@ -2,6 +2,7 @@ package client;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Map;
 
 import common.Booking;
 import common.Employee;
@@ -69,6 +70,9 @@ public class ParkClient extends AbstractClient {
                     break;
                 case "TRAVELER_BOOKINGS_RESULT":
                     listener.onTravelerBookingsResult((ArrayList<Booking>) message.getData());
+                    break;
+                case "PARK_PRICES_RESULT":
+                    listener.onParkPricesResult((Map<Integer, Integer>) message.getData());
                     break;
                 case "CREATE_BOOKING_RESULT":
                     listener.onCreateBookingResult((Booking) message.getData());

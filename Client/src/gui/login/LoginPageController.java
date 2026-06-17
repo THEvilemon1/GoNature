@@ -5,6 +5,7 @@ import boundaries.login.TravelerLoginAndRegister;
 import client.ParkClient;
 import client.ServerResponseListener;
 import client.SessionManager;
+import client.WindowUtil;
 import client.loginController;
 import common.Booking;
 import common.Employee;
@@ -163,7 +164,7 @@ public class LoginPageController implements Initializable {
                 System.exit(0);
             });
 
-            stage.show();
+            WindowUtil.showMaximized(stage);
 
         } catch (Exception e) {
             showError("Failed to open screen: " + e.getMessage());
@@ -252,7 +253,7 @@ public class LoginPageController implements Initializable {
             if (css != null) scene.getStylesheets().add(css.toExternalForm());
             stage.setTitle("GoNature - Visitor");
             stage.setScene(scene);
-            stage.show();
+            WindowUtil.showMaximized(stage);
         } catch (Exception e) {
             showError("Failed to open visitor screen.");
             btnLogin.setDisable(false);

@@ -13,7 +13,7 @@ public class ParkClientMain extends Application {
         Parent root = FXMLLoader.load(getClass().getResource("/gui/ConnectToServer.fxml"));
         primaryStage.setTitle("GoNature - Connect to Server");
         primaryStage.setScene(new Scene(root));
-        primaryStage.show();
+        WindowUtil.showMaximized(primaryStage);
     }
 
 

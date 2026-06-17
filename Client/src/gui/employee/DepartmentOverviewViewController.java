@@ -3,6 +3,7 @@ package gui.employee;
 import common.Employee;
 import common.Message;
 import client.ParkClient;
+import client.WindowUtil;
 import gui.login.EmployeeAwareController;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -50,6 +51,6 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
         stage.setTitle("GoNature - Login");
         stage.setScene(scene);
         stage.setOnCloseRequest(e -> System.exit(0));
-        stage.show();
+        WindowUtil.showMaximized(stage);
     }
 }

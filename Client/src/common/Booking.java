@@ -6,10 +6,11 @@ import java.time.LocalDateTime;
 public class Booking implements Serializable {
     private static final long serialVersionUID = 1L;
 
-    public static final String STATUS_PENDING = "PENDING";
-    public static final String STATUS_CONFIRMED = "CONFIRMED";
-    public static final String STATUS_CANCELLED = "CANCELLED";
-    public static final String STATUS_PAID = "PAID";
+    public static final String STATUS_PENDING       = "PENDING";
+    public static final String STATUS_CONFIRMED     = "CONFIRMED";
+    public static final String STATUS_CANCELLED     = "CANCELLED";
+    public static final String STATUS_PAID          = "PAID";
+    public static final String STATUS_SYSTEM_CANCEL = "SYSTEM_CANCEL";
 
     private String bookingId;
     private String travelerId;

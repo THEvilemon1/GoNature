@@ -93,6 +93,14 @@ public class EnterVisitorViewController {
                         foundBooking = null;
                         return;
                     }
+                    if (employee == null || booking.getParkId() != employee.getParkId()) {
+                        showStatus("This booking belongs to another park and cannot be checked in here.", true);
+                        btnCheckIn.setVisible(false);
+                        detailsBox.setVisible(false);
+                        detailsBox.setManaged(false);
+                        foundBooking = null;
+                        return;
+                    }
                     // Check that the booking is for today
                     java.time.LocalDate bookingDate = booking.getVisitorTime().toLocalDate();
                     java.time.LocalDate today = java.time.LocalDate.now();

@@ -175,7 +175,9 @@ public class ParkServer extends AbstractServer {
                     } else if (loginResult1.equals("ALREADY_LOGGED_IN")) {
                         client.sendToClient(new Message("EMPLOYEE_LOGIN_FAILED", "This user is already logged in."));
                     } else {
-                        client.setInfo("EMPLOYEE_USERNAME", ((Employee) loginResult1).getUsername());
+                        Employee employee = (Employee) loginResult1;
+                        client.setInfo("EMPLOYEE_USERNAME", employee.getUsername());
+                        client.setInfo("EMPLOYEE_PARK_ID", employee.getParkId());
                         client.sendToClient(new Message("EMPLOYEE_LOGIN_SUCCESS", loginResult1));
                     }
                     break;
@@ -206,7 +208,11 @@ public class ParkServer extends AbstractServer {
 
                  case "CHECK_IN_VISITOR":
                      Booking bookingToCheckIn = (Booking) message.getData();
-                     boolean checkInSuccess = checkInVisitor(bookingToCheckIn);
+                     Integer employeeParkId = (Integer) client.getInfo("EMPLOYEE_PARK_ID");
+                     if (employeeParkId == null) {
+                         throw new IllegalArgumentException("Employee park is missing. Please log in again.");
+                     }
+                     boolean checkInSuccess = checkInVisitor(bookingToCheckIn, employeeParkId);
                      client.sendToClient(new Message("CHECK_IN_RESULT", checkInSuccess));
                      break;
 
@@ -332,7 +338,8 @@ public class ParkServer extends AbstractServer {
         int price = calculatePrice(conn, booking.getParkId(), booking.getNumberOfVisitors());
 
         String sql = "UPDATE booking SET park_id = ?, numberOfVisitors = ?, visitorTime = ?, status = ?, price = ? "
-            + "WHERE booking_id = ? AND traveler_id = ? AND status <> ?";
+            + "WHERE booking_id = ? AND traveler_id = ? "
+            + "AND status NOT IN (?, ?, ?)";
         PreparedStatement ps = conn.prepareStatement(sql);
         ps.setInt(1, booking.getParkId());
         ps.setInt(2, booking.getNumberOfVisitors());
@@ -342,6 +349,8 @@ public class ParkServer extends AbstractServer {
         ps.setString(6, booking.getBookingId());
         ps.setString(7, booking.getTravelerId());
         ps.setString(8, Booking.STATUS_CANCELLED);
+        ps.setString(9, Booking.STATUS_CHECKED_IN);
+        ps.setString(10, Booking.STATUS_CHECKED_OUT);
         return ps.executeUpdate() > 0;
     }
 
@@ -351,11 +360,15 @@ public class ParkServer extends AbstractServer {
         }
 
         Connection conn = DBConnection.getStaticConnection();
-        String sql = "UPDATE booking SET status = ? WHERE booking_id = ? AND traveler_id = ?";
+        String sql = "UPDATE booking SET status = ? WHERE booking_id = ? AND traveler_id = ? "
+            + "AND status NOT IN (?, ?, ?)";
         PreparedStatement ps = conn.prepareStatement(sql);
         ps.setString(1, Booking.STATUS_CANCELLED);
         ps.setString(2, booking.getBookingId());
         ps.setString(3, booking.getTravelerId());
+        ps.setString(4, Booking.STATUS_CANCELLED);
+        ps.setString(5, Booking.STATUS_CHECKED_IN);
+        ps.setString(6, Booking.STATUS_CHECKED_OUT);
         return ps.executeUpdate() > 0;
     }
 
@@ -374,6 +387,9 @@ public class ParkServer extends AbstractServer {
         }
         if (booking.getVisitorTime() == null || !booking.getVisitorTime().isAfter(LocalDateTime.now())) {
             throw new IllegalArgumentException("Booking date and time must be in the future.");
+        }
+        if (booking.getVisitorTime().toLocalTime().isAfter(java.time.LocalTime.of(21, 0))) {
+            throw new IllegalArgumentException("Bookings can only be made until 21:00.");
         }
     }
 
@@ -478,10 +494,12 @@ public class ParkServer extends AbstractServer {
         // Sum visitors in bookings for the next 4 hours
         String bookingSql = "SELECT COALESCE(SUM(numberOfVisitors), 0) AS bookedVisitors " +
             "FROM booking WHERE park_id = ? " +
-            "AND status NOT IN ('CANCELLED', 'CHECKED_IN') " +
+            "AND status NOT IN (?, ?) " +
             "AND visitorTime BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 4 HOUR)";
         PreparedStatement bookingPs = conn.prepareStatement(bookingSql);
         bookingPs.setInt(1, parkId);
+        bookingPs.setString(2, Booking.STATUS_CANCELLED);
+        bookingPs.setString(3, Booking.STATUS_CHECKED_IN);
         ResultSet bookingRs = bookingPs.executeQuery();
         int bookedVisitors = 0;
         if (bookingRs.next()) bookedVisitors = bookingRs.getInt("bookedVisitors");
@@ -501,14 +519,21 @@ public class ParkServer extends AbstractServer {
     }
 
 
-    private boolean checkInVisitor(Booking booking) throws SQLException {
+    private boolean checkInVisitor(Booking booking, int employeeParkId) throws SQLException {
+        if (booking.getParkId() != employeeParkId) {
+            throw new IllegalArgumentException("This booking belongs to another park.");
+        }
+
         Connection conn = DBConnection.getStaticConnection();
 
         // Update booking status to CHECKED_IN and set visitorsInside = numberOfVisitors
-        String updateBooking = "UPDATE booking SET status = 'CHECKED_IN', visitorsInside = numberOfVisitors " +
-                               "WHERE booking_id = ? AND status = 'PENDING'";
+        String updateBooking = "UPDATE booking SET status = ?, visitorsInside = numberOfVisitors " +
+                               "WHERE booking_id = ? AND status = ? AND park_id = ?";
         PreparedStatement ps = conn.prepareStatement(updateBooking);
-        ps.setString(1, booking.getBookingId());
+        ps.setString(1, Booking.STATUS_CHECKED_IN);
+        ps.setString(2, booking.getBookingId());
+        ps.setString(3, Booking.STATUS_PENDING);
+        ps.setInt(4, employeeParkId);
         int rows = ps.executeUpdate();
 
         if (rows == 0) return false;
@@ -541,7 +566,7 @@ public class ParkServer extends AbstractServer {
      String status = rs.getString("status");
 
      // Only checked-in bookings can have visitors exit
-     if (!"CHECKED_IN".equals(status)) {
+     if (!Booking.STATUS_CHECKED_IN.equals(status)) {
          throw new IllegalArgumentException(
              "This booking is not checked in. Status: " + status);
      }
@@ -557,7 +582,7 @@ public class ParkServer extends AbstractServer {
      int remaining = visitorsInside - request.getVisitorsLeaving();
 
      // Update booking: reduce visitorsInside, set CHECKED_OUT if everyone left
-     String newStatus = (remaining == 0) ? "CHECKED_OUT" : "CHECKED_IN";
+     String newStatus = (remaining == 0) ? Booking.STATUS_CHECKED_OUT : Booking.STATUS_CHECKED_IN;
      String updateBooking = "UPDATE booking SET visitorsInside = ?, status = ? WHERE booking_id = ?";
      PreparedStatement updatePs = conn.prepareStatement(updateBooking);
      updatePs.setInt(1, remaining);
@@ -590,13 +615,14 @@ public class ParkServer extends AbstractServer {
         // Create booking record with CHECKED_IN status
         String bookingId = UUID.randomUUID().toString();
         String sql = "INSERT INTO booking (booking_id, traveler_id, park_id, numberOfVisitors, visitorTime, status, organizedBooking, price) " +
-            "VALUES (?, ?, ?, ?, NOW(), 'CHECKED_IN', false, ?)";
+            "VALUES (?, ?, ?, ?, NOW(), ?, false, ?)";
         PreparedStatement ps = conn.prepareStatement(sql);
         ps.setString(1, bookingId);
         ps.setString(2, request.getNationalId()); // use national ID as traveler reference
         ps.setInt(3, request.getParkId());
         ps.setInt(4, request.getNumberOfVisitors());
-        ps.setInt(5, price);
+        ps.setString(5, Booking.STATUS_CHECKED_IN);
+        ps.setInt(6, price);
         ps.executeUpdate();
 
         // Increase currentVisitors in park
@@ -608,6 +634,6 @@ public class ParkServer extends AbstractServer {
 
         return new Booking(bookingId, request.getNationalId(), request.getParkId(),
             request.getNumberOfVisitors(), java.time.LocalDateTime.now(),
-            Booking.STATUS_CONFIRMED, false, price);
+            Booking.STATUS_CHECKED_IN, false, price);
     }
 }

@@ -9,6 +9,8 @@ public class Booking implements Serializable {
     public static final String STATUS_PENDING = "PENDING";
     public static final String STATUS_CONFIRMED = "CONFIRMED";
     public static final String STATUS_CANCELLED = "CANCELLED";
+    public static final String STATUS_CHECKED_IN = "CHECKED_IN";
+    public static final String STATUS_CHECKED_OUT = "CHECKED_OUT";
 
     private String bookingId;
     private String travelerId;

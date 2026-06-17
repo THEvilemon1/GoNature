@@ -299,7 +299,7 @@ public class VisitorHomeController implements ServerResponseListener {
         }
 
         LocalDateTime now = LocalDateTime.now();
-        for (int hour = 8; hour <= 18; hour++) {
+        for (int hour = 8; hour <= 21; hour++) {
             LocalTime time = LocalTime.of(hour, 0);
             LocalDateTime slot = LocalDateTime.of(selectedDate, time);
             if (slot.isAfter(now)) {
@@ -355,6 +355,10 @@ public class VisitorHomeController implements ServerResponseListener {
     private Node createBookingRow(Booking booking) {
         VBox row = new VBox(8);
         row.getStyleClass().add("booking-row");
+        boolean locked = isLockedBooking(booking);
+        if (locked) {
+            row.getStyleClass().add("booking-row-locked");
+        }
 
         Label title = new Label(getParkName(booking.getParkId()));
         title.getStyleClass().add("booking-row-title");
@@ -369,7 +373,7 @@ public class VisitorHomeController implements ServerResponseListener {
 
         Button edit = new Button("Edit");
         edit.getStyleClass().add("small-action-btn");
-        edit.setDisable(Booking.STATUS_CANCELLED.equals(booking.getStatus()));
+        edit.setDisable(locked);
         edit.setOnAction(e -> {
             lblDetailTitle.setText("Edit Booking");
             showBookingForm(booking);
@@ -377,12 +381,19 @@ public class VisitorHomeController implements ServerResponseListener {
 
         Button cancel = new Button("Cancel Booking");
         cancel.getStyleClass().add("small-danger-btn");
-        cancel.setDisable(Booking.STATUS_CANCELLED.equals(booking.getStatus()));
+        cancel.setDisable(locked);
         cancel.setOnAction(e -> confirmAndCancelBooking(booking));
 
         HBox actions = new HBox(8, edit, cancel);
         row.getChildren().addAll(title, details, actions);
         return row;
+    }
+
+    private boolean isLockedBooking(Booking booking) {
+        String status = booking.getStatus();
+        return Booking.STATUS_CANCELLED.equals(status)
+            || Booking.STATUS_CHECKED_IN.equals(status)
+            || Booking.STATUS_CHECKED_OUT.equals(status);
     }
 
     private void confirmAndCancelBooking(Booking booking) {

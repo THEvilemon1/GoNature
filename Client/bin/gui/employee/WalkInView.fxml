@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<StackPane xmlns="http://javafx.com/javafx/17"
+           xmlns:fx="http://javafx.com/fxml/1"
+           fx:controller="gui.employee.WalkInViewController"
+           styleClass="root-pane"
+           stylesheets="@EmployeeScreens.css">
+
+    <VBox styleClass="screen-card" maxWidth="500" alignment="TOP_CENTER">
+
+        <!-- Top bar -->
+        <HBox styleClass="top-bar" alignment="CENTER_LEFT" spacing="0">
+            <Label styleClass="screen-title" text="Walk-in Visitor" />
+            <Region HBox.hgrow="ALWAYS" minWidth="20" />
+            <Label fx:id="lblAvailableSpots" styleClass="top-bar-info" text="Available Spots: --" />
+        </HBox>
+
+        <!-- Content -->
+        <VBox styleClass="content-area" spacing="16">
+
+            <!-- National ID -->
+            <VBox spacing="6">
+                <Label styleClass="field-label" text="National ID (one person from group)" />
+                <TextField fx:id="txtNationalId" styleClass="field-input"
+                           promptText="Enter national ID" />
+            </VBox>
+
+            <!-- Number of visitors -->
+            <VBox spacing="6">
+                <Label styleClass="field-label" text="Number of Visitors" />
+                <TextField fx:id="txtVisitors" styleClass="field-input"
+                           promptText="Enter number of visitors (1-15)" />
+            </VBox>
+
+            <!-- Status -->
+            <Label fx:id="lblStatus" styleClass="lbl-message" text="" wrapText="true" visible="false" />
+
+            <Separator styleClass="card-sep" />
+
+            <!-- Submit -->
+            <Button styleClass="btn-action" text="Submit Walk-in"
+                    onAction="#handleSubmit" maxWidth="Infinity" />
+
+            <Button styleClass="btn-secondary" text="← Back"
+                    onAction="#handleBack" prefWidth="100" />
+
+        </VBox>
+    </VBox>
+</StackPane>

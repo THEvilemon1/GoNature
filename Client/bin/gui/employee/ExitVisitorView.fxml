@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<StackPane xmlns="http://javafx.com/javafx/17"
+           xmlns:fx="http://javafx.com/fxml/1"
+           fx:controller="gui.employee.ExitVisitorViewController"
+           styleClass="root-pane"
+           stylesheets="@EmployeeScreens.css">
+
+    <VBox styleClass="screen-card" maxWidth="500" alignment="TOP_CENTER">
+
+        <!-- Top bar -->
+        <HBox styleClass="top-bar" alignment="CENTER_LEFT">
+            <Label styleClass="screen-title" text="Exit Visitor" />
+        </HBox>
+
+        <!-- Content -->
+        <VBox styleClass="content-area" spacing="16">
+
+            <!-- Booking ID -->
+            <VBox spacing="6">
+                <Label styleClass="field-label" text="Booking ID" />
+                <TextField fx:id="txtBookingId" styleClass="field-input"
+                           promptText="Enter booking ID" />
+            </VBox>
+
+            <!-- Number leaving -->
+            <VBox spacing="6">
+                <Label styleClass="field-label" text="Number of Visitors Leaving" />
+                <TextField fx:id="txtVisitorsLeaving" styleClass="field-input"
+                           promptText="Enter number of visitors leaving" />
+            </VBox>
+
+            <!-- Status -->
+            <Label fx:id="lblStatus" styleClass="lbl-message" text="" wrapText="true" visible="false" />
+
+            <Separator styleClass="card-sep" />
+
+            <!-- Submit -->
+            <Button styleClass="btn-danger" text="Submit Exit"
+                    onAction="#handleSubmit" maxWidth="Infinity" />
+
+            <Button styleClass="btn-secondary" text="← Back"
+                    onAction="#handleBack" prefWidth="100" />
+
+        </VBox>
+    </VBox>
+</StackPane>

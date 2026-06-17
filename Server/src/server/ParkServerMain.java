@@ -26,6 +26,9 @@ public class ParkServerMain extends Application {
             ParkServer server = new ParkServer(Integer.parseInt(port));
             server.listen();
             System.out.println("Park Server running on port " + port);
+
+            // Start the reminder scheduler — sends SMS+Email 1 hour before each booking
+            ReminderScheduler.getInstance().start();
         } catch (Exception e) {
             e.printStackTrace();
         }

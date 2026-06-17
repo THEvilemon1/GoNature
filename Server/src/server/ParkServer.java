@@ -457,12 +457,10 @@ public class ParkServer extends AbstractServer {
         conn.setAutoCommit(false);
 
         try {
-        	// Don't insert user_id — let AUTO_INCREMENT handle it
-            int userId = getNextUserId(conn);
-
+        	// traveler.traveler_id is also the foreign key to user.user_id.
         	String insertUserSql = "INSERT INTO `user` (user_id, firstName, lastName, email, phoneNumber) VALUES (?, ?, ?, ?, ?)";
         	PreparedStatement insertUserPs = conn.prepareStatement(insertUserSql);
-            insertUserPs.setInt(1, userId);
+            insertUserPs.setString(1, travelerId);
         	insertUserPs.setString(2, "Visitor");
         	insertUserPs.setString(3, "Guest");
         	insertUserPs.setString(4, "visitor-" + nationalId + "@gonature.local");
@@ -470,19 +468,13 @@ public class ParkServer extends AbstractServer {
         	insertUserPs.executeUpdate();
             System.out.println("Inserted user row for visitor: " + travelerId);
 
-            boolean travelerHasUserId = hasColumn(conn, "traveler", "user_id");
-            String insertTravelerSql = travelerHasUserId
-                ? "INSERT INTO traveler (traveler_id, nationalId, guide, clubMember, user_id) VALUES (?, ?, ?, ?, ?)"
-                : "INSERT INTO traveler (traveler_id, nationalId, guide, clubMember) VALUES (?, ?, ?, ?)";
+            String insertTravelerSql = "INSERT INTO traveler (traveler_id, nationalId, guide, clubMember) VALUES (?, ?, ?, ?)";
             PreparedStatement insertTravelerPs = conn.prepareStatement(insertTravelerSql);
             System.out.println("Registering traveler details for national ID: " + nationalId);
             insertTravelerPs.setString(1, travelerId);
             insertTravelerPs.setInt(2, nationalIdNumber);
             insertTravelerPs.setBoolean(3, false);
             insertTravelerPs.setBoolean(4, false);
-            if (travelerHasUserId) {
-                insertTravelerPs.setInt(5, userId);
-            }
             insertTravelerPs.executeUpdate();
             System.out.println("Inserted traveler row for visitor: " + travelerId);
 
@@ -495,28 +487,6 @@ public class ParkServer extends AbstractServer {
             conn.setAutoCommit(previousAutoCommit);
         }
     }
-
-    private int getNextUserId(Connection conn) throws SQLException {
-        String sql = "SELECT COALESCE(MAX(user_id), 0) + 1 AS next_user_id FROM `user`";
-        PreparedStatement ps = conn.prepareStatement(sql);
-        ResultSet rs = ps.executeQuery();
-        if (rs.next()) {
-            return rs.getInt("next_user_id");
-        }
-        return 1;
-    }
-
-    private boolean hasColumn(Connection conn, String tableName, String columnName) throws SQLException {
-        DatabaseMetaData meta = conn.getMetaData();
-        ResultSet columns = meta.getColumns(null, null, tableName, columnName);
-        if (columns.next()) {
-            return true;
-        }
-
-        columns = meta.getColumns(null, null, tableName.toUpperCase(), columnName);
-        return columns.next();
-    }
- 
 
     private int getParkCurrentVisitors(int parkId) throws SQLException {
         Connection conn = DBConnection.getStaticConnection();

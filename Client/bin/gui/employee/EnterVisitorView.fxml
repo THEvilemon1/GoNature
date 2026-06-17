@@ -9,7 +9,7 @@
            styleClass="root-pane"
            stylesheets="@EmployeeScreens.css">
 
-    <VBox styleClass="screen-card" maxWidth="500" alignment="TOP_CENTER">
+    <VBox styleClass="screen-card" prefWidth="900" maxWidth="980" alignment="TOP_CENTER">
 
         <!-- Top bar -->
         <HBox styleClass="top-bar" alignment="CENTER_LEFT" spacing="0">
@@ -28,7 +28,7 @@
                     <TextField fx:id="txtBookingId" styleClass="field-input"
                                promptText="Enter booking ID" HBox.hgrow="ALWAYS" />
                     <Button styleClass="btn-primary" text="Search"
-                            onAction="#handleSearchBooking" prefWidth="90" prefHeight="40" />
+                            onAction="#handleSearchBooking" prefWidth="120" prefHeight="40" />
                 </HBox>
             </VBox>
 
@@ -45,9 +45,9 @@
             <!-- Action buttons -->
             <HBox spacing="12">
                 <Button fx:id="btnCheckIn" styleClass="btn-primary" text="Check In"
-                        onAction="#handleCheckIn" prefWidth="150" visible="false" />
+                        onAction="#handleCheckIn" HBox.hgrow="ALWAYS" maxWidth="Infinity" visible="false" />
                 <Button styleClass="btn-action" text="Walk-in Visitor"
-                        onAction="#handleWalkIn" prefWidth="160" />
+                        onAction="#handleWalkIn" HBox.hgrow="ALWAYS" maxWidth="Infinity" />
             </HBox>
 
             <Separator styleClass="card-sep" />

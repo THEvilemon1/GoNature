@@ -6,6 +6,8 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 import client.ParkClient;
 import client.ServerResponseListener;
@@ -16,7 +18,9 @@ import common.Order;
 import common.VisitorLoginResult;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
 import javafx.scene.Node;
+import javafx.scene.Parent;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
@@ -25,6 +29,7 @@ import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.SpinnerValueFactory;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
@@ -43,6 +48,10 @@ public class VisitorHomeController implements ServerResponseListener {
     @FXML private Label lblDetailTitle;
     @FXML private Label lblBookingMessage;
     @FXML private Label lblBookingsMessage;
+    @FXML private Label lblSelectedParkPrice;
+    @FXML private Label lblParkPricesList;
+    @FXML private Label lblPricePerPerson;
+    @FXML private Label lblTotalPrice;
     @FXML private Spinner<Integer> spnVisitors;
     @FXML private ComboBox<ParkOption> cmbPark;
     @FXML private DatePicker dateVisit;
@@ -51,11 +60,13 @@ public class VisitorHomeController implements ServerResponseListener {
 
     private VisitorLoginResult currentUser;
     private Booking editingBooking;
+    private final Map<Integer, Integer> pricesByParkId = new HashMap<>();
 
     @FXML
     private void initialize() {
         spnVisitors.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, 15, 1));
         spnVisitors.getEditor().textProperty().addListener((obs, oldValue, newValue) -> clampVisitorEditor());
+        spnVisitors.valueProperty().addListener((obs, oldValue, newValue) -> updatePriceSummary());
 
         cmbPark.getItems().setAll(
             new ParkOption(1, "Banias Nature Reserve"),
@@ -63,6 +74,7 @@ public class VisitorHomeController implements ServerResponseListener {
             new ParkOption(3, "Hula Nature Reserve"),
             new ParkOption(4, "Achziv National Park")
         );
+        cmbPark.valueProperty().addListener((obs, oldValue, newValue) -> updatePriceSummary());
 
         dateVisit.setDayCellFactory(picker -> new DateCell() {
             @Override
@@ -74,6 +86,7 @@ public class VisitorHomeController implements ServerResponseListener {
         dateVisit.valueProperty().addListener((obs, oldValue, newValue) -> refreshTimeOptions());
         dateVisit.setValue(LocalDate.now());
         refreshTimeOptions();
+        updatePriceSummary();
     }
 
     public void loadVisitor(VisitorLoginResult result) {
@@ -81,6 +94,7 @@ public class VisitorHomeController implements ServerResponseListener {
         ParkClient client = ParkClient.getInstance();
         if (client != null) {
             client.setListener(this);
+            requestParkPrices();
         }
 
         lblVisitorDetails.setText(
@@ -124,9 +138,17 @@ public class VisitorHomeController implements ServerResponseListener {
     private void handleLogoutButton(javafx.event.ActionEvent event) {
         handleLogout();
         try {
-            ((Node) event.getSource()).getScene().getWindow().hide();
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/gui/login/LoginPage.fxml"));
+            Parent root = loader.load();
+            Stage stage = (Stage) ((Node) event.getSource()).getScene().getWindow();
+            javafx.scene.Scene scene = new javafx.scene.Scene(root);
+            java.net.URL css = getClass().getResource("/gui/login/LoginPage.css");
+            if (css != null) scene.getStylesheets().add(css.toExternalForm());
+            stage.setTitle("GoNature - Login");
+            stage.setScene(scene);
         } catch (Exception e) {
-            System.out.println("Error closing window: " + e.getMessage());
+            System.out.println("Error returning to login window: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -188,6 +210,17 @@ public class VisitorHomeController implements ServerResponseListener {
     @Override
     public void onTravelerBookingsResult(ArrayList<Booking> bookings) {
         Platform.runLater(() -> renderBookings(bookings));
+    }
+
+    @Override
+    public void onParkPricesResult(Map<Integer, Integer> pricesByParkId) {
+        Platform.runLater(() -> {
+            this.pricesByParkId.clear();
+            if (pricesByParkId != null) {
+                this.pricesByParkId.putAll(pricesByParkId);
+            }
+            updatePriceSummary();
+        });
     }
 
     @Override
@@ -288,6 +321,58 @@ public class VisitorHomeController implements ServerResponseListener {
             spnVisitors.getValueFactory().setValue(1);
             spnVisitors.getEditor().setText("1");
         }
+        updatePriceSummary();
+    }
+
+    private void updatePriceSummary() {
+        if (lblSelectedParkPrice == null || lblPricePerPerson == null || lblTotalPrice == null) {
+            return;
+        }
+
+        updateParkPricesList();
+
+        ParkOption park = cmbPark == null ? null : cmbPark.getValue();
+        if (park == null) {
+            lblSelectedParkPrice.setText("Select a park to see its price per person.");
+            lblPricePerPerson.setText("Price per person: --");
+            lblTotalPrice.setText("Total: --");
+            return;
+        }
+
+        Integer pricePerPerson = pricesByParkId.get(park.getId());
+        if (pricePerPerson == null) {
+            lblSelectedParkPrice.setText("Price for " + park.getName() + " is not loaded yet.");
+            lblPricePerPerson.setText("Price per person: --");
+            lblTotalPrice.setText("Total: --");
+            return;
+        }
+
+        int visitors = spnVisitors == null || spnVisitors.getValue() == null ? 1 : spnVisitors.getValue();
+        int totalPrice = pricePerPerson * visitors;
+
+        lblSelectedParkPrice.setText(park.getName() + ": " + pricePerPerson + " ILS per person.");
+        lblPricePerPerson.setText("Price per person: " + pricePerPerson + " ILS");
+        lblTotalPrice.setText("Total: " + totalPrice + " ILS");
+    }
+
+    private void updateParkPricesList() {
+        if (lblParkPricesList == null || cmbPark == null) {
+            return;
+        }
+        if (pricesByParkId.isEmpty()) {
+            lblParkPricesList.setText("");
+            return;
+        }
+
+        StringBuilder text = new StringBuilder("Park prices per person:\n");
+        for (ParkOption option : cmbPark.getItems()) {
+            Integer price = pricesByParkId.get(option.getId());
+            text.append(option.getName())
+                .append(": ")
+                .append(price == null ? "--" : price + " ILS")
+                .append("\n");
+        }
+        lblParkPricesList.setText(text.toString().trim());
     }
 
     private void refreshTimeOptions() {
@@ -330,6 +415,18 @@ public class VisitorHomeController implements ServerResponseListener {
         }
     }
 
+    private void requestParkPrices() {
+        ParkClient client = ParkClient.getInstance();
+        if (client == null || !client.isConnected()) {
+            return;
+        }
+        try {
+            client.sendToServer(new Message("GET_PARK_PRICES", null));
+        } catch (IOException e) {
+            showBookingMessage("Failed to load park prices: " + e.getMessage(), true);
+        }
+    }
+
     private void renderBookings(ArrayList<Booking> bookings) {
         bookingsList.getChildren().clear();
         if (bookings == null || bookings.isEmpty()) {
@@ -338,38 +435,95 @@ public class VisitorHomeController implements ServerResponseListener {
         }
 
         hideBookingsMessage();
-        int visibleBookings = 0;
+        VBox pendingSection = createBookingsSection("Pending approval",
+            "Waiting for park approval. These bookings can still be edited or cancelled.");
+        VBox confirmedSection = createBookingsSection("Confirmed visits",
+            "Approved reservations that can still be edited or cancelled before check-in.");
+        VBox unavailableSection = createBookingsSection("Completed / unavailable",
+            "Bookings in this section are locked because their visit state is final or already in progress.");
+
+        int pendingCount = 0;
+        int confirmedCount = 0;
+        int unavailableCount = 0;
+
         for (Booking booking : bookings) {
-            if (Booking.STATUS_CANCELLED.equals(booking.getStatus())) {
-                continue;
+            Node row = createBookingRow(booking);
+            if (Booking.STATUS_PENDING.equals(booking.getStatus())) {
+                pendingSection.getChildren().add(row);
+                pendingCount++;
+            } else if (Booking.STATUS_CONFIRMED.equals(booking.getStatus())) {
+                confirmedSection.getChildren().add(row);
+                confirmedCount++;
+            } else {
+                unavailableSection.getChildren().add(row);
+                unavailableCount++;
             }
-            bookingsList.getChildren().add(createBookingRow(booking));
-            visibleBookings++;
         }
 
-        if (visibleBookings == 0) {
+        if (pendingCount + confirmedCount + unavailableCount == 0) {
             showBookingsMessage("No bookings yet.", false);
+            return;
         }
+
+        if (pendingCount > 0) {
+            bookingsList.getChildren().add(pendingSection);
+        }
+        if (confirmedCount > 0) {
+            bookingsList.getChildren().add(confirmedSection);
+        }
+        if (unavailableCount > 0) {
+            bookingsList.getChildren().add(unavailableSection);
+        }
+    }
+
+    private VBox createBookingsSection(String titleText, String descriptionText) {
+        VBox section = new VBox(8);
+        section.getStyleClass().add("booking-section");
+
+        Label title = new Label(titleText);
+        title.getStyleClass().add("booking-section-title");
+
+        Label description = new Label(descriptionText);
+        description.getStyleClass().add("booking-section-desc");
+        description.setWrapText(true);
+
+        section.getChildren().addAll(title, description);
+        return section;
     }
 
     private Node createBookingRow(Booking booking) {
         VBox row = new VBox(8);
         row.getStyleClass().add("booking-row");
-        boolean locked = isLockedBooking(booking);
+        boolean editable = isEditableBooking(booking);
+        boolean locked = !editable;
         if (locked) {
             row.getStyleClass().add("booking-row-locked");
         }
 
+        HBox header = new HBox(10);
+        header.getStyleClass().add("booking-row-header");
+
         Label title = new Label(getParkName(booking.getParkId()));
         title.getStyleClass().add("booking-row-title");
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
+
+        Label status = new Label(getStatusLabel(booking.getStatus()));
+        status.getStyleClass().addAll("booking-status-badge", getStatusStyleClass(booking.getStatus()));
+
+        header.getChildren().addAll(title, spacer, status);
 
         Label details = new Label(
             booking.getVisitorTime().format(DATE_TIME_FORMAT)
             + " | Visitors: " + booking.getNumberOfVisitors()
-            + " | Price: " + booking.getPrice()
-            + " | Status: " + booking.getStatus()
+            + " | Price: " + booking.getPrice() + " ILS"
         );
         details.getStyleClass().add("booking-row-details");
+
+        Label description = new Label(getStatusDescription(booking.getStatus()));
+        description.getStyleClass().add("booking-row-description");
+        description.setWrapText(true);
 
         Button edit = new Button("Edit");
         edit.getStyleClass().add("small-action-btn");
@@ -385,15 +539,56 @@ public class VisitorHomeController implements ServerResponseListener {
         cancel.setOnAction(e -> confirmAndCancelBooking(booking));
 
         HBox actions = new HBox(8, edit, cancel);
-        row.getChildren().addAll(title, details, actions);
+        row.getChildren().addAll(header, details, description, actions);
         return row;
     }
 
-    private boolean isLockedBooking(Booking booking) {
+    private boolean isEditableBooking(Booking booking) {
         String status = booking.getStatus();
-        return Booking.STATUS_CANCELLED.equals(status)
-            || Booking.STATUS_CHECKED_IN.equals(status)
-            || Booking.STATUS_CHECKED_OUT.equals(status);
+        return Booking.STATUS_PENDING.equals(status)
+            || Booking.STATUS_CONFIRMED.equals(status);
+    }
+
+    private String getStatusLabel(String status) {
+        if (Booking.STATUS_PENDING.equals(status)) return "Pending";
+        if (Booking.STATUS_CONFIRMED.equals(status)) return "Confirmed";
+        if (Booking.STATUS_CANCELLED.equals(status)) return "Cancelled";
+        if (Booking.STATUS_CHECKED_IN.equals(status)) return "Checked in";
+        if (Booking.STATUS_CHECKED_OUT.equals(status)) return "Checked out";
+        if (Booking.STATUS_SYSTEM_CANCEL.equals(status)) return "System cancelled";
+        return status == null || status.isBlank() ? "Unknown" : status;
+    }
+
+    private String getStatusDescription(String status) {
+        if (Booking.STATUS_PENDING.equals(status)) {
+            return "Waiting for park approval. You can still edit or cancel this booking.";
+        }
+        if (Booking.STATUS_CONFIRMED.equals(status)) {
+            return "Your visit is approved. You can still edit or cancel before check-in.";
+        }
+        if (Booking.STATUS_CANCELLED.equals(status)) {
+            return "This booking was cancelled and can no longer be changed.";
+        }
+        if (Booking.STATUS_CHECKED_IN.equals(status)) {
+            return "This visit is already active and cannot be changed.";
+        }
+        if (Booking.STATUS_CHECKED_OUT.equals(status)) {
+            return "This visit has ended and is kept for your records.";
+        }
+        if (Booking.STATUS_SYSTEM_CANCEL.equals(status)) {
+            return "This booking was cancelled automatically by the system.";
+        }
+        return "This booking status is not available for changes.";
+    }
+
+    private String getStatusStyleClass(String status) {
+        if (Booking.STATUS_PENDING.equals(status)) return "status-pending";
+        if (Booking.STATUS_CONFIRMED.equals(status)) return "status-confirmed";
+        if (Booking.STATUS_CANCELLED.equals(status)) return "status-cancelled";
+        if (Booking.STATUS_CHECKED_IN.equals(status)) return "status-checked-in";
+        if (Booking.STATUS_CHECKED_OUT.equals(status)) return "status-checked-out";
+        if (Booking.STATUS_SYSTEM_CANCEL.equals(status)) return "status-system-cancel";
+        return "status-unknown";
     }
 
     private void confirmAndCancelBooking(Booking booking) {
@@ -441,6 +636,7 @@ public class VisitorHomeController implements ServerResponseListener {
         refreshTimeOptions();
         cmbTime.setValue(booking.getVisitorTime().toLocalTime().toString());
         btnSubmitBooking.setText("Update Booking");
+        updatePriceSummary();
     }
 
     private void showBookingsList() {
@@ -458,6 +654,7 @@ public class VisitorHomeController implements ServerResponseListener {
         cmbPark.setValue(null);
         dateVisit.setValue(LocalDate.now());
         refreshTimeOptions();
+        updatePriceSummary();
         hideBookingMessage();
     }
 

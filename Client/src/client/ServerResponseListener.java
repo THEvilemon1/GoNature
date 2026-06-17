@@ -1,6 +1,7 @@
 package client;
 
 import java.util.ArrayList;
+import java.util.Map;
 
 import common.Booking;
 import common.Employee;
@@ -15,6 +16,7 @@ public interface ServerResponseListener {
 
     default void onVisitorLoginResult(VisitorLoginResult result) {}
     default void onTravelerBookingsResult(ArrayList<Booking> bookings) {}
+    default void onParkPricesResult(Map<Integer, Integer> pricesByParkId) {}
     default void onCreateBookingResult(Booking booking) {}
     default void onUpdateBookingResult(boolean success) {}
     default void onCancelBookingResult(boolean success) {}

@@ -2,6 +2,7 @@ package gui.employee;
 
 import client.ParkClient;
 import client.ServerResponseListener;
+import client.WindowUtil;
 import common.Employee;
 import common.Message;
 import common.Order;
@@ -99,7 +100,7 @@ public class ExitVisitorViewController {
         stage.setTitle("Booking Management");
         stage.setScene(new Scene(root));
         stage.setOnCloseRequest(e -> System.exit(0));
-        stage.show();
+        WindowUtil.showMaximized(stage);
     }
 
  

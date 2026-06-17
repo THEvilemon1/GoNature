@@ -16,7 +16,7 @@ import java.util.concurrent.TimeUnit;
 // Fires every day at 23:59 and cancels bookings that were never paid/completed.
 public class EndOfDayScheduler {
 
-    private static final LocalTime FIRE_AT = LocalTime.of(12, 43, 00);
+    private static final LocalTime FIRE_AT = LocalTime.of(23, 59, 59);
     private static final long DAY_SECONDS = TimeUnit.DAYS.toSeconds(1);
 
     private static final String SAFE_STATUS =

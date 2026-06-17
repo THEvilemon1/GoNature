@@ -9,7 +9,7 @@
            styleClass="root-pane"
            stylesheets="@EmployeeScreens.css">
 
-    <VBox styleClass="screen-card" maxWidth="500" alignment="TOP_CENTER">
+    <VBox styleClass="screen-card" prefWidth="900" maxWidth="980" alignment="TOP_CENTER">
 
         <!-- Top bar -->
         <HBox styleClass="top-bar" alignment="CENTER_LEFT" spacing="0">
@@ -28,9 +28,9 @@
             <!-- Main action buttons -->
             <HBox spacing="16" alignment="CENTER">
                 <Button styleClass="btn-big, btn-primary" text="Enter Visitor"
-                        onAction="#handleEnterVisitor" prefWidth="200" />
+                        onAction="#handleEnterVisitor" HBox.hgrow="ALWAYS" maxWidth="Infinity" />
                 <Button styleClass="btn-big, btn-danger" text="Exit Visitor"
-                        onAction="#handleExitVisitor" prefWidth="200" />
+                        onAction="#handleExitVisitor" HBox.hgrow="ALWAYS" maxWidth="Infinity" />
             </HBox>
 
             <Separator styleClass="card-sep" />

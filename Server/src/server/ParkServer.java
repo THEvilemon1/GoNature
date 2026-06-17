@@ -5,7 +5,9 @@ import java.sql.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -126,6 +128,10 @@ public class ParkServer extends AbstractServer {
                 case "GET_TRAVELER_BOOKINGS":
                     String travelerId = (String) message.getData();
                     client.sendToClient(new Message("TRAVELER_BOOKINGS_RESULT", getTravelerBookings(travelerId)));
+                    break;
+
+                case "GET_PARK_PRICES":
+                    client.sendToClient(new Message("PARK_PRICES_RESULT", getParkPrices()));
                     break;
 
                 case "UPDATE_BOOKING":
@@ -406,6 +412,20 @@ public class ParkServer extends AbstractServer {
         return rs.getInt("pricePerPerson") * numberOfVisitors;
     }
 
+    private Map<Integer, Integer> getParkPrices() throws SQLException {
+        Map<Integer, Integer> prices = new HashMap<>();
+        Connection conn = DBConnection.getStaticConnection();
+        String sql = "SELECT park_id, pricePerPerson FROM park ORDER BY park_id";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ResultSet rs = ps.executeQuery();
+
+        while (rs.next()) {
+            prices.put(rs.getInt("park_id"), rs.getInt("pricePerPerson"));
+        }
+
+        return prices;
+    }
+
     private Booking mapBooking(ResultSet rs) throws SQLException {
         Timestamp visitorTimestamp = rs.getTimestamp("visitorTime");
         return new Booking(
@@ -438,22 +458,31 @@ public class ParkServer extends AbstractServer {
 
         try {
         	// Don't insert user_id — let AUTO_INCREMENT handle it
-        	String insertUserSql = "INSERT INTO `user` (firstName, lastName, email, phoneNumber) VALUES (?, ?, ?, ?)";
+            int userId = getNextUserId(conn);
+
+        	String insertUserSql = "INSERT INTO `user` (user_id, firstName, lastName, email, phoneNumber) VALUES (?, ?, ?, ?, ?)";
         	PreparedStatement insertUserPs = conn.prepareStatement(insertUserSql);
-        	insertUserPs.setString(1, "Visitor");
-        	insertUserPs.setString(2, "Guest");
-        	insertUserPs.setString(3, "visitor-" + nationalId + "@gonature.local");
-        	insertUserPs.setNull(4, Types.VARCHAR);
+            insertUserPs.setInt(1, userId);
+        	insertUserPs.setString(2, "Visitor");
+        	insertUserPs.setString(3, "Guest");
+        	insertUserPs.setString(4, "visitor-" + nationalId + "@gonature.local");
+        	insertUserPs.setNull(5, Types.VARCHAR);
         	insertUserPs.executeUpdate();
             System.out.println("Inserted user row for visitor: " + travelerId);
 
-            String insertTravelerSql = "INSERT INTO traveler (traveler_id, nationalId, guide, clubMember) VALUES (?, ?, ?, ?)";
+            boolean travelerHasUserId = hasColumn(conn, "traveler", "user_id");
+            String insertTravelerSql = travelerHasUserId
+                ? "INSERT INTO traveler (traveler_id, nationalId, guide, clubMember, user_id) VALUES (?, ?, ?, ?, ?)"
+                : "INSERT INTO traveler (traveler_id, nationalId, guide, clubMember) VALUES (?, ?, ?, ?)";
             PreparedStatement insertTravelerPs = conn.prepareStatement(insertTravelerSql);
             System.out.println("Registering traveler details for national ID: " + nationalId);
             insertTravelerPs.setString(1, travelerId);
             insertTravelerPs.setInt(2, nationalIdNumber);
             insertTravelerPs.setBoolean(3, false);
             insertTravelerPs.setBoolean(4, false);
+            if (travelerHasUserId) {
+                insertTravelerPs.setInt(5, userId);
+            }
             insertTravelerPs.executeUpdate();
             System.out.println("Inserted traveler row for visitor: " + travelerId);
 
@@ -465,6 +494,27 @@ public class ParkServer extends AbstractServer {
         } finally {
             conn.setAutoCommit(previousAutoCommit);
         }
+    }
+
+    private int getNextUserId(Connection conn) throws SQLException {
+        String sql = "SELECT COALESCE(MAX(user_id), 0) + 1 AS next_user_id FROM `user`";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ResultSet rs = ps.executeQuery();
+        if (rs.next()) {
+            return rs.getInt("next_user_id");
+        }
+        return 1;
+    }
+
+    private boolean hasColumn(Connection conn, String tableName, String columnName) throws SQLException {
+        DatabaseMetaData meta = conn.getMetaData();
+        ResultSet columns = meta.getColumns(null, null, tableName, columnName);
+        if (columns.next()) {
+            return true;
+        }
+
+        columns = meta.getColumns(null, null, tableName.toUpperCase(), columnName);
+        return columns.next();
     }
  
 

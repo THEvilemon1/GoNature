@@ -86,7 +86,7 @@ public class EnterVisitorViewController {
                         foundBooking = null;
                         return;
                     }
-                    if (!Booking.STATUS_PENDING.equals(booking.getStatus())) {
+                    if (!Booking.STATUS_CONFIRMED.equals(booking.getStatus())) {
                         showStatus("This booking cannot be checked in. Status: " + booking.getStatus(), true);
                         btnCheckIn.setVisible(false);
                         detailsBox.setVisible(false);

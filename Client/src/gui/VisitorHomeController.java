@@ -229,7 +229,11 @@ public class VisitorHomeController implements ServerResponseListener {
             resetForm();
             lblDetailTitle.setText("My Bookings");
             showBookingsList();
-            showBookingsMessage("Booking submitted and waiting for approval.", false);
+            if (booking != null && Booking.STATUS_WAITING_LIST.equals(booking.getStatus())) {
+                showBookingsMessage("No spots available. You are in the waiting list.", false);
+            } else {
+                showBookingsMessage("Booking confirmed.", false);
+            }
             requestTravelerBookings();
         });
     }
@@ -412,8 +416,8 @@ public class VisitorHomeController implements ServerResponseListener {
         }
 
         hideBookingsMessage();
-        VBox pendingSection = createBookingsSection("Pending approval",
-            "Waiting for park approval. These bookings can still be edited or cancelled.");
+        VBox pendingSection = createBookingsSection("Waiting list",
+            "You are in the waiting list. If another visitor cancels and there is enough room, your booking will be confirmed automatically.");
         VBox confirmedSection = createBookingsSection("Confirmed visits",
             "Approved reservations that can still be edited or cancelled before check-in.");
         VBox unavailableSection = createBookingsSection("Completed / unavailable",
@@ -425,7 +429,7 @@ public class VisitorHomeController implements ServerResponseListener {
 
         for (Booking booking : bookings) {
             Node row = createBookingRow(booking);
-            if (Booking.STATUS_PENDING.equals(booking.getStatus())) {
+            if (Booking.STATUS_PENDING.equals(booking.getStatus()) || Booking.STATUS_WAITING_LIST.equals(booking.getStatus())) {
                 pendingSection.getChildren().add(row);
                 pendingCount++;
             } else if (Booking.STATUS_CONFIRMED.equals(booking.getStatus())) {
@@ -523,11 +527,13 @@ public class VisitorHomeController implements ServerResponseListener {
     private boolean isEditableBooking(Booking booking) {
         String status = booking.getStatus();
         return Booking.STATUS_PENDING.equals(status)
+            || Booking.STATUS_WAITING_LIST.equals(status)
             || Booking.STATUS_CONFIRMED.equals(status);
     }
 
     private String getStatusLabel(String status) {
         if (Booking.STATUS_PENDING.equals(status)) return "Pending";
+        if (Booking.STATUS_WAITING_LIST.equals(status)) return "Waiting list";
         if (Booking.STATUS_CONFIRMED.equals(status)) return "Confirmed";
         if (Booking.STATUS_CANCELLED.equals(status)) return "Cancelled";
         if (Booking.STATUS_CHECKED_IN.equals(status)) return "Checked in";
@@ -539,6 +545,9 @@ public class VisitorHomeController implements ServerResponseListener {
     private String getStatusDescription(String status) {
         if (Booking.STATUS_PENDING.equals(status)) {
             return "Waiting for park approval. You can still edit or cancel this booking.";
+        }
+        if (Booking.STATUS_WAITING_LIST.equals(status)) {
+            return "You are in the waiting list. You will be confirmed automatically if enough spots open.";
         }
         if (Booking.STATUS_CONFIRMED.equals(status)) {
             return "Your visit is approved. You can still edit or cancel before check-in.";
@@ -560,6 +569,7 @@ public class VisitorHomeController implements ServerResponseListener {
 
     private String getStatusStyleClass(String status) {
         if (Booking.STATUS_PENDING.equals(status)) return "status-pending";
+    if (Booking.STATUS_WAITING_LIST.equals(status)) return "status-pending";
         if (Booking.STATUS_CONFIRMED.equals(status)) return "status-confirmed";
         if (Booking.STATUS_CANCELLED.equals(status)) return "status-cancelled";
         if (Booking.STATUS_CHECKED_IN.equals(status)) return "status-checked-in";

@@ -20,6 +20,7 @@ public interface ServerResponseListener {
     default void onCreateBookingResult(Booking booking) {}
     default void onUpdateBookingResult(boolean success) {}
     default void onCancelBookingResult(boolean success) {}
+    default void onConfirmBookingResult(boolean success) {}
 
     // Employee login
     default void onEmployeeLoginSuccess(Employee employee) {}

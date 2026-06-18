@@ -8,6 +8,7 @@
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.Spinner?>
+<?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.StackPane?>
@@ -72,6 +73,22 @@
             </Separator>
 
             <VBox fx:id="bookingForm" styleClass="detail-body" spacing="14">
+                <VBox spacing="5">
+                    <Label styleClass="field-label" text="Name" />
+                    <TextField fx:id="txtName" promptText="Enter your name" maxWidth="Infinity" />
+                </VBox>
+
+                <HBox spacing="12">
+                    <VBox spacing="5" HBox.hgrow="ALWAYS">
+                        <Label styleClass="field-label" text="Email Address" />
+                        <TextField fx:id="txtEmail" promptText="Enter email address" maxWidth="Infinity" />
+                    </VBox>
+                    <VBox spacing="5" HBox.hgrow="ALWAYS">
+                        <Label styleClass="field-label" text="Phone Number" />
+                        <TextField fx:id="txtPhoneNumber" promptText="Enter phone number" maxWidth="Infinity" />
+                    </VBox>
+                </HBox>
+
                 <VBox spacing="5">
                     <Label styleClass="field-label" text="Visitors" />
                     <Spinner fx:id="spnVisitors" editable="true" maxWidth="120" />

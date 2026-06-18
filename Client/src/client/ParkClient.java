@@ -83,6 +83,9 @@ public class ParkClient extends AbstractClient {
                 case "CANCEL_BOOKING_RESULT":
                     listener.onCancelBookingResult((boolean) message.getData());
                     break;
+                case "CONFIRM_BOOKING_RESULT":
+                    listener.onConfirmBookingResult((boolean) message.getData());
+                    break;
                 case "EMPLOYEE_LOGIN_SUCCESS":
                     listener.onEmployeeLoginSuccess((Employee) message.getData());
                     break;

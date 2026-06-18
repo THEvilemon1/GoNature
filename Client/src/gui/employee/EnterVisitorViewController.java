@@ -114,6 +114,36 @@ public class EnterVisitorViewController {
                         foundBooking = null;
                         return;
                     }
+                    
+                    // Check the check-in time window: 10 min before to 30 min after booking time
+                    java.time.LocalDateTime bookingTime = booking.getVisitorTime();
+                    java.time.LocalDateTime now = java.time.LocalDateTime.now();
+                    java.time.LocalDateTime windowStart = bookingTime.minusMinutes(10);
+                    java.time.LocalDateTime windowEnd = bookingTime.plusMinutes(30);
+
+                    if (now.isBefore(windowStart)) {
+                        showStatus("Too early to check in. Check-in opens at " +
+                                   windowStart.toLocalTime().withSecond(0).withNano(0) +
+                                   " (10 minutes before the booked time).", true);
+                        btnCheckIn.setVisible(false);
+                        detailsBox.setVisible(false);
+                        detailsBox.setManaged(false);
+                        foundBooking = null;
+                        return;
+                    }
+
+                    if (now.isAfter(windowEnd)) {
+                        showStatus("Too late to check in. Check-in closed at " +
+                                   windowEnd.toLocalTime().withSecond(0).withNano(0) +
+                                   " (30 minutes after the booked time).", true);
+                        btnCheckIn.setVisible(false);
+                        detailsBox.setVisible(false);
+                        detailsBox.setManaged(false);
+                        foundBooking = null;
+                        return;
+                    }
+                    
+                    
                     foundBooking = booking;
                     lblBookingDetails.setText(
                         "Booking ID: " + booking.getBookingId() + "\n" +

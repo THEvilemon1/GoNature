@@ -114,6 +114,11 @@ public class ParkClient extends AbstractClient {
                 case "WALK_IN_RESULT":
                     listener.onWalkInResult((common.Booking) message.getData());
                     break;
+                case "TODAY_BOOKINGS_RESULT":
+                    listener.onTodayBookingsResult((java.util.ArrayList<common.Booking>) message.getData());
+                    break;    
+                    
+                  
             }
         }
     }

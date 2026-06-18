@@ -9,7 +9,7 @@
            styleClass="root-pane"
            stylesheets="@EmployeeScreens.css">
 
-    <VBox styleClass="screen-card" prefWidth="900" maxWidth="980" alignment="TOP_CENTER">
+    <VBox styleClass="screen-card" maxWidth="560" alignment="TOP_CENTER">
 
         <!-- Top bar -->
         <HBox styleClass="top-bar" alignment="CENTER_LEFT" spacing="0">
@@ -19,18 +19,35 @@
         </HBox>
 
         <!-- Content -->
-        <VBox styleClass="content-area" spacing="20">
+        <VBox styleClass="content-area" spacing="16">
 
             <Label fx:id="lblWelcome" styleClass="welcome-label" text="Welcome!" />
-
-            <Separator styleClass="card-sep" />
 
             <!-- Main action buttons -->
             <HBox spacing="16" alignment="CENTER">
                 <Button styleClass="btn-big, btn-primary" text="Enter Visitor"
-                        onAction="#handleEnterVisitor" HBox.hgrow="ALWAYS" maxWidth="Infinity" />
+                        onAction="#handleEnterVisitor" prefWidth="240" />
                 <Button styleClass="btn-big, btn-danger" text="Exit Visitor"
-                        onAction="#handleExitVisitor" HBox.hgrow="ALWAYS" maxWidth="Infinity" />
+                        onAction="#handleExitVisitor" prefWidth="240" />
+            </HBox>
+
+            <Separator styleClass="card-sep" />
+
+            <!-- Today's bookings -->
+            <Label styleClass="field-label" text="Today's Bookings" />
+
+            <HBox spacing="14">
+                <!-- Pending list -->
+                <VBox spacing="6" HBox.hgrow="ALWAYS">
+                    <Label styleClass="list-header-pending" text="Pending" />
+                    <ListView fx:id="lstPending" prefHeight="160" />
+                </VBox>
+
+                <!-- Checked-in list -->
+                <VBox spacing="6" HBox.hgrow="ALWAYS">
+                    <Label styleClass="list-header-checkedin" text="Checked In" />
+                    <ListView fx:id="lstCheckedIn" prefHeight="160" />
+                </VBox>
             </HBox>
 
             <Separator styleClass="card-sep" />

@@ -32,4 +32,6 @@ public interface ServerResponseListener {
     default void onCheckInResult(boolean success) {}
     default void onCheckOutResult(boolean success) {}
     default void onWalkInResult(Booking booking) {}
+    
+    default void onTodayBookingsResult(java.util.ArrayList<common.Booking> bookings) {}
 }

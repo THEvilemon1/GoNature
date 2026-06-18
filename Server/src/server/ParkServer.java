@@ -233,6 +233,12 @@ public class ParkServer extends AbstractServer {
                      Booking walkInBooking = processWalkIn(walkInRequest);
                      client.sendToClient(new Message("WALK_IN_RESULT", walkInBooking));
                      break;
+                     
+                 case "GET_TODAY_BOOKINGS":
+                	    int parkIdForToday = (int) message.getData();
+                	    ArrayList<Booking> todayBookings = getTodayBookings(parkIdForToday);
+                	    client.sendToClient(new Message("TODAY_BOOKINGS_RESULT", todayBookings));
+                	    break;
 
                 default:
                     client.sendToClient(new Message("ERROR", "Unknown command"));
@@ -247,6 +253,27 @@ public class ParkServer extends AbstractServer {
             e.printStackTrace();
         }
     }
+    
+    
+    private ArrayList<Booking> getTodayBookings(int parkId) throws SQLException {
+        ArrayList<Booking> list = new ArrayList<>();
+        Connection conn = DBConnection.getStaticConnection();
+     
+        // Get today's bookings that are PENDING or CHECKED_IN for this park
+        String sql = "SELECT * FROM booking " +
+                     "WHERE park_id = ? " +
+                     "AND DATE(visitorTime) = CURDATE() " +
+                     "AND status IN ('PENDING', 'CHECKED_IN') " +
+                     "ORDER BY visitorTime ASC";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setInt(1, parkId);
+        ResultSet rs = ps.executeQuery();
+        while (rs.next()) {
+            list.add(mapBooking(rs));
+        }
+        return list;
+    }
+    
 
     private ArrayList<Order> getAllOrders() throws SQLException {
         ArrayList<Order> list = new ArrayList<>();
@@ -620,40 +647,47 @@ public class ParkServer extends AbstractServer {
      return true;
  }
 
-    private Booking processWalkIn(WalkInRequest request) throws SQLException {
-        // Check effective available spots first
-        int available = getEffectiveAvailableSpots(request.getParkId());
-        if (available < request.getNumberOfVisitors()) {
-            throw new IllegalArgumentException("Not enough spots available. Available: " + available);
-        }
 
-        Connection conn = DBConnection.getStaticConnection();
-
-        // Calculate price (full price for walk-in, no discount)
-        int price = calculatePrice(conn, request.getParkId(), request.getNumberOfVisitors());
-
-        // Create booking record with CHECKED_IN status
-        String bookingId = UUID.randomUUID().toString();
-        String sql = "INSERT INTO booking (booking_id, traveler_id, park_id, numberOfVisitors, visitorTime, status, organizedBooking, price) " +
-            "VALUES (?, ?, ?, ?, NOW(), ?, false, ?)";
-        PreparedStatement ps = conn.prepareStatement(sql);
-        ps.setString(1, bookingId);
-        ps.setString(2, request.getNationalId()); // use national ID as traveler reference
-        ps.setInt(3, request.getParkId());
-        ps.setInt(4, request.getNumberOfVisitors());
-        ps.setString(5, Booking.STATUS_CHECKED_IN);
-        ps.setInt(6, price);
-        ps.executeUpdate();
-
-        // Increase currentVisitors in park
-        String updatePark = "UPDATE park SET currentVisitors = currentVisitors + ? WHERE park_id = ?";
-        PreparedStatement parkPs = conn.prepareStatement(updatePark);
-        parkPs.setInt(1, request.getNumberOfVisitors());
-        parkPs.setInt(2, request.getParkId());
-        parkPs.executeUpdate();
-
-        return new Booking(bookingId, request.getNationalId(), request.getParkId(),
-            request.getNumberOfVisitors(), java.time.LocalDateTime.now(),
-            Booking.STATUS_CHECKED_IN, false, price);
-    }
+	 private Booking processWalkIn(WalkInRequest request) throws SQLException {
+	  // Check effective available spots first
+	  int available = getEffectiveAvailableSpots(request.getParkId());
+	  if (available < request.getNumberOfVisitors()) {
+	      throw new IllegalArgumentException("Not enough spots available. Available: " + available);
+	  }
+	
+	  // Get or create the traveler for this national ID (Option A: auto-register)
+	  // Reuses the same logic as the visitor login flow.
+	  VisitorLoginResult traveler = loginOrRegisterVisitor(request.getNationalId());
+	  String travelerId = traveler.getTravelerId();
+	
+	  Connection conn = DBConnection.getStaticConnection();
+	
+	  // Calculate price (full price for walk-in, no discount)
+	  int price = calculatePrice(conn, request.getParkId(), request.getNumberOfVisitors());
+	
+	  // Create booking record with CHECKED_IN status and visitorsInside set
+	  String bookingId = UUID.randomUUID().toString();
+	  String sql = "INSERT INTO booking (booking_id, traveler_id, park_id, numberOfVisitors, visitorTime, status, organizedBooking, price, visitorsInside) " +
+	      "VALUES (?, ?, ?, ?, NOW(), ?, false, ?, ?)";
+	  PreparedStatement ps = conn.prepareStatement(sql);
+	  ps.setString(1, bookingId);
+	  ps.setString(2, travelerId); // now a valid traveler_id, not the raw national ID
+	  ps.setInt(3, request.getParkId());
+	  ps.setInt(4, request.getNumberOfVisitors());
+	  ps.setString(5, Booking.STATUS_CHECKED_IN);
+	  ps.setInt(6, price);
+	  ps.setInt(7, request.getNumberOfVisitors()); // visitorsInside = all visitors
+	  ps.executeUpdate();
+	
+	  // Increase currentVisitors in park
+	  String updatePark = "UPDATE park SET currentVisitors = currentVisitors + ? WHERE park_id = ?";
+	  PreparedStatement parkPs = conn.prepareStatement(updatePark);
+	  parkPs.setInt(1, request.getNumberOfVisitors());
+	  parkPs.setInt(2, request.getParkId());
+	  parkPs.executeUpdate();
+	
+	  return new Booking(bookingId, travelerId, request.getParkId(),
+	      request.getNumberOfVisitors(), java.time.LocalDateTime.now(),
+	      Booking.STATUS_CHECKED_IN, false, price);
+	}
 }

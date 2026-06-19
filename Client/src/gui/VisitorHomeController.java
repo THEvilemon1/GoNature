@@ -132,6 +132,15 @@ public class VisitorHomeController implements ServerResponseListener {
         return (currentUser != null && currentUser.isGuide()) ? 16 : 6;
     }
 
+    /** Returns the price multiplier based on applicable discounts for non-guides. */
+    private double discountFactor(boolean isNewBooking) {
+        if (currentUser == null || currentUser.isGuide()) return 1.0;
+        double factor = 1.0;
+        if (isNewBooking)               factor *= 0.85; // 15% new-booking discount
+        if (currentUser.isClubMember()) factor *= 0.90; // 10% club-member discount
+        return factor;
+    }
+
     private void setupGuideMode() {
         int max = maxVisitors();
         SpinnerValueFactory<Integer> factory = spnVisitors.getValueFactory();
@@ -218,7 +227,10 @@ public class VisitorHomeController implements ServerResponseListener {
                 showBookingMessage("Client is not connected to the server.", true);
                 return;
             }
-
+            if (currentUser.isGuide() && booking.getNumberOfVisitors() == 1) {
+                showBookingMessage("You cannot book a visit with only yourself as a guide.", true);
+                return;
+            }
             String command = pendingWaitlistBooking != null ? "CREATE_WAITLIST_BOOKING" : (editingBooking == null ? "CREATE_BOOKING" : "UPDATE_BOOKING");
             client.sendToServer(new Message(command, booking));
             btnSubmitBooking.setDisable(true);
@@ -369,7 +381,9 @@ public class VisitorHomeController implements ServerResponseListener {
         boolean isGuide = currentUser.isGuide();
         int billableVisitors = isGuide ? Math.max(0, visitors - 1) : visitors;
         Integer pricePerPerson = pricesByParkId.get(park.getId());
-        int computedPrice = (pricePerPerson != null) ? pricePerPerson * billableVisitors : 0;
+        int computedPrice = (pricePerPerson != null)
+            ? (int) Math.round(pricePerPerson * billableVisitors * discountFactor(editingBooking == null))
+            : 0;
 
         LocalDateTime visitorTime = LocalDateTime.of(date, LocalTime.parse(timeText));
         if (!visitorTime.isAfter(LocalDateTime.now())) {
@@ -443,12 +457,18 @@ public class VisitorHomeController implements ServerResponseListener {
         int visitors = spnVisitors == null || spnVisitors.getValue() == null ? 1 : spnVisitors.getValue();
         boolean isGuide = currentUser != null && currentUser.isGuide();
         int billableVisitors = isGuide ? Math.max(0, visitors - 1) : visitors;
-        int totalPrice = pricePerPerson * billableVisitors;
+        double factor = discountFactor(editingBooking == null);
+        int totalPrice = (int) Math.round(pricePerPerson * billableVisitors * factor);
+
+        java.util.List<String> notes = new java.util.ArrayList<>();
+        if (isGuide) notes.add("guide entry excluded");
+        if (!isGuide && editingBooking == null) notes.add("15% new booking");
+        if (!isGuide && currentUser != null && currentUser.isClubMember()) notes.add("10% club member");
+        String suffix = notes.isEmpty() ? "" : " (" + String.join(", ", notes) + ")";
 
         lblSelectedParkPrice.setText(park.getName() + ": " + pricePerPerson + " ILS per person.");
         lblPricePerPerson.setText("Price per person: " + pricePerPerson + " ILS");
-        lblTotalPrice.setText("Total: " + totalPrice + " ILS"
-            + (isGuide ? " (guide entry excluded)" : ""));
+        lblTotalPrice.setText("Total: " + totalPrice + " ILS" + suffix);
     }
 
     private void refreshTimeOptions() {

@@ -9,16 +9,22 @@ public class VisitorLoginResult implements Serializable {
     private final String nationalId;
     private final boolean newVisitor;
     private final boolean guide;
+    private final boolean clubMember;
 
     public VisitorLoginResult(String travelerId, String nationalId, boolean newVisitor) {
-        this(travelerId, nationalId, newVisitor, false);
+        this(travelerId, nationalId, newVisitor, false, false);
     }
 
     public VisitorLoginResult(String travelerId, String nationalId, boolean newVisitor, boolean guide) {
+        this(travelerId, nationalId, newVisitor, guide, false);
+    }
+
+    public VisitorLoginResult(String travelerId, String nationalId, boolean newVisitor, boolean guide, boolean clubMember) {
         this.travelerId = travelerId;
         this.nationalId = nationalId;
         this.newVisitor = newVisitor;
         this.guide = guide;
+        this.clubMember = clubMember;
     }
 
     public String getTravelerId() {
@@ -35,5 +41,9 @@ public class VisitorLoginResult implements Serializable {
 
     public boolean isGuide() {
         return guide;
+    }
+
+    public boolean isClubMember() {
+        return clubMember;
     }
 }

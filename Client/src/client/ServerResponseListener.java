@@ -18,6 +18,7 @@ public interface ServerResponseListener {
     default void onTravelerBookingsResult(ArrayList<Booking> bookings) {}
     default void onParkPricesResult(Map<Integer, Integer> pricesByParkId) {}
     default void onCreateBookingResult(Booking booking) {}
+    default void onCreateBookingRequiresWaitlistConfirmation(Booking booking, String message) {}
     default void onUpdateBookingResult(boolean success) {}
     default void onCancelBookingResult(boolean success) {}
     default void onConfirmBookingResult(boolean success) {}

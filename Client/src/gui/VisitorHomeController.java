@@ -66,6 +66,7 @@ public class VisitorHomeController implements ServerResponseListener {
 
     private VisitorLoginResult currentUser;
     private Booking editingBooking;
+    private Booking pendingWaitlistBooking;
     private final Map<Integer, Integer> pricesByParkId = new HashMap<>();
     private Timer bookingsRefreshTimer;
 
@@ -199,7 +200,7 @@ public class VisitorHomeController implements ServerResponseListener {
                 return;
             }
 
-            String command = editingBooking == null ? "CREATE_BOOKING" : "UPDATE_BOOKING";
+            String command = pendingWaitlistBooking != null ? "CREATE_WAITLIST_BOOKING" : (editingBooking == null ? "CREATE_BOOKING" : "UPDATE_BOOKING");
             client.sendToServer(new Message(command, booking));
             btnSubmitBooking.setDisable(true);
         } catch (IllegalArgumentException e) {
@@ -238,6 +239,7 @@ public class VisitorHomeController implements ServerResponseListener {
     public void onCreateBookingResult(Booking booking) {
         Platform.runLater(() -> {
             btnSubmitBooking.setDisable(false);
+            pendingWaitlistBooking = null;
             resetForm();
             lblDetailTitle.setText("My Bookings");
             showBookingsList();
@@ -247,6 +249,34 @@ public class VisitorHomeController implements ServerResponseListener {
                 showBookingsMessage("Booking confirmed.", false);
             }
             requestTravelerBookings();
+        });
+    }
+
+    @Override
+    public void onCreateBookingRequiresWaitlistConfirmation(Booking booking, String message) {
+        Platform.runLater(() -> {
+            btnSubmitBooking.setDisable(false);
+            pendingWaitlistBooking = booking;
+            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+            alert.setTitle("Parking is Full");
+            alert.setHeaderText("No place is available for this time.");
+            alert.setContentText(message + "\n\nChoose 'Yes' to join the waiting list.");
+            alert.showAndWait().ifPresent(result -> {
+                if (result == javafx.scene.control.ButtonType.OK) {
+                    try {
+                        ParkClient client = ParkClient.getInstance();
+                        if (client != null && client.isConnected()) {
+                            client.sendToServer(new Message("CREATE_WAITLIST_BOOKING", booking));
+                            btnSubmitBooking.setDisable(true);
+                        }
+                    } catch (IOException e) {
+                        showBookingMessage("Failed to join waiting list: " + e.getMessage(), true);
+                    }
+                } else {
+                    pendingWaitlistBooking = null;
+                    showBookingMessage("Booking was not created.", false);
+                }
+            });
         });
     }
 
@@ -714,6 +744,7 @@ public class VisitorHomeController implements ServerResponseListener {
 
     private void resetForm() {
         editingBooking = null;
+        pendingWaitlistBooking = null;
         btnSubmitBooking.setDisable(false);
         btnSubmitBooking.setText("Submit Booking");
     txtName.clear();

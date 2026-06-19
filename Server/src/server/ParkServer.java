@@ -121,8 +121,20 @@ public class ParkServer extends AbstractServer {
 
                 case "CREATE_BOOKING":
                     Booking bookingToCreate = (Booking) message.getData();
-                    Booking createdBooking = createBooking(bookingToCreate);
-                    client.sendToClient(new Message("CREATE_BOOKING_RESULT", createdBooking));
+                    BookingAvailabilityResult bookingAvailabilityResult = createBooking(bookingToCreate, false);
+                    if (bookingAvailabilityResult.requiresWaitlistConfirmation) {
+                        client.sendToClient(new Message("CREATE_BOOKING_REQUIRES_WAITLIST_CONFIRMATION",
+                            new Object[] { bookingAvailabilityResult.booking,
+                                "The selected park is full for this date and time. You can join the waiting list or choose another time." }));
+                    } else {
+                        client.sendToClient(new Message("CREATE_BOOKING_RESULT", bookingAvailabilityResult.booking));
+                    }
+                    break;
+
+                case "CREATE_WAITLIST_BOOKING":
+                    Booking waitlistBooking = (Booking) message.getData();
+                    Booking createdWaitlistBooking = createBooking(waitlistBooking);
+                    client.sendToClient(new Message("CREATE_BOOKING_RESULT", createdWaitlistBooking));
                     break;
 
                 case "GET_TRAVELER_BOOKINGS":
@@ -331,7 +343,7 @@ public class ParkServer extends AbstractServer {
         return ps.executeUpdate() > 0;
     }
 
-    private synchronized Booking createBooking(Booking booking) throws SQLException {
+    private synchronized BookingAvailabilityResult createBooking(Booking booking, boolean allowWaitlistCreation) throws SQLException {
         validateBooking(booking);
 
         Connection conn = DBConnection.getStaticConnection();
@@ -344,9 +356,18 @@ public class ParkServer extends AbstractServer {
             String bookingId = String.valueOf(1000000 + new java.util.Random().nextInt(9000000));
             ParkCapacity capacity = getParkCapacityForUpdate(conn, booking.getParkId());
             int confirmedVisitors = getConfirmedVisitorsForSlot(conn, booking.getParkId(), booking.getVisitorTime());
-            String status = confirmedVisitors + booking.getNumberOfVisitors() <= capacity.effectiveCapacity
-                ? Booking.STATUS_CONFIRMED
-                : Booking.STATUS_WAITING_LIST;
+            boolean isFull = confirmedVisitors + booking.getNumberOfVisitors() > capacity.effectiveCapacity;
+            String status = isFull
+                ? Booking.STATUS_WAITING_LIST
+                : Booking.STATUS_CONFIRMED;
+
+            if (isFull && !allowWaitlistCreation) {
+                conn.rollback();
+                return new BookingAvailabilityResult(true, new Booking(null, booking.getTravelerId(), booking.getTravelerName(),
+                    booking.getTravelerEmail(), booking.getTravelerPhoneNumber(), booking.getParkId(), booking.getNumberOfVisitors(),
+                    booking.getVisitorTime(), Booking.STATUS_WAITING_LIST, false, 0));
+            }
+
             int price = calculatePrice(conn, booking.getParkId(), booking.getNumberOfVisitors());
 
             String sql = "INSERT INTO booking (booking_id, traveler_id, park_id, numberOfVisitors, visitorTime, status, organizedBooking, price) "
@@ -368,15 +389,19 @@ public class ParkServer extends AbstractServer {
             }
 
             conn.commit();
-            return new Booking(bookingId, booking.getTravelerId(), booking.getTravelerName(),
+            return new BookingAvailabilityResult(false, new Booking(bookingId, booking.getTravelerId(), booking.getTravelerName(),
                 booking.getTravelerEmail(), booking.getTravelerPhoneNumber(),
-                booking.getParkId(), booking.getNumberOfVisitors(), booking.getVisitorTime(), status, false, price);
+                booking.getParkId(), booking.getNumberOfVisitors(), booking.getVisitorTime(), status, false, price));
         } catch (SQLException | RuntimeException e) {
             conn.rollback();
             throw e;
         } finally {
             conn.setAutoCommit(previousAutoCommit);
         }
+    }
+
+    private synchronized Booking createBooking(Booking booking) throws SQLException {
+        return createBooking(booking, true).booking;
     }
 
     private ParkCapacity getParkCapacityForUpdate(Connection conn, int parkId) throws SQLException {
@@ -438,6 +463,16 @@ public class ParkServer extends AbstractServer {
 
         private ParkCapacity(int effectiveCapacity) {
             this.effectiveCapacity = effectiveCapacity;
+        }
+    }
+
+    private static final class BookingAvailabilityResult {
+        private final boolean requiresWaitlistConfirmation;
+        private final Booking booking;
+
+        private BookingAvailabilityResult(boolean requiresWaitlistConfirmation, Booking booking) {
+            this.requiresWaitlistConfirmation = requiresWaitlistConfirmation;
+            this.booking = booking;
         }
     }
 

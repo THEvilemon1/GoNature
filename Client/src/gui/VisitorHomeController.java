@@ -54,6 +54,7 @@ public class VisitorHomeController implements ServerResponseListener {
     @FXML private Label lblSelectedParkPrice;
     @FXML private Label lblPricePerPerson;
     @FXML private Label lblTotalPrice;
+    @FXML private Label lblVisitorHint;
     @FXML private TextField txtFirstName;
     @FXML private TextField txtName;
     @FXML private TextField txtEmail;
@@ -72,7 +73,7 @@ public class VisitorHomeController implements ServerResponseListener {
 
     @FXML
     private void initialize() {
-        spnVisitors.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, 15, 1));
+        spnVisitors.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, 6, 1));
         spnVisitors.getEditor().textProperty().addListener((obs, oldValue, newValue) -> clampVisitorEditor());
         spnVisitors.valueProperty().addListener((obs, oldValue, newValue) -> updatePriceSummary());
 
@@ -99,6 +100,7 @@ public class VisitorHomeController implements ServerResponseListener {
 
     public void loadVisitor(VisitorLoginResult result) {
         this.currentUser = result;
+        setupGuideMode();
         ParkClient client = ParkClient.getInstance();
         if (client != null) {
             client.setListener(this);
@@ -124,6 +126,23 @@ public class VisitorHomeController implements ServerResponseListener {
                 System.out.println("Could not set up window close handler: " + e.getMessage());
             }
         });
+    }
+
+    private int maxVisitors() {
+        return (currentUser != null && currentUser.isGuide()) ? 16 : 6;
+    }
+
+    private void setupGuideMode() {
+        int max = maxVisitors();
+        SpinnerValueFactory<Integer> factory = spnVisitors.getValueFactory();
+        if (factory instanceof SpinnerValueFactory.IntegerSpinnerValueFactory) {
+            ((SpinnerValueFactory.IntegerSpinnerValueFactory) factory).setMax(max);
+        }
+        if (currentUser != null && currentUser.isGuide()) {
+            lblVisitorHint.setText("Choose between 1 and 16 visitors. As a guide, your own entry is free.");
+        } else {
+            lblVisitorHint.setText("Choose between 1 and 6 visitors.");
+        }
     }
 
     private void handleLogout() {
@@ -342,6 +361,16 @@ public class VisitorHomeController implements ServerResponseListener {
         }
 
         int visitors = getVisitorCount();
+        int max = maxVisitors();
+        if (visitors < 1 || visitors > max) {
+            throw new IllegalArgumentException("Number of visitors must be between 1 and " + max + ".");
+        }
+
+        boolean isGuide = currentUser.isGuide();
+        int billableVisitors = isGuide ? Math.max(0, visitors - 1) : visitors;
+        Integer pricePerPerson = pricesByParkId.get(park.getId());
+        int computedPrice = (pricePerPerson != null) ? pricePerPerson * billableVisitors : 0;
+
         LocalDateTime visitorTime = LocalDateTime.of(date, LocalTime.parse(timeText));
         if (!visitorTime.isAfter(LocalDateTime.now())) {
             throw new IllegalArgumentException("Booking date and time must be in the future.");
@@ -353,7 +382,7 @@ public class VisitorHomeController implements ServerResponseListener {
 
         String bookingId = editingBooking == null ? null : editingBooking.getBookingId();
         return new Booking(bookingId, currentUser.getTravelerId(), name, email, phoneNumber, park.getId(), visitors,
-            visitorTime, Booking.STATUS_PENDING, false, 0);
+            visitorTime, Booking.STATUS_PENDING, false, computedPrice);
     }
 
     private String requireText(TextField field, String errorMessage) {
@@ -373,11 +402,12 @@ public class VisitorHomeController implements ServerResponseListener {
         if (spnVisitors.getValueFactory() == null) {
             return;
         }
+        int max = maxVisitors();
         String text = spnVisitors.getEditor().getText();
         try {
             int value = Integer.parseInt(text);
             if (value < 1) value = 1;
-            if (value > 15) value = 15;
+            if (value > max) value = max;
             spnVisitors.getValueFactory().setValue(value);
             if (!String.valueOf(value).equals(text)) {
                 spnVisitors.getEditor().setText(String.valueOf(value));
@@ -411,11 +441,14 @@ public class VisitorHomeController implements ServerResponseListener {
         }
 
         int visitors = spnVisitors == null || spnVisitors.getValue() == null ? 1 : spnVisitors.getValue();
-        int totalPrice = pricePerPerson * visitors;
+        boolean isGuide = currentUser != null && currentUser.isGuide();
+        int billableVisitors = isGuide ? Math.max(0, visitors - 1) : visitors;
+        int totalPrice = pricePerPerson * billableVisitors;
 
         lblSelectedParkPrice.setText(park.getName() + ": " + pricePerPerson + " ILS per person.");
         lblPricePerPerson.setText("Price per person: " + pricePerPerson + " ILS");
-        lblTotalPrice.setText("Total: " + totalPrice + " ILS");
+        lblTotalPrice.setText("Total: " + totalPrice + " ILS"
+            + (isGuide ? " (guide entry excluded)" : ""));
     }
 
     private void refreshTimeOptions() {

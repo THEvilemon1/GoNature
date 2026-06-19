@@ -8,11 +8,17 @@ public class VisitorLoginResult implements Serializable {
     private final String travelerId;
     private final String nationalId;
     private final boolean newVisitor;
+    private final boolean guide;
 
     public VisitorLoginResult(String travelerId, String nationalId, boolean newVisitor) {
+        this(travelerId, nationalId, newVisitor, false);
+    }
+
+    public VisitorLoginResult(String travelerId, String nationalId, boolean newVisitor, boolean guide) {
         this.travelerId = travelerId;
         this.nationalId = nationalId;
         this.newVisitor = newVisitor;
+        this.guide = guide;
     }
 
     public String getTravelerId() {
@@ -25,6 +31,10 @@ public class VisitorLoginResult implements Serializable {
 
     public boolean isNewVisitor() {
         return newVisitor;
+    }
+
+    public boolean isGuide() {
+        return guide;
     }
     
     

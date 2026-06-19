@@ -679,12 +679,13 @@ public class ParkServer extends AbstractServer {
         Connection conn = DBConnection.getStaticConnection();
         int nationalIdNumber = Integer.parseInt(nationalId);
 
-        String selectSql = "SELECT traveler_id FROM traveler WHERE nationalId = ?";
+        String selectSql = "SELECT traveler_id, guide FROM traveler WHERE nationalId = ?";
         PreparedStatement selectPs = conn.prepareStatement(selectSql);
         selectPs.setInt(1, nationalIdNumber);
         ResultSet rs = selectPs.executeQuery();
         if (rs.next()) {
-            return new VisitorLoginResult(rs.getString("traveler_id"), nationalId, false);
+            boolean isGuide = rs.getBoolean("guide");
+            return new VisitorLoginResult(rs.getString("traveler_id"), nationalId, false, isGuide);
         }
 
         String travelerId = UUID.randomUUID().toString();

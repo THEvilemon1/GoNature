@@ -18,8 +18,8 @@ public class DBConnection {
     private static final long TIMEOUT  = 30*1000; // 30 seconds
     private static final String URL = "jdbc:mysql://localhost:3306/gonaturedb?allowLoadLocalInfile=true&serverTimezone=Asia/Jerusalem&useSSL=false&allowPublicKeyRetrieval=true";
     private static final String USER     = "root";
-    private static final String PASSWORD = "319Benan@@";
-//    private static final String PASSWORD = "roottoor";
+//    private static final String PASSWORD = "319Benan@@";
+    private static final String PASSWORD = "roottoor";
 //    private static final String PASSWORD = "amerhmysql";
 
     private DBConnection() throws SQLException {

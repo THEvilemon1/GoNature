@@ -27,6 +27,7 @@ public class Booking implements Serializable {
     private String status;
     private boolean organizedBooking;
     private int price;
+    private boolean paid;
 
     public Booking(String bookingId, String travelerId, int parkId, int numberOfVisitors,
                    LocalDateTime visitorTime, String status, boolean organizedBooking, int price) {
@@ -60,4 +61,7 @@ public class Booking implements Serializable {
     public String getStatus() { return status; }
     public boolean isOrganizedBooking() { return organizedBooking; }
     public int getPrice() { return price; }
+    public boolean isPaid() { return paid; }
+    public void setPaid(boolean paid) { this.paid = paid; }
+    public void setPrice(int price) { this.price = price; }
 }

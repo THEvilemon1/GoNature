@@ -124,7 +124,9 @@ public class ParkClient extends AbstractClient {
                 case "TODAY_BOOKINGS_RESULT":
                     listener.onTodayBookingsResult((java.util.ArrayList<common.Booking>) message.getData());
                     break;    
-                    
+                case "REGISTER_TRAVELER_RESULT":
+                    listener.onRegisterTravelerResult((String) message.getData());
+                    break;
                   
             }
         }

@@ -36,4 +36,6 @@ public interface ServerResponseListener {
     default void onWalkInResult(Booking booking) {}
     
     default void onTodayBookingsResult(java.util.ArrayList<common.Booking> bookings) {}
+    
+    default void onRegisterTravelerResult(String result) {}
 }

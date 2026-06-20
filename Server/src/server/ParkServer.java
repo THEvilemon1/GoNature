@@ -12,9 +12,11 @@ import java.util.Set;
 import java.util.UUID;
 
 import common.Booking;
+import common.ContactInfoValidator;
 import common.Employee;
 import common.Message;
 import common.Order;
+import common.TravelerProfile;
 import common.WalkInRequest;
 import common.ExitRequest;
 import common.VisitorLoginResult;
@@ -144,6 +146,16 @@ public class ParkServer extends AbstractServer {
 
                 case "GET_PARK_PRICES":
                     client.sendToClient(new Message("PARK_PRICES_RESULT", getParkPrices()));
+                    break;
+
+                case "GET_TRAVELER_PROFILE":
+                    String profileTravelerId = (String) message.getData();
+                    client.sendToClient(new Message("TRAVELER_PROFILE_RESULT", getTravelerProfile(profileTravelerId)));
+                    break;
+
+                case "UPDATE_TRAVELER_PROFILE":
+                    TravelerProfile profileToUpdate = (TravelerProfile) message.getData();
+                    client.sendToClient(new Message("UPDATE_TRAVELER_PROFILE_RESULT", updateTravelerProfile(profileToUpdate)));
                     break;
 
                 case "UPDATE_BOOKING":
@@ -351,8 +363,6 @@ public class ParkServer extends AbstractServer {
         conn.setAutoCommit(false);
 
         try {
-            upsertTravelerContactInfo(conn, booking);
-
             String bookingId = String.valueOf(1000000 + new java.util.Random().nextInt(9000000));
             ParkCapacity capacity = getParkCapacityForUpdate(conn, booking.getParkId());
             int confirmedVisitors = getConfirmedVisitorsForSlot(conn, booking.getParkId(), booking.getVisitorTime());
@@ -370,17 +380,21 @@ public class ParkServer extends AbstractServer {
 
             int price = calculatePrice(conn, booking.getParkId(), booking.getNumberOfVisitors());
 
-            String sql = "INSERT INTO booking (booking_id, traveler_id, park_id, numberOfVisitors, visitorTime, status, organizedBooking, price) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+            String sql = "INSERT INTO booking (booking_id, traveler_id, travelerName, travelerEmail, travelerPhoneNumber, "
+                + "park_id, numberOfVisitors, visitorTime, status, organizedBooking, price) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             PreparedStatement ps = conn.prepareStatement(sql);
             ps.setString(1, bookingId);
             ps.setString(2, booking.getTravelerId());
-            ps.setInt(3, booking.getParkId());
-            ps.setInt(4, booking.getNumberOfVisitors());
-            ps.setTimestamp(5, Timestamp.valueOf(booking.getVisitorTime()));
-            ps.setString(6, status);
-            ps.setBoolean(7, false);
-            ps.setInt(8, price);
+            ps.setString(3, booking.getTravelerName().trim());
+            ps.setString(4, booking.getTravelerEmail().trim());
+            ps.setString(5, booking.getTravelerPhoneNumber().trim());
+            ps.setInt(6, booking.getParkId());
+            ps.setInt(7, booking.getNumberOfVisitors());
+            ps.setTimestamp(8, Timestamp.valueOf(booking.getVisitorTime()));
+            ps.setString(9, status);
+            ps.setBoolean(10, false);
+            ps.setInt(11, price);
             ps.executeUpdate();
 
             if (Booking.STATUS_WAITING_LIST.equals(status)) {
@@ -479,9 +493,7 @@ public class ParkServer extends AbstractServer {
     private ArrayList<Booking> getTravelerBookings(String travelerId) throws SQLException {
         ArrayList<Booking> bookings = new ArrayList<>();
         Connection conn = DBConnection.getStaticConnection();
-        String sql = "SELECT b.*, u.firstName, u.email, u.phoneNumber "
-            + "FROM booking b JOIN `user` u ON u.user_id = b.traveler_id "
-            + "WHERE b.traveler_id = ? ORDER BY b.visitorTime";
+        String sql = "SELECT * FROM booking WHERE traveler_id = ? ORDER BY visitorTime";
         PreparedStatement ps = conn.prepareStatement(sql);
         ps.setString(1, travelerId);
         ResultSet rs = ps.executeQuery();
@@ -499,20 +511,24 @@ public class ParkServer extends AbstractServer {
         Connection conn = DBConnection.getStaticConnection();
         int price = calculatePrice(conn, booking.getParkId(), booking.getNumberOfVisitors());
 
-        String sql = "UPDATE booking SET park_id = ?, numberOfVisitors = ?, visitorTime = ?, status = ?, price = ? "
+        String sql = "UPDATE booking SET travelerName = ?, travelerEmail = ?, travelerPhoneNumber = ?, "
+            + "park_id = ?, numberOfVisitors = ?, visitorTime = ?, status = ?, price = ? "
             + "WHERE booking_id = ? AND traveler_id = ? "
             + "AND status NOT IN (?, ?, ?)";
         PreparedStatement ps = conn.prepareStatement(sql);
-        ps.setInt(1, booking.getParkId());
-        ps.setInt(2, booking.getNumberOfVisitors());
-        ps.setTimestamp(3, Timestamp.valueOf(booking.getVisitorTime()));
-        ps.setString(4, Booking.STATUS_PENDING);
-        ps.setInt(5, price);
-        ps.setString(6, booking.getBookingId());
-        ps.setString(7, booking.getTravelerId());
-        ps.setString(8, Booking.STATUS_CANCELLED);
-        ps.setString(9, Booking.STATUS_CHECKED_IN);
-        ps.setString(10, Booking.STATUS_CHECKED_OUT);
+        ps.setString(1, booking.getTravelerName().trim());
+        ps.setString(2, booking.getTravelerEmail().trim());
+        ps.setString(3, booking.getTravelerPhoneNumber().trim());
+        ps.setInt(4, booking.getParkId());
+        ps.setInt(5, booking.getNumberOfVisitors());
+        ps.setTimestamp(6, Timestamp.valueOf(booking.getVisitorTime()));
+        ps.setString(7, Booking.STATUS_PENDING);
+        ps.setInt(8, price);
+        ps.setString(9, booking.getBookingId());
+        ps.setString(10, booking.getTravelerId());
+        ps.setString(11, Booking.STATUS_CANCELLED);
+        ps.setString(12, Booking.STATUS_CHECKED_IN);
+        ps.setString(13, Booking.STATUS_CHECKED_OUT);
         return ps.executeUpdate() > 0;
     }
 
@@ -587,15 +603,9 @@ public class ParkServer extends AbstractServer {
         if (booking.getTravelerId() == null || booking.getTravelerId().isBlank()) {
             throw new IllegalArgumentException("Traveler is missing.");
         }
-        if (booking.getTravelerName() == null || booking.getTravelerName().isBlank()) {
-            throw new IllegalArgumentException("Traveler name is missing.");
-        }
-        if (booking.getTravelerEmail() == null || booking.getTravelerEmail().isBlank()) {
-            throw new IllegalArgumentException("Traveler email is missing.");
-        }
-        if (booking.getTravelerPhoneNumber() == null || booking.getTravelerPhoneNumber().isBlank()) {
-            throw new IllegalArgumentException("Traveler phone number is missing.");
-        }
+        ContactInfoValidator.requireName(booking.getTravelerName(), "Traveler name");
+        ContactInfoValidator.requireEmail(booking.getTravelerEmail());
+        ContactInfoValidator.requirePhoneNumber(booking.getTravelerPhoneNumber());
         if (booking.getParkId() < 1 || booking.getParkId() > 4) {
             throw new IllegalArgumentException("Please choose a valid park.");
         }
@@ -642,9 +652,9 @@ public class ParkServer extends AbstractServer {
         return new Booking(
             rs.getString("booking_id"),
             rs.getString("traveler_id"),
-            getOptionalColumn(rs, "fullName"),
-            getOptionalColumn(rs, "email"),
-            getOptionalColumn(rs, "phoneNumber"),
+            getOptionalColumn(rs, "travelerName"),
+            getOptionalColumn(rs, "travelerEmail"),
+            getOptionalColumn(rs, "travelerPhoneNumber"),
             rs.getInt("park_id"),
             rs.getInt("numberOfVisitors"),
             visitorTimestamp.toLocalDateTime(),
@@ -654,24 +664,62 @@ public class ParkServer extends AbstractServer {
         );
     }
 
-    private void upsertTravelerContactInfo(Connection conn, Booking booking) throws SQLException {
-        String sql = "UPDATE `user` SET firstName = ?, email = ?, phoneNumber = ? WHERE user_id = ?";
-        PreparedStatement ps = conn.prepareStatement(sql);
-    ps.setString(1, booking.getTravelerName().trim());
-        ps.setString(2, booking.getTravelerEmail().trim());
-        ps.setString(3, booking.getTravelerPhoneNumber().trim());
-        ps.setString(4, booking.getTravelerId());
-
-        if (ps.executeUpdate() == 0) {
-            throw new IllegalArgumentException("Traveler user record was not found.");
-        }
-    }
-
     private String getOptionalColumn(ResultSet rs, String columnName) {
         try {
             return rs.getString(columnName);
         } catch (SQLException e) {
             return null;
+        }
+    }
+
+    private TravelerProfile getTravelerProfile(String travelerId) throws SQLException {
+        if (travelerId == null || travelerId.isBlank()) {
+            throw new IllegalArgumentException("Traveler is missing.");
+        }
+
+        Connection conn = DBConnection.getStaticConnection();
+        String sql = "SELECT u.firstName, u.lastName, u.email, u.phoneNumber, t.clubMember "
+            + "FROM traveler t JOIN `user` u ON u.user_id = t.traveler_id "
+            + "WHERE t.traveler_id = ?";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setString(1, travelerId);
+        ResultSet rs = ps.executeQuery();
+        if (!rs.next()) {
+            throw new IllegalArgumentException("Traveler profile was not found.");
+        }
+
+        return new TravelerProfile(
+            travelerId,
+            rs.getString("firstName"),
+            rs.getString("lastName"),
+            rs.getString("email"),
+            rs.getString("phoneNumber"),
+            rs.getBoolean("clubMember")
+        );
+    }
+
+    private boolean updateTravelerProfile(TravelerProfile profile) throws SQLException {
+        if (profile == null || profile.getTravelerId() == null || profile.getTravelerId().isBlank()) {
+            throw new IllegalArgumentException("Traveler profile is missing.");
+        }
+
+        String firstName = ContactInfoValidator.requireName(profile.getFirstName(), "First name");
+        String lastName = ContactInfoValidator.requireName(profile.getLastName(), "Last name");
+        String email = ContactInfoValidator.requireEmail(profile.getEmail());
+        String phoneNumber = ContactInfoValidator.requirePhoneNumber(profile.getPhoneNumber());
+
+        Connection conn = DBConnection.getStaticConnection();
+        String sql = "UPDATE `user` SET firstName = ?, lastName = ?, email = ?, phoneNumber = ? WHERE user_id = ?";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setString(1, firstName);
+        ps.setString(2, lastName);
+        ps.setString(3, email);
+        ps.setString(4, phoneNumber);
+        ps.setString(5, profile.getTravelerId());
+        try {
+            return ps.executeUpdate() > 0;
+        } catch (SQLIntegrityConstraintViolationException e) {
+            throw new IllegalArgumentException("Email address is already used by another user.");
         }
     }
 
@@ -767,9 +815,7 @@ public class ParkServer extends AbstractServer {
 
     private Booking getBookingById(String bookingId) throws SQLException {
         Connection conn = DBConnection.getStaticConnection();
-        String sql = "SELECT b.*, u.fullName, u.email, u.phoneNumber "
-            + "FROM booking b JOIN `user` u ON u.user_id = b.traveler_id "
-            + "WHERE b.booking_id = ?";
+        String sql = "SELECT * FROM booking WHERE booking_id = ?";
         PreparedStatement ps = conn.prepareStatement(sql);
         ps.setString(1, bookingId);
         ResultSet rs = ps.executeQuery();

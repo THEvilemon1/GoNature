@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.chart.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<StackPane xmlns="http://javafx.com/javafx/17"
+           xmlns:fx="http://javafx.com/fxml/1"
+           fx:controller="gui.employee.ParkUsageReportViewController"
+           styleClass="root-pane"
+           stylesheets="@EmployeeScreens.css">
+
+    <VBox styleClass="screen-card" spacing="20" prefWidth="900" alignment="TOP_CENTER">
+
+        <Label styleClass="screen-title" text="Park Usage Report" />
+
+        <HBox spacing="10" alignment="CENTER">
+            <Label text="From:" />
+            <DatePicker fx:id="fromDatePicker" />
+
+            <Label text="To:" />
+            <DatePicker fx:id="toDatePicker" />
+
+            <Button text="Generate Report"
+                    styleClass="btn-primary"
+                    onAction="#handleGenerateReport" />
+        </HBox>
+
+        <TextArea fx:id="reportArea"
+                  prefHeight="220"
+                  editable="false"
+                  wrapText="true" />
+
+        <BarChart fx:id="usageChart"
+                  title="Park Usage By Day"
+                  prefHeight="350">
+            <xAxis>
+                <CategoryAxis label="Date" />
+            </xAxis>
+            <yAxis>
+                <NumberAxis label="Usage %" />
+            </yAxis>
+        </BarChart>
+
+    </VBox>
+</StackPane>

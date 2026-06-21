@@ -1,17 +1,24 @@
 package client;
 
 import java.io.IOException;
+
 import java.util.ArrayList;
 import java.util.Map;
 
+import common.ParkChangeRequest;
 import common.Booking;
 import common.Employee;
 import common.Message;
 import common.Order;
 import common.VisitorLoginResult;
+import common.Promotion;
+import common.PromotionRequest;
+import common.ParkVisitorsReportResult;
+
 import javafx.application.Platform;
 import javafx.scene.control.Alert;
 import ocsf.client.AbstractClient;
+
 
 public class ParkClient extends AbstractClient {
 
@@ -116,9 +123,40 @@ public class ParkClient extends AbstractClient {
                     break;
                 case "TODAY_BOOKINGS_RESULT":
                     listener.onTodayBookingsResult((java.util.ArrayList<common.Booking>) message.getData());
-                    break;    
-                    
-                  
+                    break;  
+                case "PARK_CHANGE_REQUEST_RESULT":
+                    listener.onParkChangeRequestResult((boolean) message.getData());
+                    break;
+
+                case "PARK_CHANGE_APPROVAL_RESULT":
+                    Object[] approvalData = (Object[]) message.getData();
+                    listener.onParkChangeApprovalResult((String) approvalData[0], (boolean) approvalData[1]);
+                    break;
+
+                case "PARK_CHANGE_REQUEST_NOTIFICATION":
+                    ParkChangeRequest incomingRequest = (ParkChangeRequest) message.getData();
+                    listener.onParkChangeRequestNotification(incomingRequest);
+                    break;
+
+                case "PROMOTIONS_LIST_RESULT":
+                    listener.onPromotionsListResult((java.util.ArrayList<Promotion>) message.getData());
+                    break;
+
+                case "PROMOTION_REQUEST_RESULT":
+                    listener.onPromotionRequestResult((boolean) message.getData());
+                    break;
+
+                case "PROMOTION_APPROVAL_RESULT":
+                    Object[] promoApprovalData = (Object[]) message.getData();
+                    listener.onPromotionApprovalResult((String) promoApprovalData[0], (boolean) promoApprovalData[1]);
+                    break;
+
+                case "PROMOTION_REQUEST_NOTIFICATION":
+                    listener.onPromotionRequestNotification((PromotionRequest) message.getData());
+                    break;
+                case "PARK_VISITORS_REPORT_RESULT":
+                    listener.onParkVisitorsReportResult((ParkVisitorsReportResult) message.getData());
+                    break;
             }
         }
     }

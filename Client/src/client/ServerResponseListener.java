@@ -7,6 +7,10 @@ import common.Booking;
 import common.Employee;
 import common.Order;
 import common.VisitorLoginResult;
+import common.ParkChangeRequest;
+import common.Promotion;
+import common.PromotionRequest;
+import common.ParkVisitorsReportResult;
 
 public interface ServerResponseListener {
     void onOrderExistsResult(boolean exists);
@@ -20,6 +24,7 @@ public interface ServerResponseListener {
     default void onCreateBookingResult(Booking booking) {}
     default void onUpdateBookingResult(boolean success) {}
     default void onCancelBookingResult(boolean success) {}
+    default void onParkVisitorsReportResult(ParkVisitorsReportResult result) {}
 
     // Employee login
     default void onEmployeeLoginSuccess(Employee employee) {}
@@ -34,4 +39,13 @@ public interface ServerResponseListener {
     default void onWalkInResult(Booking booking) {}
     
     default void onTodayBookingsResult(java.util.ArrayList<common.Booking> bookings) {}
+    
+    default void onParkChangeRequestResult(boolean success) {}
+    default void onParkChangeApprovalResult(String requestId, boolean approved) {}
+    default void onParkChangeRequestNotification(ParkChangeRequest request) {}
+    
+    default void onPromotionsListResult(java.util.ArrayList<Promotion> promotions) {}
+    default void onPromotionRequestResult(boolean success) {}
+    default void onPromotionApprovalResult(String requestId, boolean approved) {}
+    default void onPromotionRequestNotification(PromotionRequest request) {}
 }

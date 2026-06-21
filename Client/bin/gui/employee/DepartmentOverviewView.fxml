@@ -9,15 +9,36 @@
            styleClass="root-pane"
            stylesheets="@EmployeeScreens.css">
 
-    <VBox styleClass="screen-card" prefWidth="900" maxWidth="980" alignment="TOP_CENTER">
-        <HBox styleClass="top-bar" alignment="CENTER_LEFT">
+    <VBox styleClass="screen-card" prefWidth="960" maxWidth="1040" alignment="TOP_CENTER">
+
+        <!-- Top bar -->
+        <HBox styleClass="top-bar" alignment="CENTER_LEFT" spacing="12">
             <Label styleClass="screen-title" text="Department Overview" />
+            <HBox HBox.hgrow="ALWAYS" />
+            <Label fx:id="lblWelcome" styleClass="top-bar-info" text="" />
+            <Button styleClass="btn-secondary" text="Logout" onAction="#handleLogout" />
         </HBox>
 
-        <VBox styleClass="content-area" spacing="18">
-            <Label fx:id="lblWelcome" styleClass="welcome-label" text="Welcome!" />
-            <Separator styleClass="card-sep" />
-            <Button styleClass="btn-secondary" text="Logout" onAction="#handleLogout" prefWidth="120" />
+        <VBox styleClass="content-area" spacing="20" VBox.vgrow="ALWAYS">
+
+            <!-- Empty space for other team members to fill -->
+            <VBox VBox.vgrow="ALWAYS" />
+
+            <!-- Requests section at the bottom -->
+            <Label styleClass="field-label" text="PARK MANAGER REQUESTS" />
+
+            <TableView fx:id="tblRequests" styleClass="list-view" prefHeight="250">
+                <columns>
+                    <TableColumn fx:id="colRequest" text="Request" prefWidth="500" />
+                    <TableColumn fx:id="colStatus" text="Status" prefWidth="120" />
+                    <TableColumn fx:id="colApprove" text="" prefWidth="110" />
+                    <TableColumn fx:id="colReject" text="" prefWidth="110" />
+                </columns>
+            </TableView>
+
+            <Label fx:id="lblMessage" styleClass="lbl-message" text=""
+                   wrapText="true" maxWidth="700" visible="false" />
+
         </VBox>
     </VBox>
 </StackPane>

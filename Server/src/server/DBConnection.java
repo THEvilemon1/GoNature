@@ -20,7 +20,8 @@ public class DBConnection {
     private static final String USER     = "root";
     //private static final String PASSWORD = "amerhmysql";
     //private static final String PASSWORD = "roottoor";
-    private static final String PASSWORD = "amerhmysql";
+    //private static final String PASSWORD = "amerhmysql";
+    private static final String PASSWORD = "brunoMars24";
 
     private DBConnection() throws SQLException {
         openConnection();

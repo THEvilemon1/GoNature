@@ -9,15 +9,79 @@
            styleClass="root-pane"
            stylesheets="@EmployeeScreens.css">
 
-    <VBox styleClass="screen-card" prefWidth="900" maxWidth="980" alignment="TOP_CENTER">
-        <HBox styleClass="top-bar" alignment="CENTER_LEFT">
-            <Label styleClass="screen-title" text="Park Control" />
+    <VBox styleClass="screen-card" prefWidth="960" maxWidth="1040" alignment="TOP_CENTER">
+
+        <!-- Top bar -->
+        <HBox styleClass="top-bar" alignment="CENTER_LEFT" spacing="12">
+            <Label styleClass="screen-title" text="Park Manager — Control Panel" />
+            <HBox HBox.hgrow="ALWAYS" />
+            <Label fx:id="lblWelcome" styleClass="top-bar-info" text="" />
+            <Button styleClass="btn-secondary" text="Promotions" onAction="#handleOpenPromotions" />
+            <Button styleClass="btn-secondary" text="Visitors Report" onAction="#handleVisitorsReport" />
+            <Button styleClass="btn-secondary" text="Usage Report" onAction="#handleUsageReport" />
+            <Button styleClass="btn-secondary" text="Logout" onAction="#handleLogout" />
         </HBox>
 
-        <VBox styleClass="content-area" spacing="18">
-            <Label fx:id="lblWelcome" styleClass="welcome-label" text="Welcome!" />
+        <VBox styleClass="content-area" spacing="20">
+
+            <Label styleClass="field-label" text="REQUEST PARAMETER CHANGE" />
+            <Label styleClass="welcome-label"
+                   text="All changes require department manager approval before taking effect." />
+
+            <GridPane hgap="16" vgap="14">
+
+                <!-- Max Capacity -->
+                <Label styleClass="field-label" text="New Max Capacity:"
+                       GridPane.columnIndex="0" GridPane.rowIndex="0" />
+                <TextField fx:id="txtNewMaxCapacity" styleClass="field-input"
+                           promptText="e.g. 300" prefWidth="180"
+                           GridPane.columnIndex="1" GridPane.rowIndex="0" />
+                <Button styleClass="btn-primary" text="Send Request"
+                        onAction="#handleUpdateMaxCapacity" prefWidth="130"
+                        GridPane.columnIndex="2" GridPane.rowIndex="0" />
+
+                <!-- Gap for Walk-Ins -->
+                <Label styleClass="field-label" text="New Gap for Walk-Ins:"
+                       GridPane.columnIndex="0" GridPane.rowIndex="1" />
+                <TextField fx:id="txtNewGap" styleClass="field-input"
+                           promptText="e.g. 20" prefWidth="180"
+                           GridPane.columnIndex="1" GridPane.rowIndex="1" />
+                <Button styleClass="btn-primary" text="Send Request"
+                        onAction="#handleUpdateGap" prefWidth="130"
+                        GridPane.columnIndex="2" GridPane.rowIndex="1" />
+
+                <!-- Default Stay Time -->
+                <Label styleClass="field-label" text="New Default Stay Time (hours):"
+                       GridPane.columnIndex="0" GridPane.rowIndex="2" />
+                <TextField fx:id="txtNewStayTime" styleClass="field-input"
+                           promptText="e.g. 4" prefWidth="180"
+                           GridPane.columnIndex="1" GridPane.rowIndex="2" />
+                <Button styleClass="btn-primary" text="Send Request"
+                        onAction="#handleUpdateStayTime" prefWidth="130"
+                        GridPane.columnIndex="2" GridPane.rowIndex="2" />
+
+                <!-- Price Per Person -->
+                <Label styleClass="field-label" text="New Price Per Person (₪):"
+                       GridPane.columnIndex="0" GridPane.rowIndex="3" />
+                <TextField fx:id="txtNewPrice" styleClass="field-input"
+                           promptText="e.g. 50" prefWidth="180"
+                           GridPane.columnIndex="1" GridPane.rowIndex="3" />
+                <Button styleClass="btn-primary" text="Send Request"
+                        onAction="#handleUpdatePrice" prefWidth="130"
+                        GridPane.columnIndex="2" GridPane.rowIndex="3" />
+
+            </GridPane>
+
+            <!-- Status message -->
+            <Label fx:id="lblMessage" styleClass="lbl-message" text=""
+                   wrapText="true" maxWidth="700" visible="false" />
+
             <Separator styleClass="card-sep" />
-            <Button styleClass="btn-secondary" text="Logout" onAction="#handleLogout" prefWidth="120" />
+
+            <!-- Activity Log -->
+            <Label styleClass="field-label" text="ACTIVITY LOG" />
+            <ListView fx:id="lstActivityLog" styleClass="list-view" prefHeight="200" />
+
         </VBox>
     </VBox>
 </StackPane>

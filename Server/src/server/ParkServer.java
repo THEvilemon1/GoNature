@@ -582,17 +582,15 @@ public class ParkServer extends AbstractServer {
         ContactInfoValidator.requireName(booking.getTravelerName(), "Traveler name");
         ContactInfoValidator.requireEmail(booking.getTravelerEmail());
         ContactInfoValidator.requirePhoneNumber(booking.getTravelerPhoneNumber());
-        if (booking.getParkId() < 1 || booking.getParkId() > 4) {
-            throw new IllegalArgumentException("Please choose a valid park.");
-        }
-        if (booking.getNumberOfVisitors() < 1 || booking.getNumberOfVisitors() > 15) {
-            throw new IllegalArgumentException("Visitors must be between 1 and 15.");
+        
+        if (booking.getNumberOfVisitors() < 1 || booking.getNumberOfVisitors() > 16) {
+            throw new IllegalArgumentException("Visitors must be between 1 and 16.");
         }
         if (booking.getVisitorTime() == null || !booking.getVisitorTime().isAfter(LocalDateTime.now())) {
             throw new IllegalArgumentException("Booking date and time must be in the future.");
         }
-        if (booking.getVisitorTime().toLocalTime().isAfter(java.time.LocalTime.of(21, 0))) {
-            throw new IllegalArgumentException("Bookings can only be made until 21:00.");
+        if (booking.getVisitorTime().toLocalTime().isAfter(java.time.LocalTime.of(16, 0))) {
+            throw new IllegalArgumentException("Bookings can only be made until 16:00.");
         }
     }
 

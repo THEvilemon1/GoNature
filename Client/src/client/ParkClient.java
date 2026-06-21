@@ -74,6 +74,12 @@ public class ParkClient extends AbstractClient {
                 case "PARK_PRICES_RESULT":
                     listener.onParkPricesResult((Map<Integer, Integer>) message.getData());
                     break;
+                case "TRAVELER_PROFILE_RESULT":
+                    listener.onTravelerProfileResult((common.TravelerProfile) message.getData());
+                    break;
+                case "UPDATE_TRAVELER_PROFILE_RESULT":
+                    listener.onUpdateTravelerProfileResult((boolean) message.getData());
+                    break;
                 case "CREATE_BOOKING_RESULT":
                     listener.onCreateBookingResult((Booking) message.getData());
                     break;

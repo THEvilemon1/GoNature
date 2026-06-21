@@ -6,6 +6,7 @@ import java.util.Map;
 import common.Booking;
 import common.Employee;
 import common.Order;
+import common.TravelerProfile;
 import common.VisitorLoginResult;
 
 public interface ServerResponseListener {
@@ -17,6 +18,8 @@ public interface ServerResponseListener {
     default void onVisitorLoginResult(VisitorLoginResult result) {}
     default void onTravelerBookingsResult(ArrayList<Booking> bookings) {}
     default void onParkPricesResult(Map<Integer, Integer> pricesByParkId) {}
+    default void onTravelerProfileResult(TravelerProfile profile) {}
+    default void onUpdateTravelerProfileResult(boolean success) {}
     default void onCreateBookingResult(Booking booking) {}
     default void onCreateBookingRequiresWaitlistConfirmation(Booking booking, String message) {}
     default void onUpdateBookingResult(boolean success) {}

@@ -15,8 +15,10 @@ import client.ParkClient;
 import client.ServerResponseListener;
 import client.SessionManager;
 import common.Booking;
+import common.ContactInfoValidator;
 import common.Message;
 import common.Order;
+import common.TravelerProfile;
 import common.VisitorLoginResult;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -47,10 +49,12 @@ public class VisitorHomeController implements ServerResponseListener {
     @FXML private VBox bookingForm;
     @FXML private VBox bookingsListView;
     @FXML private VBox bookingsList;
+    @FXML private VBox profileForm;
     @FXML private Label lblVisitorDetails;
     @FXML private Label lblDetailTitle;
     @FXML private Label lblBookingMessage;
     @FXML private Label lblBookingsMessage;
+    @FXML private Label lblProfileMessage;
     @FXML private Label lblSelectedParkPrice;
     @FXML private Label lblPricePerPerson;
     @FXML private Label lblTotalPrice;
@@ -59,13 +63,22 @@ public class VisitorHomeController implements ServerResponseListener {
     @FXML private TextField txtName;
     @FXML private TextField txtEmail;
     @FXML private TextField txtPhoneNumber;
+    @FXML private TextField txtProfileFirstName;
+    @FXML private TextField txtProfileLastName;
+    @FXML private TextField txtProfileEmail;
+    @FXML private TextField txtProfilePhoneNumber;
+    @FXML private TextField txtProfileClubMember;
     @FXML private Spinner<Integer> spnVisitors;
     @FXML private ComboBox<ParkOption> cmbPark;
     @FXML private DatePicker dateVisit;
     @FXML private ComboBox<String> cmbTime;
     @FXML private Button btnSubmitBooking;
+    @FXML private Button btnEditProfile;
+    @FXML private Button btnCancelProfile;
+    @FXML private Button btnSaveProfile;
 
     private VisitorLoginResult currentUser;
+    private TravelerProfile currentProfile;
     private Booking editingBooking;
     private Booking pendingWaitlistBooking;
     private final Map<Integer, Integer> pricesByParkId = new HashMap<>();
@@ -105,6 +118,7 @@ public class VisitorHomeController implements ServerResponseListener {
         if (client != null) {
             client.setListener(this);
             requestParkPrices();
+            requestTravelerProfile();
         }
 
         lblVisitorDetails.setText(
@@ -137,8 +151,12 @@ public class VisitorHomeController implements ServerResponseListener {
         if (currentUser == null || currentUser.isGuide()) return 1.0;
         double factor = 1.0;
         if (isNewBooking)               factor *= 0.85; // 15% new-booking discount
-        if (currentUser.isClubMember()) factor *= 0.90; // 10% club-member discount
+        if (isClubMember())             factor *= 0.90; // 10% club-member discount
         return factor;
+    }
+
+    private boolean isClubMember() {
+        return currentProfile != null ? currentProfile.isClubMember() : currentUser != null && currentUser.isClubMember();
     }
 
     private void setupGuideMode() {
@@ -206,6 +224,17 @@ public class VisitorHomeController implements ServerResponseListener {
     }
 
     @FXML
+    private void handleProfileAction() {
+        stopBookingsAutoRefresh();
+        lblDetailTitle.setText("Profile");
+        showProfileForm();
+        showDetail();
+        if (currentProfile == null) {
+            requestTravelerProfile();
+        }
+    }
+
+    @FXML
     private void handleBack() {
         stopBookingsAutoRefresh();
         showMain();
@@ -216,6 +245,37 @@ public class VisitorHomeController implements ServerResponseListener {
         resetForm();
         stopBookingsAutoRefresh();
         showMain();
+    }
+
+    @FXML
+    private void handleEditProfile() {
+        setProfileEditMode(true);
+        hideProfileMessage();
+    }
+
+    @FXML
+    private void handleCancelProfileEdit() {
+        populateProfileForm();
+        setProfileEditMode(false);
+        hideProfileMessage();
+    }
+
+    @FXML
+    private void handleSaveProfile() {
+        try {
+            TravelerProfile profile = buildProfileFromForm();
+            ParkClient client = ParkClient.getInstance();
+            if (client == null || !client.isConnected()) {
+                showProfileMessage("Client is not connected to the server.", true);
+                return;
+            }
+            client.sendToServer(new Message("UPDATE_TRAVELER_PROFILE", profile));
+            btnSaveProfile.setDisable(true);
+        } catch (IllegalArgumentException e) {
+            showProfileMessage(e.getMessage(), true);
+        } catch (IOException e) {
+            showProfileMessage("Failed to save profile: " + e.getMessage(), true);
+        }
     }
 
     @FXML
@@ -263,6 +323,32 @@ public class VisitorHomeController implements ServerResponseListener {
                 this.pricesByParkId.putAll(pricesByParkId);
             }
             updatePriceSummary();
+        });
+    }
+
+    @Override
+    public void onTravelerProfileResult(TravelerProfile profile) {
+        Platform.runLater(() -> {
+            currentProfile = profile;
+            populateProfileForm();
+            if (profileForm != null && profileForm.isVisible()) {
+                setProfileEditMode(!hasCompleteProfile());
+            }
+        });
+    }
+
+    @Override
+    public void onUpdateTravelerProfileResult(boolean success) {
+        Platform.runLater(() -> {
+            btnSaveProfile.setDisable(false);
+            if (success) {
+                currentProfile = buildProfileFromForm();
+                populateProfileForm();
+                setProfileEditMode(false);
+                showProfileMessage("Profile saved.", false);
+            } else {
+                showProfileMessage("Profile could not be saved.", true);
+            }
         });
     }
 
@@ -347,7 +433,10 @@ public class VisitorHomeController implements ServerResponseListener {
     public void onError(String errorMessage) {
         Platform.runLater(() -> {
             btnSubmitBooking.setDisable(false);
-            if (bookingForm.isVisible()) {
+            if (profileForm != null && profileForm.isVisible()) {
+                btnSaveProfile.setDisable(false);
+                showProfileMessage(errorMessage, true);
+            } else if (bookingForm.isVisible()) {
                 showBookingMessage(errorMessage, true);
             } else {
                 showBookingsMessage(errorMessage, true);
@@ -390,21 +479,30 @@ public class VisitorHomeController implements ServerResponseListener {
             throw new IllegalArgumentException("Booking date and time must be in the future.");
         }
 
-        String name = requireText(txtName, "Please enter your name.");
-    String email = requireText(txtEmail, "Please enter email address.");
-    String phoneNumber = requireText(txtPhoneNumber, "Please enter phone number.");
+        String name = ContactInfoValidator.requireName(getFieldText(txtName), "Name");
+        String email = ContactInfoValidator.requireEmail(getFieldText(txtEmail));
+        String phoneNumber = ContactInfoValidator.requirePhoneNumber(getFieldText(txtPhoneNumber));
 
         String bookingId = editingBooking == null ? null : editingBooking.getBookingId();
         return new Booking(bookingId, currentUser.getTravelerId(), name, email, phoneNumber, park.getId(), visitors,
             visitorTime, Booking.STATUS_PENDING, false, computedPrice);
     }
 
-    private String requireText(TextField field, String errorMessage) {
-        String value = field == null ? null : field.getText();
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(errorMessage);
+    private String getFieldText(TextField field) {
+        return field == null ? "" : field.getText();
+    }
+
+    private TravelerProfile buildProfileFromForm() {
+        if (currentUser == null) {
+            throw new IllegalArgumentException("No traveler is logged in.");
         }
-        return value.trim();
+
+        String firstName = ContactInfoValidator.requireName(getFieldText(txtProfileFirstName), "First name");
+        String lastName = ContactInfoValidator.requireName(getFieldText(txtProfileLastName), "Last name");
+        String email = ContactInfoValidator.requireEmail(getFieldText(txtProfileEmail));
+        String phoneNumber = ContactInfoValidator.requirePhoneNumber(getFieldText(txtProfilePhoneNumber));
+        boolean clubMember = currentProfile != null ? currentProfile.isClubMember() : currentUser.isClubMember();
+        return new TravelerProfile(currentUser.getTravelerId(), firstName, lastName, email, phoneNumber, clubMember);
     }
 
     private int getVisitorCount() {
@@ -463,7 +561,7 @@ public class VisitorHomeController implements ServerResponseListener {
         java.util.List<String> notes = new java.util.ArrayList<>();
         if (isGuide) notes.add("guide entry excluded");
         if (!isGuide && editingBooking == null) notes.add("15% new booking");
-        if (!isGuide && currentUser != null && currentUser.isClubMember()) notes.add("10% club member");
+        if (!isGuide && isClubMember()) notes.add("10% club member");
         String suffix = notes.isEmpty() ? "" : " (" + String.join(", ", notes) + ")";
 
         lblSelectedParkPrice.setText(park.getName() + ": " + pricePerPerson + " ILS per person.");
@@ -520,6 +618,21 @@ public class VisitorHomeController implements ServerResponseListener {
             client.sendToServer(new Message("GET_PARK_PRICES", null));
         } catch (IOException e) {
             showBookingMessage("Failed to load park prices: " + e.getMessage(), true);
+        }
+    }
+
+    private void requestTravelerProfile() {
+        if (currentUser == null) {
+            return;
+        }
+        ParkClient client = ParkClient.getInstance();
+        if (client == null || !client.isConnected()) {
+            return;
+        }
+        try {
+            client.sendToServer(new Message("GET_TRAVELER_PROFILE", currentUser.getTravelerId()));
+        } catch (IOException e) {
+            showProfileMessage("Failed to load profile: " + e.getMessage(), true);
         }
     }
 
@@ -767,6 +880,8 @@ public class VisitorHomeController implements ServerResponseListener {
         bookingForm.setManaged(true);
         bookingsListView.setVisible(false);
         bookingsListView.setManaged(false);
+        profileForm.setVisible(false);
+        profileForm.setManaged(false);
         hideBookingMessage();
 
         if (booking == null) {
@@ -792,7 +907,20 @@ public class VisitorHomeController implements ServerResponseListener {
         bookingForm.setManaged(false);
         bookingsListView.setVisible(true);
         bookingsListView.setManaged(true);
+        profileForm.setVisible(false);
+        profileForm.setManaged(false);
         startBookingsAutoRefresh();
+    }
+
+    private void showProfileForm() {
+        bookingForm.setVisible(false);
+        bookingForm.setManaged(false);
+        bookingsListView.setVisible(false);
+        bookingsListView.setManaged(false);
+        profileForm.setVisible(true);
+        profileForm.setManaged(true);
+        populateProfileForm();
+        setProfileEditMode(!hasCompleteProfile());
     }
 
     private void resetForm() {
@@ -803,6 +931,7 @@ public class VisitorHomeController implements ServerResponseListener {
     txtName.clear();
     txtEmail.clear();
     txtPhoneNumber.clear();
+        populateBookingContactFieldsFromProfile();
         spnVisitors.getValueFactory().setValue(1);
         cmbPark.setValue(null);
         dateVisit.setValue(LocalDate.now());
@@ -839,6 +968,65 @@ public class VisitorHomeController implements ServerResponseListener {
         viewMain.setManaged(true);
     }
 
+    private void populateProfileForm() {
+        if (txtProfileFirstName == null || txtProfileClubMember == null) {
+            return;
+        }
+
+        if (currentProfile == null) {
+            txtProfileFirstName.clear();
+            txtProfileLastName.clear();
+            txtProfileEmail.clear();
+            txtProfilePhoneNumber.clear();
+            txtProfileClubMember.setText(currentUser != null && currentUser.isClubMember() ? "True" : "False");
+            return;
+        }
+
+        txtProfileFirstName.setText(ContactInfoValidator.clean(currentProfile.getFirstName()));
+        txtProfileLastName.setText(ContactInfoValidator.clean(currentProfile.getLastName()));
+        txtProfileEmail.setText(ContactInfoValidator.isPlaceholderEmail(currentProfile.getEmail()) ? "" : ContactInfoValidator.clean(currentProfile.getEmail()));
+        txtProfilePhoneNumber.setText(ContactInfoValidator.clean(currentProfile.getPhoneNumber()));
+        txtProfileClubMember.setText(currentProfile.isClubMember() ? "True" : "False");
+    }
+
+    private void populateBookingContactFieldsFromProfile() {
+        if (!hasCompleteProfile()) {
+            return;
+        }
+        txtName.setText(currentProfile.getFullName());
+        txtEmail.setText(ContactInfoValidator.clean(currentProfile.getEmail()));
+        txtPhoneNumber.setText(ContactInfoValidator.clean(currentProfile.getPhoneNumber()));
+    }
+
+    private boolean hasCompleteProfile() {
+        if (currentProfile == null) {
+            return false;
+        }
+        if (ContactInfoValidator.isPlaceholderEmail(currentProfile.getEmail())) {
+            return false;
+        }
+        try {
+            ContactInfoValidator.requireName(currentProfile.getFirstName(), "First name");
+            ContactInfoValidator.requireName(currentProfile.getLastName(), "Last name");
+            ContactInfoValidator.requireEmail(currentProfile.getEmail());
+            ContactInfoValidator.requirePhoneNumber(currentProfile.getPhoneNumber());
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    private void setProfileEditMode(boolean editable) {
+        txtProfileFirstName.setEditable(editable);
+        txtProfileLastName.setEditable(editable);
+        txtProfileEmail.setEditable(editable);
+        txtProfilePhoneNumber.setEditable(editable);
+        txtProfileClubMember.setEditable(false);
+        btnEditProfile.setDisable(editable);
+        btnCancelProfile.setDisable(!editable);
+        btnSaveProfile.setDisable(!editable);
+    }
+
     private void showBookingMessage(String message, boolean error) {
         lblBookingMessage.setText(message);
         lblBookingMessage.getStyleClass().removeAll("msg-error", "msg-success");
@@ -861,6 +1049,18 @@ public class VisitorHomeController implements ServerResponseListener {
     private void hideBookingsMessage() {
         lblBookingsMessage.setText("");
         lblBookingsMessage.setVisible(false);
+    }
+
+    private void showProfileMessage(String message, boolean error) {
+        lblProfileMessage.setText(message);
+        lblProfileMessage.getStyleClass().removeAll("msg-error", "msg-success");
+        lblProfileMessage.getStyleClass().add(error ? "msg-error" : "msg-success");
+        lblProfileMessage.setVisible(true);
+    }
+
+    private void hideProfileMessage() {
+        lblProfileMessage.setText("");
+        lblProfileMessage.setVisible(false);
     }
 
 

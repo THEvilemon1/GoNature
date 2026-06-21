@@ -57,6 +57,16 @@
                     <Button styleClass="card-btn-secondary" text="View"
                             onAction="#handleSecondaryAction" maxWidth="Infinity" />
                 </VBox>
+
+                <VBox styleClass="action-card" spacing="12" HBox.hgrow="ALWAYS" maxWidth="Infinity">
+                    <Label styleClass="card-title" text="Profile" />
+                    <Label styleClass="card-desc"
+                           text="View and update your saved contact information."
+                           wrapText="true" />
+                    <Region VBox.vgrow="ALWAYS" />
+                    <Button styleClass="card-btn-secondary" text="Edit Profile"
+                            onAction="#handleProfileAction" maxWidth="Infinity" />
+                </VBox>
             </HBox>
         </VBox>
     </VBox>
@@ -139,6 +149,46 @@
                 <ScrollPane fitToWidth="true" hbarPolicy="NEVER" prefHeight="520" VBox.vgrow="ALWAYS" styleClass="bookings-scroll">
                     <VBox fx:id="bookingsList" spacing="10" />
                 </ScrollPane>
+            </VBox>
+
+            <VBox fx:id="profileForm" visible="false" managed="false" styleClass="detail-body" spacing="14">
+                <HBox spacing="12">
+                    <VBox spacing="5" HBox.hgrow="ALWAYS">
+                        <Label styleClass="field-label" text="First Name" />
+                        <TextField fx:id="txtProfileFirstName" promptText="Enter first name" maxWidth="Infinity" />
+                    </VBox>
+                    <VBox spacing="5" HBox.hgrow="ALWAYS">
+                        <Label styleClass="field-label" text="Last Name" />
+                        <TextField fx:id="txtProfileLastName" promptText="Enter last name" maxWidth="Infinity" />
+                    </VBox>
+                </HBox>
+
+                <HBox spacing="12">
+                    <VBox spacing="5" HBox.hgrow="ALWAYS">
+                        <Label styleClass="field-label" text="Email Address" />
+                        <TextField fx:id="txtProfileEmail" promptText="Enter email address" maxWidth="Infinity" />
+                    </VBox>
+                    <VBox spacing="5" HBox.hgrow="ALWAYS">
+                        <Label styleClass="field-label" text="Phone Number" />
+                        <TextField fx:id="txtProfilePhoneNumber" promptText="Enter phone number" maxWidth="Infinity" />
+                    </VBox>
+                </HBox>
+
+                <VBox spacing="5">
+                    <Label styleClass="field-label" text="Club Member" />
+                    <TextField fx:id="txtProfileClubMember" editable="false" focusTraversable="false" maxWidth="160" />
+                    <Label styleClass="field-help"
+                           text="Only a service representative can change club member status."
+                           wrapText="true" />
+                </VBox>
+
+                <Label fx:id="lblProfileMessage" styleClass="booking-message" text="" wrapText="true" visible="false" />
+
+                <HBox spacing="10" alignment="CENTER_RIGHT">
+                    <Button fx:id="btnEditProfile" styleClass="card-btn-secondary" text="Edit" onAction="#handleEditProfile" />
+                    <Button fx:id="btnCancelProfile" styleClass="card-btn-secondary" text="Cancel" onAction="#handleCancelProfileEdit" />
+                    <Button fx:id="btnSaveProfile" styleClass="card-btn-primary" text="Save Profile" onAction="#handleSaveProfile" />
+                </HBox>
             </VBox>
         </VBox>
     </VBox>

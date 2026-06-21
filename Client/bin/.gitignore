@@ -1,6 +1,13 @@
+<<<<<<< HEAD
 /boundaries/
 /client/
 /common/
 /gui/
+=======
+/client/
+/common/
+/gui/
+/boundaries/
+>>>>>>> benan
 /login/
 /ocsf/

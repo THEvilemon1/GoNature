@@ -65,7 +65,10 @@ public class NotificationService {
     }
 
     private static BookingNotificationContext getContext(Connection conn, String bookingId) throws SQLException {
-        String sql = "SELECT b.booking_id, b.traveler_id, b.park_id, b.visitorTime, u.firstName, u.lastName, u.email, u.phoneNumber "
+        String sql = "SELECT b.booking_id, b.traveler_id, b.park_id, b.visitorTime, "
+            + "COALESCE(NULLIF(b.travelerName, ''), TRIM(CONCAT(u.firstName, ' ', u.lastName))) AS contactName, "
+            + "COALESCE(NULLIF(b.travelerEmail, ''), u.email) AS contactEmail, "
+            + "COALESCE(NULLIF(b.travelerPhoneNumber, ''), u.phoneNumber) AS contactPhoneNumber "
             + "FROM booking b "
             + "JOIN `user` u ON u.user_id = b.traveler_id "
             + "WHERE b.booking_id = ?";
@@ -82,9 +85,9 @@ public class NotificationService {
             rs.getString("traveler_id"),
             rs.getInt("park_id"),
             visitorTimestamp.toLocalDateTime(),
-            buildName(rs.getString("firstName")),
-            rs.getString("email"),
-            rs.getString("phoneNumber")
+            buildName(rs.getString("contactName")),
+            rs.getString("contactEmail"),
+            rs.getString("contactPhoneNumber")
         );
     }
 

@@ -6,11 +6,10 @@ import java.sql.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import common.SubscriberRequest;
 
 import common.ParkSubmittedReport;
 import common.ParkReportRequest;
@@ -18,9 +17,12 @@ import common.ParkVisitorsReportResult;
 import common.ParkUsageReportResult;
 import common.ParkChangeRequest;
 import common.Booking;
+import common.ContactInfoValidator;
 import common.Employee;
 import common.Message;
 import common.Order;
+import common.TravelerProfile;
+import common.ParkOption;
 import common.WalkInRequest;
 import common.ExitRequest;
 import common.VisitorLoginResult;
@@ -223,8 +225,20 @@ public class ParkServer extends AbstractServer {
 
                 case "CREATE_BOOKING":
                     Booking bookingToCreate = (Booking) message.getData();
-                    Booking createdBooking = createBooking(bookingToCreate);
-                    client.sendToClient(new Message("CREATE_BOOKING_RESULT", createdBooking));
+                    BookingAvailabilityResult bookingAvailabilityResult = createBooking(bookingToCreate, false);
+                    if (bookingAvailabilityResult.requiresWaitlistConfirmation) {
+                        client.sendToClient(new Message("CREATE_BOOKING_REQUIRES_WAITLIST_CONFIRMATION",
+                            new Object[] { bookingAvailabilityResult.booking,
+                                "The selected park is full for this date and time. You can join the waiting list or choose another time." }));
+                    } else {
+                        client.sendToClient(new Message("CREATE_BOOKING_RESULT", bookingAvailabilityResult.booking));
+                    }
+                    break;
+
+                case "CREATE_WAITLIST_BOOKING":
+                    Booking waitlistBooking = (Booking) message.getData();
+                    Booking createdWaitlistBooking = createBooking(waitlistBooking);
+                    client.sendToClient(new Message("CREATE_BOOKING_RESULT", createdWaitlistBooking));
                     break;
 
                 case "GET_TRAVELER_BOOKINGS":
@@ -232,8 +246,18 @@ public class ParkServer extends AbstractServer {
                     client.sendToClient(new Message("TRAVELER_BOOKINGS_RESULT", getTravelerBookings(travelerId)));
                     break;
 
-                case "GET_PARK_PRICES":
-                    client.sendToClient(new Message("PARK_PRICES_RESULT", getParkPrices()));
+                case "GET_PARKS":
+                    client.sendToClient(new Message("PARKS_RESULT", getParkOptions()));
+                    break;
+
+                case "GET_TRAVELER_PROFILE":
+                    String profileTravelerId = (String) message.getData();
+                    client.sendToClient(new Message("TRAVELER_PROFILE_RESULT", getTravelerProfile(profileTravelerId)));
+                    break;
+
+                case "UPDATE_TRAVELER_PROFILE":
+                    TravelerProfile profileToUpdate = (TravelerProfile) message.getData();
+                    client.sendToClient(new Message("UPDATE_TRAVELER_PROFILE_RESULT", updateTravelerProfile(profileToUpdate)));
                     break;
 
                 case "UPDATE_BOOKING":
@@ -244,6 +268,18 @@ public class ParkServer extends AbstractServer {
                 case "CANCEL_BOOKING":
                     Booking bookingToCancel = (Booking) message.getData();
                     client.sendToClient(new Message("CANCEL_BOOKING_RESULT", cancelBooking(bookingToCancel)));
+                    break;
+
+                case "CONFIRM_BOOKING":
+                    String[] confirmationData = (String[]) message.getData();
+                    boolean confirmed = BookingLifecycleService.confirmBooking(confirmationData[0], confirmationData[1]);
+                    client.sendToClient(new Message("CONFIRM_BOOKING_RESULT", confirmed));
+                    break;
+
+                case "PAY_IN_ADVANCE":
+                    Booking payBooking = (Booking) message.getData();
+                    boolean payResult = payInAdvance(payBooking);
+                    client.sendToClient(new Message("PAY_IN_ADVANCE_RESULT", payResult));
                     break;
 
                 case "TRAVELER_LOGIN":
@@ -410,6 +446,12 @@ public class ParkServer extends AbstractServer {
                 	    ArrayList<Booking> todayBookings = getTodayBookings(parkIdForToday);
                 	    client.sendToClient(new Message("TODAY_BOOKINGS_RESULT", todayBookings));
                 	    break;
+                	    
+                 case "REGISTER_TRAVELER":
+                	    SubscriberRequest subReq = (SubscriberRequest) message.getData();
+                	    String registerResult = registerTraveler(subReq);
+                	    client.sendToClient(new Message("REGISTER_TRAVELER_RESULT", registerResult));
+                	    break;
 
                 default:
                     client.sendToClient(new Message("ERROR", "Unknown command"));
@@ -445,6 +487,127 @@ public class ParkServer extends AbstractServer {
 
             ps.executeUpdate();
     }
+    
+    
+
+    /**
+     * Registers a traveler as a club member or tour guide.
+     * If a traveler with this national ID already exists, upgrades them
+     * (sets the relevant flag and updates their user details).
+     * Returns "SUCCESS" or an error message string.
+     */  
+    private String registerTraveler(SubscriberRequest req) throws SQLException {
+        Connection conn = DBConnection.getStaticConnection();
+        int nationalIdNumber;
+        try {
+            nationalIdNumber = Integer.parseInt(req.getNationalId().trim());
+        } catch (NumberFormatException e) {
+            return "National ID must be a number.";
+        }
+     
+        boolean isGuide = SubscriberRequest.TYPE_GUIDE.equals(req.getType());
+        boolean isClubMember = SubscriberRequest.TYPE_CLUB_MEMBER.equals(req.getType());
+     
+        boolean previousAutoCommit = conn.getAutoCommit();
+        conn.setAutoCommit(false);
+     
+        try {
+            // Check if traveler already exists
+            String selectSql = "SELECT traveler_id, user_id, guide, clubMember FROM traveler WHERE nationalId = ?";
+            PreparedStatement selectPs = conn.prepareStatement(selectSql);
+            selectPs.setInt(1, nationalIdNumber);
+            ResultSet rs = selectPs.executeQuery();
+     
+            if (rs.next()) {
+                // Traveler exists — upgrade them
+                String travelerId = rs.getString("traveler_id");
+                String userId = rs.getString("user_id");
+                boolean alreadyGuide = rs.getBoolean("guide");
+                boolean alreadyClub = rs.getBoolean("clubMember");
+     
+                if (isGuide && alreadyGuide) {
+                    conn.rollback();
+                    return "This person is already registered as a tour guide.";
+                }
+                if (isClubMember && alreadyClub) {
+                    conn.rollback();
+                    return "This person is already registered as a club member.";
+                }
+     
+                // Update the traveler flags + club-member fields
+                String updateTravelerSql =
+                    "UPDATE traveler SET guide = ?, clubMember = ?, familyMembers = ?, creditCard = ? WHERE traveler_id = ?";
+                PreparedStatement updTravelerPs = conn.prepareStatement(updateTravelerSql);
+                updTravelerPs.setBoolean(1, alreadyGuide || isGuide);
+                updTravelerPs.setBoolean(2, alreadyClub || isClubMember);
+                if (isClubMember) {
+                    updTravelerPs.setInt(3, req.getFamilyMembers());
+                    if (req.getCreditCard() == null) updTravelerPs.setNull(4, Types.VARCHAR);
+                    else updTravelerPs.setString(4, req.getCreditCard());
+                } else {
+                    // Guide upgrade — leave family/credit fields as they were (set null)
+                    updTravelerPs.setNull(3, Types.INTEGER);
+                    updTravelerPs.setNull(4, Types.VARCHAR);
+                }
+                updTravelerPs.setString(5, travelerId);
+                updTravelerPs.executeUpdate();
+     
+                // Update user details
+                String updateUserSql = "UPDATE `user` SET firstName = ?, lastName = ?, email = ?, phoneNumber = ? WHERE user_id = ?";
+                PreparedStatement updUserPs = conn.prepareStatement(updateUserSql);
+                updUserPs.setString(1, req.getFirstName());
+                updUserPs.setString(2, req.getLastName());
+                updUserPs.setString(3, req.getEmail());
+                updUserPs.setString(4, req.getPhoneNumber());
+                updUserPs.setString(5, userId);
+                updUserPs.executeUpdate();
+     
+                conn.commit();
+                return "SUCCESS";
+            } else {
+                // New traveler — create user + traveler rows
+                String travelerId = UUID.randomUUID().toString();
+     
+                String insertUserSql = "INSERT INTO `user` (user_id, firstName, lastName, email, phoneNumber) VALUES (?, ?, ?, ?, ?)";
+                PreparedStatement insertUserPs = conn.prepareStatement(insertUserSql);
+                insertUserPs.setString(1, travelerId);
+                insertUserPs.setString(2, req.getFirstName());
+                insertUserPs.setString(3, req.getLastName());
+                insertUserPs.setString(4, req.getEmail());
+                insertUserPs.setString(5, req.getPhoneNumber());
+                insertUserPs.executeUpdate();
+     
+                String insertTravelerSql =
+                    "INSERT INTO traveler (traveler_id, nationalId, guide, clubMember, user_id, familyMembers, creditCard) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)";
+                PreparedStatement insertTravelerPs = conn.prepareStatement(insertTravelerSql);
+                insertTravelerPs.setString(1, travelerId);
+                insertTravelerPs.setInt(2, nationalIdNumber);
+                insertTravelerPs.setBoolean(3, isGuide);
+                insertTravelerPs.setBoolean(4, isClubMember);
+                insertTravelerPs.setString(5, travelerId);
+                if (isClubMember) {
+                    insertTravelerPs.setInt(6, req.getFamilyMembers());
+                    if (req.getCreditCard() == null) insertTravelerPs.setNull(7, Types.VARCHAR);
+                    else insertTravelerPs.setString(7, req.getCreditCard());
+                } else {
+                    insertTravelerPs.setNull(6, Types.INTEGER);
+                    insertTravelerPs.setNull(7, Types.VARCHAR);
+                }
+                insertTravelerPs.executeUpdate();
+     
+                conn.commit();
+                return "SUCCESS";
+            }
+        } catch (SQLException e) {
+            conn.rollback();
+            throw e;
+        } finally {
+            conn.setAutoCommit(previousAutoCommit);
+        }
+    }
+    
+    
     private ArrayList<Booking> getTodayBookings(int parkId) throws SQLException {
         ArrayList<Booking> list = new ArrayList<>();
         Connection conn = DBConnection.getStaticConnection();
@@ -458,7 +621,7 @@ public class ParkServer extends AbstractServer {
         ps.setInt(1, parkId);
         ResultSet rs = ps.executeQuery();
         while (rs.next()) {
-            list.add(mapBooking(rs));
+            list.add(Utils.mapBooking(rs));
         }
         return list;
     }
@@ -514,28 +677,127 @@ public class ParkServer extends AbstractServer {
         return ps.executeUpdate() > 0;
     }
 
-    private Booking createBooking(Booking booking) throws SQLException {
+    private synchronized BookingAvailabilityResult createBooking(Booking booking, boolean allowWaitlistCreation) throws SQLException {
         validateBooking(booking);
 
         Connection conn = DBConnection.getStaticConnection();
-        String bookingId = UUID.randomUUID().toString();
-        int price = calculatePrice(conn, booking.getParkId(), booking.getNumberOfVisitors());
+        boolean previousAutoCommit = conn.getAutoCommit();
+        conn.setAutoCommit(false);
 
-        String sql = "INSERT INTO booking (booking_id, traveler_id, park_id, numberOfVisitors, visitorTime, status, organizedBooking, price) "
-            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        try {
+            if (Utils.hasActiveBookingAtTime(conn, booking.getTravelerId(), booking.getVisitorTime())) {
+                conn.rollback();
+                throw new IllegalArgumentException(
+                    "You already have a booking at this date and time. Please choose a different time slot.");
+            }
+
+            String bookingId = String.valueOf(1000000 + new java.util.Random().nextInt(9000000));
+            int capacity = Utils.getParkEffectiveCapacity(conn, booking.getParkId());
+            int confirmedVisitors = getConfirmedVisitorsForSlot(conn, booking.getParkId(), booking.getVisitorTime());
+            boolean isFull = confirmedVisitors + booking.getNumberOfVisitors() > capacity;
+            String status = isFull
+                ? Booking.STATUS_WAITING_LIST
+                : Booking.STATUS_CONFIRMED;
+
+            if (isFull && !allowWaitlistCreation) {
+                conn.rollback();
+                return new BookingAvailabilityResult(true, new Booking(null, booking.getTravelerId(), booking.getTravelerName(),
+                    booking.getTravelerEmail(), booking.getTravelerPhoneNumber(), booking.getParkId(), booking.getNumberOfVisitors(),
+                    booking.getVisitorTime(), Booking.STATUS_WAITING_LIST, false, 0));
+            }
+            String travelerID = booking.getTravelerId();
+
+            double price = calculatePrice(conn, booking.getParkId(), booking.getNumberOfVisitors(), travelerID, true);
+
+            String sql = "INSERT INTO booking (booking_id, traveler_id, travelerName, travelerEmail, travelerPhoneNumber, "
+                + "park_id, numberOfVisitors, visitorTime, status, organizedBooking, price) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            PreparedStatement ps = conn.prepareStatement(sql);
+            ps.setString(1, bookingId);
+            ps.setString(2, travelerID);
+            ps.setString(3, booking.getTravelerName().trim());
+            ps.setString(4, booking.getTravelerEmail().trim());
+            ps.setString(5, booking.getTravelerPhoneNumber().trim());
+            ps.setInt(6, booking.getParkId());
+            ps.setInt(7, booking.getNumberOfVisitors());
+            ps.setTimestamp(8, Timestamp.valueOf(booking.getVisitorTime()));
+            ps.setString(9, status);
+            ps.setBoolean(10, false);
+            ps.setDouble(11, price);
+            ps.executeUpdate();
+
+            if (Booking.STATUS_WAITING_LIST.equals(status)) {
+                String waitingListId = getOrCreateWaitingList(conn, booking.getParkId(), booking.getVisitorTime());
+                addWaitingListEntry(conn, waitingListId, bookingId);
+            }
+
+            conn.commit();
+            return new BookingAvailabilityResult(false, new Booking(bookingId, booking.getTravelerId(), booking.getTravelerName(),
+                booking.getTravelerEmail(), booking.getTravelerPhoneNumber(),
+                booking.getParkId(), booking.getNumberOfVisitors(), booking.getVisitorTime(), status, false, price));
+        } catch (SQLException | RuntimeException e) {
+            conn.rollback();
+            throw e;
+        } finally {
+            conn.setAutoCommit(previousAutoCommit);
+        }
+    }
+
+    private synchronized Booking createBooking(Booking booking) throws SQLException {
+        return createBooking(booking, true).booking;
+    }
+
+    private int getConfirmedVisitorsForSlot(Connection conn, int parkId, LocalDateTime visitorTime) throws SQLException {
+        String sql = "SELECT COALESCE(SUM(numberOfVisitors), 0) AS confirmedVisitors "
+            + "FROM booking WHERE park_id = ? AND visitorTime = ? AND status = ? FOR UPDATE";
         PreparedStatement ps = conn.prepareStatement(sql);
-        ps.setString(1, bookingId);
-        ps.setString(2, booking.getTravelerId());
-        ps.setInt(3, booking.getParkId());
-        ps.setInt(4, booking.getNumberOfVisitors());
-        ps.setTimestamp(5, Timestamp.valueOf(booking.getVisitorTime()));
-        ps.setString(6, Booking.STATUS_PENDING);
-        ps.setBoolean(7, false);
-        ps.setInt(8, price);
-        ps.executeUpdate();
+        ps.setInt(1, parkId);
+        ps.setTimestamp(2, Timestamp.valueOf(visitorTime));
+        ps.setString(3, Booking.STATUS_CONFIRMED);
+        ResultSet rs = ps.executeQuery();
+        return rs.next() ? rs.getInt("confirmedVisitors") : 0;
+    }
 
-        return new Booking(bookingId, booking.getTravelerId(), booking.getParkId(),
-            booking.getNumberOfVisitors(), booking.getVisitorTime(), Booking.STATUS_PENDING, false, price);
+    private String getOrCreateWaitingList(Connection conn, int parkId, LocalDateTime slotTime) throws SQLException {
+        String selectSql = "SELECT waitingList_id FROM WaitingList WHERE park_id = ? AND slot_time = ? FOR UPDATE";
+        PreparedStatement selectPs = conn.prepareStatement(selectSql);
+        selectPs.setInt(1, parkId);
+        selectPs.setTimestamp(2, Timestamp.valueOf(slotTime));
+        ResultSet rs = selectPs.executeQuery();
+        if (rs.next()) {
+            return rs.getString("waitingList_id");
+        }
+
+        String waitingListId = UUID.randomUUID().toString();
+        String insertSql = "INSERT INTO WaitingList (waitingList_id, park_id, slot_time, status, created_at) VALUES (?, ?, ?, ?, NOW())";
+        PreparedStatement insertPs = conn.prepareStatement(insertSql);
+        insertPs.setString(1, waitingListId);
+        insertPs.setInt(2, parkId);
+        insertPs.setTimestamp(3, Timestamp.valueOf(slotTime));
+        insertPs.setString(4, "OPEN");
+        insertPs.executeUpdate();
+        return waitingListId;
+    }
+
+    private void addWaitingListEntry(Connection conn, String waitingListId, String bookingId) throws SQLException {
+        String sql = "INSERT INTO WaitingListEntry (id, waitingList_id, booking_id, registered_at, status, updated_at) "
+            + "VALUES (?, ?, ?, NOW(), ?, NOW())";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setString(1, UUID.randomUUID().toString());
+        ps.setString(2, waitingListId);
+        ps.setString(3, bookingId);
+        ps.setString(4, "WAITING");
+        ps.executeUpdate();
+    }
+
+    private static final class BookingAvailabilityResult {
+        private final boolean requiresWaitlistConfirmation;
+        private final Booking booking;
+
+        private BookingAvailabilityResult(boolean requiresWaitlistConfirmation, Booking booking) {
+            this.requiresWaitlistConfirmation = requiresWaitlistConfirmation;
+            this.booking = booking;
+        }
     }
 
     private ArrayList<Booking> getTravelerBookings(String travelerId) throws SQLException {
@@ -547,51 +809,91 @@ public class ParkServer extends AbstractServer {
         ResultSet rs = ps.executeQuery();
 
         while (rs.next()) {
-            bookings.add(mapBooking(rs));
+            bookings.add(Utils.mapBooking(rs));
         }
 
         return bookings;
     }
 
-    private boolean updateBooking(Booking booking) throws SQLException {
-        validateBooking(booking);
-
+    private boolean payInAdvance(Booking booking) throws SQLException {
         Connection conn = DBConnection.getStaticConnection();
-        int price = calculatePrice(conn, booking.getParkId(), booking.getNumberOfVisitors());
-
-        String sql = "UPDATE booking SET park_id = ?, numberOfVisitors = ?, visitorTime = ?, status = ?, price = ? "
-            + "WHERE booking_id = ? AND traveler_id = ? "
-            + "AND status NOT IN (?, ?, ?)";
+        String sql = "UPDATE booking SET paid = 1, price = ? WHERE booking_id = ?";
         PreparedStatement ps = conn.prepareStatement(sql);
-        ps.setInt(1, booking.getParkId());
-        ps.setInt(2, booking.getNumberOfVisitors());
-        ps.setTimestamp(3, Timestamp.valueOf(booking.getVisitorTime()));
-        ps.setString(4, Booking.STATUS_PENDING);
-        ps.setInt(5, price);
-        ps.setString(6, booking.getBookingId());
-        ps.setString(7, booking.getTravelerId());
-        ps.setString(8, Booking.STATUS_CANCELLED);
-        ps.setString(9, Booking.STATUS_CHECKED_IN);
-        ps.setString(10, Booking.STATUS_CHECKED_OUT);
+        ps.setDouble(1, booking.getPrice());
+        ps.setString(2, booking.getBookingId());
         return ps.executeUpdate() > 0;
     }
 
-    private boolean cancelBooking(Booking booking) throws SQLException {
+    private boolean updateBooking(Booking booking) throws SQLException {
+
+        Connection conn = DBConnection.getStaticConnection();
+        double price = calculatePrice(conn, booking.getParkId(), booking.getNumberOfVisitors(), booking.getTravelerId(), true);
+
+        String sql = "UPDATE booking SET travelerName = ?, travelerEmail = ?, travelerPhoneNumber = ?, "
+            + "park_id = ?, numberOfVisitors = ?, visitorTime = ?, status = ?, price = ? "
+            + "WHERE booking_id = ? AND traveler_id = ? "
+            + "AND status NOT IN (?, ?, ?)";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setString(1, booking.getTravelerName().trim());
+        ps.setString(2, booking.getTravelerEmail().trim());
+        ps.setString(3, booking.getTravelerPhoneNumber().trim());
+        ps.setInt(4, booking.getParkId());
+        ps.setInt(5, booking.getNumberOfVisitors());
+        ps.setTimestamp(6, Timestamp.valueOf(booking.getVisitorTime()));
+        ps.setString(7, Booking.STATUS_PENDING);
+        ps.setDouble(8, price);
+        ps.setString(9, booking.getBookingId());
+        ps.setString(10, booking.getTravelerId());
+        ps.setString(11, Booking.STATUS_CANCELLED);
+        ps.setString(12, Booking.STATUS_CHECKED_IN);
+        ps.setString(13, Booking.STATUS_CHECKED_OUT);
+        return ps.executeUpdate() > 0;
+    }
+
+    private synchronized boolean cancelBooking(Booking booking) throws SQLException {
         if (booking == null || booking.getBookingId() == null || booking.getTravelerId() == null) {
             throw new IllegalArgumentException("Booking details are missing.");
         }
 
         Connection conn = DBConnection.getStaticConnection();
-        String sql = "UPDATE booking SET status = ? WHERE booking_id = ? AND traveler_id = ? "
-            + "AND status NOT IN (?, ?, ?)";
-        PreparedStatement ps = conn.prepareStatement(sql);
-        ps.setString(1, Booking.STATUS_CANCELLED);
-        ps.setString(2, booking.getBookingId());
-        ps.setString(3, booking.getTravelerId());
-        ps.setString(4, Booking.STATUS_CANCELLED);
-        ps.setString(5, Booking.STATUS_CHECKED_IN);
-        ps.setString(6, Booking.STATUS_CHECKED_OUT);
-        return ps.executeUpdate() > 0;
+        boolean previousAutoCommit = conn.getAutoCommit();
+        conn.setAutoCommit(false);
+
+        try {
+            Booking existingBooking = Utils.getBookingByIdForUpdate(conn, booking.getBookingId());
+            if (existingBooking == null || !booking.getTravelerId().equals(existingBooking.getTravelerId())) {
+                conn.rollback();
+                return false;
+            }
+
+            String sql = "UPDATE booking SET status = ? WHERE booking_id = ? AND traveler_id = ? "
+                + "AND status NOT IN (?, ?, ?)";
+            PreparedStatement ps = conn.prepareStatement(sql);
+            ps.setString(1, Booking.STATUS_CANCELLED);
+            ps.setString(2, booking.getBookingId());
+            ps.setString(3, booking.getTravelerId());
+            ps.setString(4, Booking.STATUS_CANCELLED);
+            ps.setString(5, Booking.STATUS_CHECKED_IN);
+            ps.setString(6, Booking.STATUS_CHECKED_OUT);
+            boolean cancelled = ps.executeUpdate() > 0;
+
+            if (cancelled) {
+                Utils.updateWaitingListEntryByBooking(conn, booking.getBookingId(), "WAITING", "CANCELLED");
+                if (Booking.STATUS_CONFIRMED.equals(existingBooking.getStatus())
+                    || Booking.STATUS_PENDING_REMINDER_CONFIRMATION.equals(existingBooking.getStatus())
+                    || Booking.STATUS_PENDING_WAITLIST_CONFIRMATION.equals(existingBooking.getStatus())) {
+                    BookingLifecycleService.handleConfirmedBookingCancelled(conn, existingBooking);
+                }
+            }
+
+            conn.commit();
+            return cancelled;
+        } catch (SQLException | RuntimeException e) {
+            conn.rollback();
+            throw e;
+        } finally {
+            conn.setAutoCommit(previousAutoCommit);
+        }
     }
 
     private void validateBooking(Booking booking) {
@@ -601,21 +903,22 @@ public class ParkServer extends AbstractServer {
         if (booking.getTravelerId() == null || booking.getTravelerId().isBlank()) {
             throw new IllegalArgumentException("Traveler is missing.");
         }
-        if (booking.getParkId() < 1 || booking.getParkId() > 4) {
-            throw new IllegalArgumentException("Please choose a valid park.");
-        }
-        if (booking.getNumberOfVisitors() < 1 || booking.getNumberOfVisitors() > 15) {
-            throw new IllegalArgumentException("Visitors must be between 1 and 15.");
+        ContactInfoValidator.requireName(booking.getTravelerName(), "Traveler name");
+        ContactInfoValidator.requireEmail(booking.getTravelerEmail());
+        ContactInfoValidator.requirePhoneNumber(booking.getTravelerPhoneNumber());
+        
+        if (booking.getNumberOfVisitors() < 1 || booking.getNumberOfVisitors() > 16) {
+            throw new IllegalArgumentException("Visitors must be between 1 and 16.");
         }
         if (booking.getVisitorTime() == null || !booking.getVisitorTime().isAfter(LocalDateTime.now())) {
             throw new IllegalArgumentException("Booking date and time must be in the future.");
         }
-        if (booking.getVisitorTime().toLocalTime().isAfter(java.time.LocalTime.of(21, 0))) {
-            throw new IllegalArgumentException("Bookings can only be made until 21:00.");
+        if (booking.getVisitorTime().toLocalTime().isAfter(java.time.LocalTime.of(16, 0))) {
+            throw new IllegalArgumentException("Bookings can only be made until 16:00.");
         }
     }
 
-    private int calculatePrice(Connection conn, int parkId, int numberOfVisitors) throws SQLException {
+    private double calculatePrice(Connection conn, int parkId, int numberOfVisitors, String travelerId, boolean digitalBooking) throws SQLException {
         String sql = "SELECT pricePerPerson FROM park WHERE park_id = ?";
         PreparedStatement ps = conn.prepareStatement(sql);
         ps.setInt(1, parkId);
@@ -624,48 +927,104 @@ public class ParkServer extends AbstractServer {
         if (!rs.next()) {
             throw new IllegalArgumentException("Selected park does not exist in the database.");
         }
+        
+        double parkPrice = rs.getInt("pricePerPerson");
+        boolean guide = Utils.isGuide(conn, travelerId);
+        if (digitalBooking){
+            parkPrice = (double) (parkPrice * Utils.DIGITAL_BOOKING_DISCOUNT); // Apply 15% discount for digital bookings
+            System.out.println("Applying digital booking discount for traveler: " + travelerId);
+            if (guide) {
+                parkPrice = (double) (parkPrice * Utils.GUIDE_DISCOUNT); // Apply 25% discount for guides
+                if (numberOfVisitors > 1){
+                    numberOfVisitors -= 1;
+                }
+            }
+        }
+        if (!guide && Utils.isClubMember(conn, travelerId)) {
+            System.out.println("Applying club member discount for traveler: " + travelerId);
+            parkPrice = (double) (parkPrice * Utils.CLUB_MEMBER_DISCOUNT); // Apply 10% discount for club members
+        }
 
-        return rs.getInt("pricePerPerson") * numberOfVisitors;
+        return (double) (parkPrice * numberOfVisitors);
     }
 
-    private Map<Integer, Integer> getParkPrices() throws SQLException {
-        Map<Integer, Integer> prices = new HashMap<>();
+    private ArrayList<ParkOption> getParkOptions() throws SQLException {
+        ArrayList<ParkOption> parks = new ArrayList<>();
         Connection conn = DBConnection.getStaticConnection();
-        String sql = "SELECT park_id, pricePerPerson FROM park ORDER BY park_id";
+        String sql = "SELECT park_id, name, pricePerPerson FROM park ORDER BY park_id";
         PreparedStatement ps = conn.prepareStatement(sql);
         ResultSet rs = ps.executeQuery();
 
         while (rs.next()) {
-            prices.put(rs.getInt("park_id"), rs.getInt("pricePerPerson"));
+            parks.add(new ParkOption(rs.getInt("park_id"), rs.getString("name"), rs.getInt("pricePerPerson")));
         }
 
-        return prices;
+        return parks;
     }
 
-    private Booking mapBooking(ResultSet rs) throws SQLException {
-        Timestamp visitorTimestamp = rs.getTimestamp("visitorTime");
-        return new Booking(
-            rs.getString("booking_id"),
-            rs.getString("traveler_id"),
-            rs.getInt("park_id"),
-            rs.getInt("numberOfVisitors"),
-            visitorTimestamp.toLocalDateTime(),
-            rs.getString("status"),
-            rs.getBoolean("organizedBooking"),
-            rs.getInt("price")
+    private TravelerProfile getTravelerProfile(String travelerId) throws SQLException {
+        if (travelerId == null || travelerId.isBlank()) {
+            throw new IllegalArgumentException("Traveler is missing.");
+        }
+
+        Connection conn = DBConnection.getStaticConnection();
+        String sql = "SELECT u.firstName, u.lastName, u.email, u.phoneNumber, t.clubMember "
+            + "FROM traveler t JOIN `user` u ON u.user_id = t.traveler_id "
+            + "WHERE t.traveler_id = ?";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setString(1, travelerId);
+        ResultSet rs = ps.executeQuery();
+        if (!rs.next()) {
+            throw new IllegalArgumentException("Traveler profile was not found.");
+        }
+
+        return new TravelerProfile(
+            travelerId,
+            rs.getString("firstName"),
+            rs.getString("lastName"),
+            rs.getString("email"),
+            rs.getString("phoneNumber"),
+            rs.getBoolean("clubMember")
         );
+    }
+
+    private boolean updateTravelerProfile(TravelerProfile profile) throws SQLException {
+        if (profile == null || profile.getTravelerId() == null || profile.getTravelerId().isBlank()) {
+            throw new IllegalArgumentException("Traveler profile is missing.");
+        }
+
+        String firstName = ContactInfoValidator.requireName(profile.getFirstName(), "First name");
+        String lastName = ContactInfoValidator.requireName(profile.getLastName(), "Last name");
+        String email = ContactInfoValidator.requireEmail(profile.getEmail());
+        String phoneNumber = ContactInfoValidator.requirePhoneNumber(profile.getPhoneNumber());
+
+        Connection conn = DBConnection.getStaticConnection();
+        String sql = "UPDATE `user` SET firstName = ?, lastName = ?, email = ?, phoneNumber = ? WHERE user_id = ?";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setString(1, firstName);
+        ps.setString(2, lastName);
+        ps.setString(3, email);
+        ps.setString(4, phoneNumber);
+        ps.setString(5, profile.getTravelerId());
+        try {
+            return ps.executeUpdate() > 0;
+        } catch (SQLIntegrityConstraintViolationException e) {
+            throw new IllegalArgumentException("Email address is already used by another user.");
+        }
     }
 
     private VisitorLoginResult loginOrRegisterVisitor(String nationalId) throws SQLException {
         Connection conn = DBConnection.getStaticConnection();
         int nationalIdNumber = Integer.parseInt(nationalId);
 
-        String selectSql = "SELECT traveler_id FROM traveler WHERE nationalId = ?";
+        String selectSql = "SELECT traveler_id, guide, clubMember FROM traveler WHERE nationalId = ?";
         PreparedStatement selectPs = conn.prepareStatement(selectSql);
         selectPs.setInt(1, nationalIdNumber);
         ResultSet rs = selectPs.executeQuery();
         if (rs.next()) {
-            return new VisitorLoginResult(rs.getString("traveler_id"), nationalId, false);
+            boolean isGuide = rs.getBoolean("guide");
+            boolean isClubMember = rs.getBoolean("clubMember");
+            return new VisitorLoginResult(rs.getString("traveler_id"), nationalId, false, isGuide, isClubMember);
         }
 
         String travelerId = UUID.randomUUID().toString();
@@ -683,13 +1042,14 @@ public class ParkServer extends AbstractServer {
         	insertUserPs.executeUpdate();
             System.out.println("Inserted user row for visitor: " + travelerId);
 
-            String insertTravelerSql = "INSERT INTO traveler (traveler_id, nationalId, guide, clubMember) VALUES (?, ?, ?, ?)";
+            String insertTravelerSql = "INSERT INTO traveler (traveler_id, nationalId, guide, clubMember, user_id) VALUES (?, ?, ?, ?, ?)";
             PreparedStatement insertTravelerPs = conn.prepareStatement(insertTravelerSql);
             System.out.println("Registering traveler details for national ID: " + nationalId);
             insertTravelerPs.setString(1, travelerId);
             insertTravelerPs.setInt(2, nationalIdNumber);
             insertTravelerPs.setBoolean(3, false);
             insertTravelerPs.setBoolean(4, false);
+            insertTravelerPs.setString(5, travelerId); //user_id
             insertTravelerPs.executeUpdate();
             System.out.println("Inserted traveler row for visitor: " + travelerId);
 
@@ -747,7 +1107,7 @@ public class ParkServer extends AbstractServer {
         PreparedStatement ps = conn.prepareStatement(sql);
         ps.setString(1, bookingId);
         ResultSet rs = ps.executeQuery();
-        if (rs.next()) return mapBooking(rs);
+        if (rs.next()) return Utils.mapBooking(rs);
         return null;
     }
 
@@ -759,12 +1119,13 @@ public class ParkServer extends AbstractServer {
 
         Connection conn = DBConnection.getStaticConnection();
 
+    // Update confirmed booking status to CHECKED_IN and set visitorsInside = numberOfVisitors
         String updateBooking = "UPDATE booking SET status = ?, visitorsInside = numberOfVisitors " +
                                "WHERE booking_id = ? AND status = ? AND park_id = ?";
         PreparedStatement ps = conn.prepareStatement(updateBooking);
         ps.setString(1, Booking.STATUS_CHECKED_IN);
         ps.setString(2, booking.getBookingId());
-        ps.setString(3, Booking.STATUS_PENDING);
+    ps.setString(3, Booking.STATUS_CONFIRMED);
         ps.setInt(4, employeeParkId);
         int rows = ps.executeUpdate();
 
@@ -823,6 +1184,11 @@ public class ParkServer extends AbstractServer {
      parkPs.setInt(2, request.getParkId());
      parkPs.executeUpdate();
 
+     Booking updatedBooking = getBookingById(request.getBookingId());
+     if (updatedBooking != null && Booking.STATUS_CHECKED_OUT.equals(updatedBooking.getStatus())) {
+         BookingLifecycleService.handleSpotFreed(conn, updatedBooking.getParkId(), updatedBooking.getVisitorTime());
+     }
+
      return true;
  }
 
@@ -838,7 +1204,8 @@ public class ParkServer extends AbstractServer {
 	
 	  Connection conn = DBConnection.getStaticConnection();
 	
-	  int price = calculatePrice(conn, request.getParkId(), request.getNumberOfVisitors());
+	  // Calculate price (full price for walk-in, no discount)
+	  double price = calculatePrice(conn, request.getParkId(), request.getNumberOfVisitors(), travelerId, false);
 	
 	  String bookingId = UUID.randomUUID().toString();
 	  String sql = "INSERT INTO booking (booking_id, traveler_id, park_id, numberOfVisitors, visitorTime, status, organizedBooking, price, visitorsInside) " +
@@ -849,8 +1216,8 @@ public class ParkServer extends AbstractServer {
 	  ps.setInt(3, request.getParkId());
 	  ps.setInt(4, request.getNumberOfVisitors());
 	  ps.setString(5, Booking.STATUS_CHECKED_IN);
-	  ps.setInt(6, price);
-	  ps.setInt(7, request.getNumberOfVisitors());
+	  ps.setDouble(6, price);
+	  ps.setInt(7, request.getNumberOfVisitors()); // visitorsInside = all visitors
 	  ps.executeUpdate();
 	
 	  String updatePark = "UPDATE park SET currentVisitors = currentVisitors + ? WHERE park_id = ?";

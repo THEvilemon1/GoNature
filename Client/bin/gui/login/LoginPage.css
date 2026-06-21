@@ -1,36 +1,8 @@
-/*
- * LoginPage.css — GoNature Login Screen
- * ═══════════════════════════════════════════════════════════════════
- *
- * Design language: "Forest Clarity"
- *  • Deep forest green anchors the palette (authority, nature)
- *  • Warm off-white card floats on a dark gradient background
- *  • Accent: amber-gold — energy / action (login button only)
- *  • Typography: clean, legible, no decorative clutter
- *
- * Color tokens:
- *   --bg-dark       #1a2e1a   deep forest night (background gradient start)
- *   --bg-mid        #2d4a2d   forest mid-tone   (background gradient end)
- *   --card-bg       #f8f6f0   warm paper white
- *   --brand-green   #2e7d32   primary green
- *   --accent-amber  #e65100   call-to-action orange-amber
- *   --text-primary  #1c1c1e   near-black
- *   --text-muted    #6b7280   slate grey for hints
- *   --border        #d1d5db   light border
- *   --toggle-active #2e7d32   selected tab fill
- * ═══════════════════════════════════════════════════════════════════
- */
-
-
-/* ── Root / background ─────────────────────────────────────────── */
-
 .root-pane {
     -fx-background-color: linear-gradient(to bottom right, #1a2e1a, #2d4a2d);
     -fx-padding: 32;
 }
 
-
-/* ── Card ──────────────────────────────────────────────────────── */
 
 .login-card {
     -fx-background-color: #f8f6f0;
@@ -40,8 +12,6 @@
     -fx-spacing: 20;
 }
 
-
-/* ── Branding ──────────────────────────────────────────────────── */
 
 .branding {
     -fx-padding: 0 0 4 0;

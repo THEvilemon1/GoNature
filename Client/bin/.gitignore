@@ -1,4 +1,6 @@
-/common/
-/client/
 /gui/
-/snippet/
+/boundaries/
+/client/
+/common/
+/login/
+/ocsf/

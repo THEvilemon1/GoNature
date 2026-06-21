@@ -1,12 +1,14 @@
 package client;
 
 import java.util.ArrayList;
-import java.util.Map;
 
 import common.ParkSubmittedReport;
 import common.Booking;
 import common.Employee;
 import common.Order;
+import common.TravelerProfile;
+import common.ParkOption;
+import java.util.Map;
 import common.VisitorLoginResult;
 import common.ParkChangeRequest;
 import common.Promotion;
@@ -22,10 +24,15 @@ public interface ServerResponseListener {
     default void onVisitorLoginResult(VisitorLoginResult result) {}
     default void onTravelerBookingsResult(ArrayList<Booking> bookings) {}
     default void onParkPricesResult(Map<Integer, Integer> pricesByParkId) {}
+    default void onTravelerProfileResult(TravelerProfile profile) {}
+    default void onUpdateTravelerProfileResult(boolean success) {}
+    default void onParksResult(ArrayList<ParkOption> parks) {}
     default void onCreateBookingResult(Booking booking) {}
+    default void onCreateBookingRequiresWaitlistConfirmation(Booking booking, String message) {}
     default void onUpdateBookingResult(boolean success) {}
     default void onCancelBookingResult(boolean success) {}
     default void onParkVisitorsReportResult(ParkVisitorsReportResult result) {}
+    default void onConfirmBookingResult(boolean success) {}
 
     // Employee login
     default void onEmployeeLoginSuccess(Employee employee) {}
@@ -50,4 +57,5 @@ public interface ServerResponseListener {
     default void onPromotionApprovalResult(String requestId, boolean approved) {}
     default void onPromotionRequestNotification(PromotionRequest request) {}
     default void onSubmittedReportsResult(ArrayList<ParkSubmittedReport> reports) {}
+    default void onRegisterTravelerResult(String result) {}
 }

@@ -3,7 +3,6 @@ package client;
 import java.io.IOException;
 
 import java.util.ArrayList;
-import java.util.Map;
 
 import common.ParkSubmittedReport;
 import common.ParkChangeRequest;
@@ -11,6 +10,7 @@ import common.Booking;
 import common.Employee;
 import common.Message;
 import common.Order;
+import common.ParkOption;
 import common.VisitorLoginResult;
 import common.Promotion;
 import common.PromotionRequest;
@@ -79,17 +79,30 @@ public class ParkClient extends AbstractClient {
                 case "TRAVELER_BOOKINGS_RESULT":
                     listener.onTravelerBookingsResult((ArrayList<Booking>) message.getData());
                     break;
-                case "PARK_PRICES_RESULT":
-                    listener.onParkPricesResult((Map<Integer, Integer>) message.getData());
+                case "PARKS_RESULT":
+                    listener.onParksResult((ArrayList<ParkOption>) message.getData());
+                    break;
+                case "TRAVELER_PROFILE_RESULT":
+                    listener.onTravelerProfileResult((common.TravelerProfile) message.getData());
+                    break;
+                case "UPDATE_TRAVELER_PROFILE_RESULT":
+                    listener.onUpdateTravelerProfileResult((boolean) message.getData());
                     break;
                 case "CREATE_BOOKING_RESULT":
                     listener.onCreateBookingResult((Booking) message.getData());
+                    break;
+                case "CREATE_BOOKING_REQUIRES_WAITLIST_CONFIRMATION":
+                    Object[] waitlistPayload = (Object[]) message.getData();
+                    listener.onCreateBookingRequiresWaitlistConfirmation((Booking) waitlistPayload[0], (String) waitlistPayload[1]);
                     break;
                 case "UPDATE_BOOKING_RESULT":
                     listener.onUpdateBookingResult((boolean) message.getData());
                     break;
                 case "CANCEL_BOOKING_RESULT":
                     listener.onCancelBookingResult((boolean) message.getData());
+                    break;
+                case "CONFIRM_BOOKING_RESULT":
+                    listener.onConfirmBookingResult((boolean) message.getData());
                     break;
                 case "EMPLOYEE_LOGIN_SUCCESS":
                     listener.onEmployeeLoginSuccess((Employee) message.getData());
@@ -161,6 +174,10 @@ public class ParkClient extends AbstractClient {
                 case "SUBMITTED_REPORTS_RESULT":
                     listener.onSubmittedReportsResult((ArrayList<ParkSubmittedReport>) message.getData());
                     break;
+                case "REGISTER_TRAVELER_RESULT":
+                    listener.onRegisterTravelerResult((String) message.getData());
+                    break;
+                  
             }
         }
     }

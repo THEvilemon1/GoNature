@@ -86,7 +86,7 @@ public class EnterVisitorViewController {
                         foundBooking = null;
                         return;
                     }
-                    if (!Booking.STATUS_PENDING.equals(booking.getStatus())) {
+                    if (!Booking.STATUS_CONFIRMED.equals(booking.getStatus())) {
                         showStatus("This booking cannot be checked in. Status: " + booking.getStatus(), true);
                         btnCheckIn.setVisible(false);
                         detailsBox.setVisible(false);
@@ -149,7 +149,7 @@ public class EnterVisitorViewController {
                         "Booking ID: " + booking.getBookingId() + "\n" +
                         "Visitors: " + booking.getNumberOfVisitors() + "\n" +
                         "Time: " + booking.getVisitorTime() + "\n" +
-                        "Price: " + booking.getPrice() + " ILS"
+                        "Price: " + String.format("%.2f", booking.getPrice()) + " ILS"
                     );
                     showStatus("Booking found. Click Check In to proceed.", false);
                     btnCheckIn.setVisible(true);

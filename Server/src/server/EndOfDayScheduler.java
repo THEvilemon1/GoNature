@@ -1,7 +1,6 @@
 package server;
 
 import common.Booking;
-import gui.ServerPortFrameController;
 
 import java.sql.*;
 import java.time.LocalDate;
@@ -103,9 +102,7 @@ public class EndOfDayScheduler {
     }
 
     private void log(String message) {
-        System.out.println("[EndOfDayScheduler] " + message);
-        if (ServerPortFrameController.instance != null)
-            ServerPortFrameController.instance.log("[EndOfDayScheduler] " + message);
+        Utils.log("EndOfDayScheduler", message);
     }
 }
 

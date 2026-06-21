@@ -27,7 +27,9 @@ public class ParkServerMain extends Application {
             server.listen();
             System.out.println("Park Server running on port " + port);
 
-            // Start the reminder scheduler — sends SMS+Email 1 hour before each booking
+            BookingLifecycleService.ensureLifecycleColumns();
+
+            // Start the lifecycle scheduler — waitlist timing, confirmations, reminders, SMS and email
             ReminderScheduler.getInstance().start();
 
             // Start the end-of-day scheduler — cancels unpaid bookings at 23:59

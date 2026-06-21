@@ -165,7 +165,7 @@ public class WalkInViewController implements Initializable {
             "Booking ID: " + booking.getBookingId() + "\n" +
             "Visitors: " + booking.getNumberOfVisitors() + "\n" +
             "Visit Time: " + booking.getVisitorTime() + "\n" +
-            "Price: " + booking.getPrice() + " ILS\n" +
+            "Price: " + String.format("%.2f", booking.getPrice()) + " ILS\n" +
             "Status: CHECKED IN"
         );
         alert.showAndWait();

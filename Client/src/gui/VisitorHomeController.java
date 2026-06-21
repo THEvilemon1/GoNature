@@ -8,6 +8,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import client.ParkClient;
 import client.ServerResponseListener;
@@ -29,6 +31,7 @@ import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.SpinnerValueFactory;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
@@ -51,6 +54,11 @@ public class VisitorHomeController implements ServerResponseListener {
     @FXML private Label lblSelectedParkPrice;
     @FXML private Label lblPricePerPerson;
     @FXML private Label lblTotalPrice;
+    @FXML private Label lblVisitorHint;
+    @FXML private TextField txtFirstName;
+    @FXML private TextField txtName;
+    @FXML private TextField txtEmail;
+    @FXML private TextField txtPhoneNumber;
     @FXML private Spinner<Integer> spnVisitors;
     @FXML private ComboBox<ParkOption> cmbPark;
     @FXML private DatePicker dateVisit;
@@ -59,11 +67,13 @@ public class VisitorHomeController implements ServerResponseListener {
 
     private VisitorLoginResult currentUser;
     private Booking editingBooking;
+    private Booking pendingWaitlistBooking;
     private final Map<Integer, Integer> pricesByParkId = new HashMap<>();
+    private Timer bookingsRefreshTimer;
 
     @FXML
     private void initialize() {
-        spnVisitors.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, 15, 1));
+        spnVisitors.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, 6, 1));
         spnVisitors.getEditor().textProperty().addListener((obs, oldValue, newValue) -> clampVisitorEditor());
         spnVisitors.valueProperty().addListener((obs, oldValue, newValue) -> updatePriceSummary());
 
@@ -90,6 +100,7 @@ public class VisitorHomeController implements ServerResponseListener {
 
     public void loadVisitor(VisitorLoginResult result) {
         this.currentUser = result;
+        setupGuideMode();
         ParkClient client = ParkClient.getInstance();
         if (client != null) {
             client.setListener(this);
@@ -115,6 +126,32 @@ public class VisitorHomeController implements ServerResponseListener {
                 System.out.println("Could not set up window close handler: " + e.getMessage());
             }
         });
+    }
+
+    private int maxVisitors() {
+        return (currentUser != null && currentUser.isGuide()) ? 16 : 6;
+    }
+
+    /** Returns the price multiplier based on applicable discounts for non-guides. */
+    private double discountFactor(boolean isNewBooking) {
+        if (currentUser == null || currentUser.isGuide()) return 1.0;
+        double factor = 1.0;
+        if (isNewBooking)               factor *= 0.85; // 15% new-booking discount
+        if (currentUser.isClubMember()) factor *= 0.90; // 10% club-member discount
+        return factor;
+    }
+
+    private void setupGuideMode() {
+        int max = maxVisitors();
+        SpinnerValueFactory<Integer> factory = spnVisitors.getValueFactory();
+        if (factory instanceof SpinnerValueFactory.IntegerSpinnerValueFactory) {
+            ((SpinnerValueFactory.IntegerSpinnerValueFactory) factory).setMax(max);
+        }
+        if (currentUser != null && currentUser.isGuide()) {
+            lblVisitorHint.setText("Choose between 1 and 16 visitors. As a guide, your own entry is free.");
+        } else {
+            lblVisitorHint.setText("Choose between 1 and 6 visitors.");
+        }
     }
 
     private void handleLogout() {
@@ -153,6 +190,7 @@ public class VisitorHomeController implements ServerResponseListener {
 
     @FXML
     private void handlePrimaryAction() {
+        stopBookingsAutoRefresh();
         lblDetailTitle.setText("Book a Visit");
         showBookingForm(null);
         showDetail();
@@ -163,17 +201,20 @@ public class VisitorHomeController implements ServerResponseListener {
         lblDetailTitle.setText("My Bookings");
         showBookingsList();
         requestTravelerBookings();
+        startBookingsAutoRefresh();
         showDetail();
     }
 
     @FXML
     private void handleBack() {
+        stopBookingsAutoRefresh();
         showMain();
     }
 
     @FXML
     private void handleCancelForm() {
         resetForm();
+        stopBookingsAutoRefresh();
         showMain();
     }
 
@@ -186,8 +227,11 @@ public class VisitorHomeController implements ServerResponseListener {
                 showBookingMessage("Client is not connected to the server.", true);
                 return;
             }
-
-            String command = editingBooking == null ? "CREATE_BOOKING" : "UPDATE_BOOKING";
+            if (currentUser.isGuide() && booking.getNumberOfVisitors() == 1) {
+                showBookingMessage("You cannot book a visit with only yourself as a guide.", true);
+                return;
+            }
+            String command = pendingWaitlistBooking != null ? "CREATE_WAITLIST_BOOKING" : (editingBooking == null ? "CREATE_BOOKING" : "UPDATE_BOOKING");
             client.sendToServer(new Message(command, booking));
             btnSubmitBooking.setDisable(true);
         } catch (IllegalArgumentException e) {
@@ -226,11 +270,44 @@ public class VisitorHomeController implements ServerResponseListener {
     public void onCreateBookingResult(Booking booking) {
         Platform.runLater(() -> {
             btnSubmitBooking.setDisable(false);
+            pendingWaitlistBooking = null;
             resetForm();
             lblDetailTitle.setText("My Bookings");
             showBookingsList();
-            showBookingsMessage("Booking submitted and waiting for approval.", false);
+            if (booking != null && Booking.STATUS_WAITING_LIST.equals(booking.getStatus())) {
+                showBookingsMessage("No spots available. You are in the waiting list.", false);
+            } else {
+                showBookingsMessage("Booking confirmed.", false);
+            }
             requestTravelerBookings();
+        });
+    }
+
+    @Override
+    public void onCreateBookingRequiresWaitlistConfirmation(Booking booking, String message) {
+        Platform.runLater(() -> {
+            btnSubmitBooking.setDisable(false);
+            pendingWaitlistBooking = booking;
+            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+            alert.setTitle("Parking is Full");
+            alert.setHeaderText("No place is available for this time.");
+            alert.setContentText(message + "\n\nChoose 'Yes' to join the waiting list.");
+            alert.showAndWait().ifPresent(result -> {
+                if (result == javafx.scene.control.ButtonType.OK) {
+                    try {
+                        ParkClient client = ParkClient.getInstance();
+                        if (client != null && client.isConnected()) {
+                            client.sendToServer(new Message("CREATE_WAITLIST_BOOKING", booking));
+                            btnSubmitBooking.setDisable(true);
+                        }
+                    } catch (IOException e) {
+                        showBookingMessage("Failed to join waiting list: " + e.getMessage(), true);
+                    }
+                } else {
+                    pendingWaitlistBooking = null;
+                    showBookingMessage("Booking was not created.", false);
+                }
+            });
         });
     }
 
@@ -254,6 +331,14 @@ public class VisitorHomeController implements ServerResponseListener {
     public void onCancelBookingResult(boolean success) {
         Platform.runLater(() -> {
             showBookingsMessage(success ? "Booking cancelled." : "Booking could not be cancelled.", !success);
+            requestTravelerBookings();
+        });
+    }
+
+    @Override
+    public void onConfirmBookingResult(boolean success) {
+        Platform.runLater(() -> {
+            showBookingsMessage(success ? "Booking confirmed successfully." : "Booking confirmation failed.", !success);
             requestTravelerBookings();
         });
     }
@@ -288,14 +373,38 @@ public class VisitorHomeController implements ServerResponseListener {
         }
 
         int visitors = getVisitorCount();
+        int max = maxVisitors();
+        if (visitors < 1 || visitors > max) {
+            throw new IllegalArgumentException("Number of visitors must be between 1 and " + max + ".");
+        }
+
+        boolean isGuide = currentUser.isGuide();
+        int billableVisitors = isGuide ? Math.max(0, visitors - 1) : visitors;
+        Integer pricePerPerson = pricesByParkId.get(park.getId());
+        int computedPrice = (pricePerPerson != null)
+            ? (int) Math.round(pricePerPerson * billableVisitors * discountFactor(editingBooking == null))
+            : 0;
+
         LocalDateTime visitorTime = LocalDateTime.of(date, LocalTime.parse(timeText));
         if (!visitorTime.isAfter(LocalDateTime.now())) {
             throw new IllegalArgumentException("Booking date and time must be in the future.");
         }
 
+        String name = requireText(txtName, "Please enter your name.");
+    String email = requireText(txtEmail, "Please enter email address.");
+    String phoneNumber = requireText(txtPhoneNumber, "Please enter phone number.");
+
         String bookingId = editingBooking == null ? null : editingBooking.getBookingId();
-        return new Booking(bookingId, currentUser.getTravelerId(), park.getId(), visitors,
-            visitorTime, Booking.STATUS_PENDING, false, 0);
+        return new Booking(bookingId, currentUser.getTravelerId(), name, email, phoneNumber, park.getId(), visitors,
+            visitorTime, Booking.STATUS_PENDING, false, computedPrice);
+    }
+
+    private String requireText(TextField field, String errorMessage) {
+        String value = field == null ? null : field.getText();
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(errorMessage);
+        }
+        return value.trim();
     }
 
     private int getVisitorCount() {
@@ -307,11 +416,12 @@ public class VisitorHomeController implements ServerResponseListener {
         if (spnVisitors.getValueFactory() == null) {
             return;
         }
+        int max = maxVisitors();
         String text = spnVisitors.getEditor().getText();
         try {
             int value = Integer.parseInt(text);
             if (value < 1) value = 1;
-            if (value > 15) value = 15;
+            if (value > max) value = max;
             spnVisitors.getValueFactory().setValue(value);
             if (!String.valueOf(value).equals(text)) {
                 spnVisitors.getEditor().setText(String.valueOf(value));
@@ -345,11 +455,20 @@ public class VisitorHomeController implements ServerResponseListener {
         }
 
         int visitors = spnVisitors == null || spnVisitors.getValue() == null ? 1 : spnVisitors.getValue();
-        int totalPrice = pricePerPerson * visitors;
+        boolean isGuide = currentUser != null && currentUser.isGuide();
+        int billableVisitors = isGuide ? Math.max(0, visitors - 1) : visitors;
+        double factor = discountFactor(editingBooking == null);
+        int totalPrice = (int) Math.round(pricePerPerson * billableVisitors * factor);
+
+        java.util.List<String> notes = new java.util.ArrayList<>();
+        if (isGuide) notes.add("guide entry excluded");
+        if (!isGuide && editingBooking == null) notes.add("15% new booking");
+        if (!isGuide && currentUser != null && currentUser.isClubMember()) notes.add("10% club member");
+        String suffix = notes.isEmpty() ? "" : " (" + String.join(", ", notes) + ")";
 
         lblSelectedParkPrice.setText(park.getName() + ": " + pricePerPerson + " ILS per person.");
         lblPricePerPerson.setText("Price per person: " + pricePerPerson + " ILS");
-        lblTotalPrice.setText("Total: " + totalPrice + " ILS");
+        lblTotalPrice.setText("Total: " + totalPrice + " ILS" + suffix);
     }
 
     private void refreshTimeOptions() {
@@ -412,8 +531,8 @@ public class VisitorHomeController implements ServerResponseListener {
         }
 
         hideBookingsMessage();
-        VBox pendingSection = createBookingsSection("Pending approval",
-            "Waiting for park approval. These bookings can still be edited or cancelled.");
+        VBox pendingSection = createBookingsSection("Waiting and action needed",
+            "Bookings here are either waiting for availability or waiting for your confirmation.");
         VBox confirmedSection = createBookingsSection("Confirmed visits",
             "Approved reservations that can still be edited or cancelled before check-in.");
         VBox unavailableSection = createBookingsSection("Completed / unavailable",
@@ -425,7 +544,10 @@ public class VisitorHomeController implements ServerResponseListener {
 
         for (Booking booking : bookings) {
             Node row = createBookingRow(booking);
-            if (Booking.STATUS_PENDING.equals(booking.getStatus())) {
+            if (Booking.STATUS_PENDING.equals(booking.getStatus())
+                || Booking.STATUS_WAITING_LIST.equals(booking.getStatus())
+                || Booking.STATUS_PENDING_WAITLIST_CONFIRMATION.equals(booking.getStatus())
+                || Booking.STATUS_PENDING_REMINDER_CONFIRMATION.equals(booking.getStatus())) {
                 pendingSection.getChildren().add(row);
                 pendingCount++;
             } else if (Booking.STATUS_CONFIRMED.equals(booking.getStatus())) {
@@ -504,7 +626,7 @@ public class VisitorHomeController implements ServerResponseListener {
 
         Button edit = new Button("Edit");
         edit.getStyleClass().add("small-action-btn");
-        edit.setDisable(locked);
+        edit.setDisable(locked || requiresTravelerConfirmation(booking));
         edit.setOnAction(e -> {
             lblDetailTitle.setText("Edit Booking");
             showBookingForm(booking);
@@ -515,20 +637,38 @@ public class VisitorHomeController implements ServerResponseListener {
         cancel.setDisable(locked);
         cancel.setOnAction(e -> confirmAndCancelBooking(booking));
 
-        HBox actions = new HBox(8, edit, cancel);
+        HBox actions = new HBox(8);
+        if (requiresTravelerConfirmation(booking)) {
+            Button confirm = new Button("Confirm Arrival");
+            confirm.getStyleClass().add("small-action-btn");
+            confirm.setOnAction(e -> sendConfirmBooking(booking));
+            actions.getChildren().add(confirm);
+        }
+        actions.getChildren().addAll(edit, cancel);
         row.getChildren().addAll(header, details, description, actions);
         return row;
+    }
+
+    private boolean requiresTravelerConfirmation(Booking booking) {
+        return Booking.STATUS_PENDING_WAITLIST_CONFIRMATION.equals(booking.getStatus())
+            || Booking.STATUS_PENDING_REMINDER_CONFIRMATION.equals(booking.getStatus());
     }
 
     private boolean isEditableBooking(Booking booking) {
         String status = booking.getStatus();
         return Booking.STATUS_PENDING.equals(status)
-            || Booking.STATUS_CONFIRMED.equals(status);
+            || Booking.STATUS_WAITING_LIST.equals(status)
+            || Booking.STATUS_CONFIRMED.equals(status)
+            || Booking.STATUS_PENDING_WAITLIST_CONFIRMATION.equals(status)
+            || Booking.STATUS_PENDING_REMINDER_CONFIRMATION.equals(status);
     }
 
     private String getStatusLabel(String status) {
         if (Booking.STATUS_PENDING.equals(status)) return "Pending";
+        if (Booking.STATUS_WAITING_LIST.equals(status)) return "Waiting list";
         if (Booking.STATUS_CONFIRMED.equals(status)) return "Confirmed";
+    if (Booking.STATUS_PENDING_WAITLIST_CONFIRMATION.equals(status)) return "Pending confirmation";
+    if (Booking.STATUS_PENDING_REMINDER_CONFIRMATION.equals(status)) return "Pending confirmation";
         if (Booking.STATUS_CANCELLED.equals(status)) return "Cancelled";
         if (Booking.STATUS_CHECKED_IN.equals(status)) return "Checked in";
         if (Booking.STATUS_CHECKED_OUT.equals(status)) return "Checked out";
@@ -540,8 +680,17 @@ public class VisitorHomeController implements ServerResponseListener {
         if (Booking.STATUS_PENDING.equals(status)) {
             return "Waiting for park approval. You can still edit or cancel this booking.";
         }
+        if (Booking.STATUS_WAITING_LIST.equals(status)) {
+            return "You are in the waiting list until a matching spot becomes available.";
+        }
         if (Booking.STATUS_CONFIRMED.equals(status)) {
             return "Your visit is approved. You can still edit or cancel before check-in.";
+        }
+        if (Booking.STATUS_PENDING_WAITLIST_CONFIRMATION.equals(status)) {
+            return "A spot opened for you. Confirm within one hour or the booking will be system cancelled.";
+        }
+        if (Booking.STATUS_PENDING_REMINDER_CONFIRMATION.equals(status)) {
+            return "Please confirm that you are coming. If you do not confirm in time, the booking will be system cancelled.";
         }
         if (Booking.STATUS_CANCELLED.equals(status)) {
             return "This booking was cancelled and can no longer be changed.";
@@ -560,6 +709,9 @@ public class VisitorHomeController implements ServerResponseListener {
 
     private String getStatusStyleClass(String status) {
         if (Booking.STATUS_PENDING.equals(status)) return "status-pending";
+        if (Booking.STATUS_WAITING_LIST.equals(status)) return "status-pending";
+        if (Booking.STATUS_PENDING_WAITLIST_CONFIRMATION.equals(status)) return "status-pending";
+        if (Booking.STATUS_PENDING_REMINDER_CONFIRMATION.equals(status)) return "status-pending";
         if (Booking.STATUS_CONFIRMED.equals(status)) return "status-confirmed";
         if (Booking.STATUS_CANCELLED.equals(status)) return "status-cancelled";
         if (Booking.STATUS_CHECKED_IN.equals(status)) return "status-checked-in";
@@ -593,6 +745,22 @@ public class VisitorHomeController implements ServerResponseListener {
         }
     }
 
+    private void sendConfirmBooking(Booking booking) {
+        ParkClient client = ParkClient.getInstance();
+        if (client == null || !client.isConnected()) {
+            showBookingsMessage("Client is not connected to the server.", true);
+            return;
+        }
+        try {
+            client.sendToServer(new Message("CONFIRM_BOOKING", new String[] {
+                booking.getBookingId(),
+                booking.getTravelerId()
+            }));
+        } catch (IOException e) {
+            showBookingsMessage("Failed to confirm booking: " + e.getMessage(), true);
+        }
+    }
+
     private void showBookingForm(Booking booking) {
         editingBooking = booking;
         bookingForm.setVisible(true);
@@ -607,6 +775,9 @@ public class VisitorHomeController implements ServerResponseListener {
             return;
         }
 
+    txtName.setText(booking.getTravelerName());
+        txtEmail.setText(booking.getTravelerEmail());
+        txtPhoneNumber.setText(booking.getTravelerPhoneNumber());
         spnVisitors.getValueFactory().setValue(booking.getNumberOfVisitors());
         cmbPark.setValue(findParkOption(booking.getParkId()));
         dateVisit.setValue(booking.getVisitorTime().toLocalDate());
@@ -621,12 +792,17 @@ public class VisitorHomeController implements ServerResponseListener {
         bookingForm.setManaged(false);
         bookingsListView.setVisible(true);
         bookingsListView.setManaged(true);
+        startBookingsAutoRefresh();
     }
 
     private void resetForm() {
         editingBooking = null;
+        pendingWaitlistBooking = null;
         btnSubmitBooking.setDisable(false);
         btnSubmitBooking.setText("Submit Booking");
+    txtName.clear();
+    txtEmail.clear();
+    txtPhoneNumber.clear();
         spnVisitors.getValueFactory().setValue(1);
         cmbPark.setValue(null);
         dateVisit.setValue(LocalDate.now());
@@ -685,6 +861,27 @@ public class VisitorHomeController implements ServerResponseListener {
     private void hideBookingsMessage() {
         lblBookingsMessage.setText("");
         lblBookingsMessage.setVisible(false);
+    }
+
+
+    private void startBookingsAutoRefresh() {
+        stopBookingsAutoRefresh();
+        bookingsRefreshTimer = new Timer(true);
+        bookingsRefreshTimer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                if (bookingsListView != null && bookingsListView.isVisible()) {
+                    requestTravelerBookings();
+                }
+            }
+        }, 15000, 15000);
+    }
+
+    private void stopBookingsAutoRefresh() {
+        if (bookingsRefreshTimer != null) {
+            bookingsRefreshTimer.cancel();
+            bookingsRefreshTimer = null;
+        }
     }
 
     private static class ParkOption {

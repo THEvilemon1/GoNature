@@ -21,6 +21,10 @@ public class DBConnection {
     //private static final String PASSWORD = "amerhmysql";
     //private static final String PASSWORD = "roottoor";
     private static final String PASSWORD = "Y&A4ever";
+    //private static final String PASSWORD = "amerhmysql";
+//    private static final String PASSWORD = "roottoor";
+//    private static final String PASSWORD = "amerhmysql";
+
 
     private DBConnection() throws SQLException {
         openConnection();

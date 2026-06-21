@@ -169,8 +169,20 @@ public class ParkServer extends AbstractServer {
 
                 case "CREATE_BOOKING":
                     Booking bookingToCreate = (Booking) message.getData();
-                    Booking createdBooking = createBooking(bookingToCreate);
-                    client.sendToClient(new Message("CREATE_BOOKING_RESULT", createdBooking));
+                    BookingAvailabilityResult bookingAvailabilityResult = createBooking(bookingToCreate, false);
+                    if (bookingAvailabilityResult.requiresWaitlistConfirmation) {
+                        client.sendToClient(new Message("CREATE_BOOKING_REQUIRES_WAITLIST_CONFIRMATION",
+                            new Object[] { bookingAvailabilityResult.booking,
+                                "The selected park is full for this date and time. You can join the waiting list or choose another time." }));
+                    } else {
+                        client.sendToClient(new Message("CREATE_BOOKING_RESULT", bookingAvailabilityResult.booking));
+                    }
+                    break;
+
+                case "CREATE_WAITLIST_BOOKING":
+                    Booking waitlistBooking = (Booking) message.getData();
+                    Booking createdWaitlistBooking = createBooking(waitlistBooking);
+                    client.sendToClient(new Message("CREATE_BOOKING_RESULT", createdWaitlistBooking));
                     break;
 
                 case "GET_TRAVELER_BOOKINGS":
@@ -190,6 +202,12 @@ public class ParkServer extends AbstractServer {
                 case "CANCEL_BOOKING":
                     Booking bookingToCancel = (Booking) message.getData();
                     client.sendToClient(new Message("CANCEL_BOOKING_RESULT", cancelBooking(bookingToCancel)));
+                    break;
+
+                case "CONFIRM_BOOKING":
+                    String[] confirmationData = (String[]) message.getData();
+                    boolean confirmed = BookingLifecycleService.confirmBooking(confirmationData[0], confirmationData[1]);
+                    client.sendToClient(new Message("CONFIRM_BOOKING_RESULT", confirmed));
                     break;
 
                 case "TRAVELER_LOGIN":
@@ -373,34 +391,145 @@ public class ParkServer extends AbstractServer {
         return ps.executeUpdate() > 0;
     }
 
-    private Booking createBooking(Booking booking) throws SQLException {
+    private synchronized BookingAvailabilityResult createBooking(Booking booking, boolean allowWaitlistCreation) throws SQLException {
         validateBooking(booking);
 
         Connection conn = DBConnection.getStaticConnection();
-        String bookingId = UUID.randomUUID().toString();
-        int price = calculatePrice(conn, booking.getParkId(), booking.getNumberOfVisitors());
+        boolean previousAutoCommit = conn.getAutoCommit();
+        conn.setAutoCommit(false);
 
-        String sql = "INSERT INTO booking (booking_id, traveler_id, park_id, numberOfVisitors, visitorTime, status, organizedBooking, price) "
-            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        try {
+            upsertTravelerContactInfo(conn, booking);
+
+            String bookingId = String.valueOf(1000000 + new java.util.Random().nextInt(9000000));
+            ParkCapacity capacity = getParkCapacityForUpdate(conn, booking.getParkId());
+            int confirmedVisitors = getConfirmedVisitorsForSlot(conn, booking.getParkId(), booking.getVisitorTime());
+            boolean isFull = confirmedVisitors + booking.getNumberOfVisitors() > capacity.effectiveCapacity;
+            String status = isFull
+                ? Booking.STATUS_WAITING_LIST
+                : Booking.STATUS_CONFIRMED;
+
+            if (isFull && !allowWaitlistCreation) {
+                conn.rollback();
+                return new BookingAvailabilityResult(true, new Booking(null, booking.getTravelerId(), booking.getTravelerName(),
+                    booking.getTravelerEmail(), booking.getTravelerPhoneNumber(), booking.getParkId(), booking.getNumberOfVisitors(),
+                    booking.getVisitorTime(), Booking.STATUS_WAITING_LIST, false, 0));
+            }
+
+            int price = calculatePrice(conn, booking.getParkId(), booking.getNumberOfVisitors());
+
+            String sql = "INSERT INTO booking (booking_id, traveler_id, park_id, numberOfVisitors, visitorTime, status, organizedBooking, price) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+            PreparedStatement ps = conn.prepareStatement(sql);
+            ps.setString(1, bookingId);
+            ps.setString(2, booking.getTravelerId());
+            ps.setInt(3, booking.getParkId());
+            ps.setInt(4, booking.getNumberOfVisitors());
+            ps.setTimestamp(5, Timestamp.valueOf(booking.getVisitorTime()));
+            ps.setString(6, status);
+            ps.setBoolean(7, false);
+            ps.setInt(8, price);
+            ps.executeUpdate();
+
+            if (Booking.STATUS_WAITING_LIST.equals(status)) {
+                String waitingListId = getOrCreateWaitingList(conn, booking.getParkId(), booking.getVisitorTime());
+                addWaitingListEntry(conn, waitingListId, bookingId);
+            }
+
+            conn.commit();
+            return new BookingAvailabilityResult(false, new Booking(bookingId, booking.getTravelerId(), booking.getTravelerName(),
+                booking.getTravelerEmail(), booking.getTravelerPhoneNumber(),
+                booking.getParkId(), booking.getNumberOfVisitors(), booking.getVisitorTime(), status, false, price));
+        } catch (SQLException | RuntimeException e) {
+            conn.rollback();
+            throw e;
+        } finally {
+            conn.setAutoCommit(previousAutoCommit);
+        }
+    }
+
+    private synchronized Booking createBooking(Booking booking) throws SQLException {
+        return createBooking(booking, true).booking;
+    }
+
+    private ParkCapacity getParkCapacityForUpdate(Connection conn, int parkId) throws SQLException {
+        String sql = "SELECT maxCapacity, gap FROM park WHERE park_id = ? FOR UPDATE";
         PreparedStatement ps = conn.prepareStatement(sql);
-        ps.setString(1, bookingId);
-        ps.setString(2, booking.getTravelerId());
-        ps.setInt(3, booking.getParkId());
-        ps.setInt(4, booking.getNumberOfVisitors());
-        ps.setTimestamp(5, Timestamp.valueOf(booking.getVisitorTime()));
-        ps.setString(6, Booking.STATUS_PENDING);
-        ps.setBoolean(7, false);
-        ps.setInt(8, price);
-        ps.executeUpdate();
+        ps.setInt(1, parkId);
+        ResultSet rs = ps.executeQuery();
+        if (!rs.next()) {
+            throw new IllegalArgumentException("Selected park does not exist in the database.");
+        }
+        return new ParkCapacity(Math.max(0, rs.getInt("maxCapacity") - rs.getInt("gap")));
+    }
 
-        return new Booking(bookingId, booking.getTravelerId(), booking.getParkId(),
-            booking.getNumberOfVisitors(), booking.getVisitorTime(), Booking.STATUS_PENDING, false, price);
+    private int getConfirmedVisitorsForSlot(Connection conn, int parkId, LocalDateTime visitorTime) throws SQLException {
+        String sql = "SELECT COALESCE(SUM(numberOfVisitors), 0) AS confirmedVisitors "
+            + "FROM booking WHERE park_id = ? AND visitorTime = ? AND status = ? FOR UPDATE";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setInt(1, parkId);
+        ps.setTimestamp(2, Timestamp.valueOf(visitorTime));
+        ps.setString(3, Booking.STATUS_CONFIRMED);
+        ResultSet rs = ps.executeQuery();
+        return rs.next() ? rs.getInt("confirmedVisitors") : 0;
+    }
+
+    private String getOrCreateWaitingList(Connection conn, int parkId, LocalDateTime slotTime) throws SQLException {
+        String selectSql = "SELECT waitingList_id FROM WaitingList WHERE park_id = ? AND slot_time = ? FOR UPDATE";
+        PreparedStatement selectPs = conn.prepareStatement(selectSql);
+        selectPs.setInt(1, parkId);
+        selectPs.setTimestamp(2, Timestamp.valueOf(slotTime));
+        ResultSet rs = selectPs.executeQuery();
+        if (rs.next()) {
+            return rs.getString("waitingList_id");
+        }
+
+        String waitingListId = UUID.randomUUID().toString();
+        String insertSql = "INSERT INTO WaitingList (waitingList_id, park_id, slot_time, status, created_at) VALUES (?, ?, ?, ?, NOW())";
+        PreparedStatement insertPs = conn.prepareStatement(insertSql);
+        insertPs.setString(1, waitingListId);
+        insertPs.setInt(2, parkId);
+        insertPs.setTimestamp(3, Timestamp.valueOf(slotTime));
+        insertPs.setString(4, "OPEN");
+        insertPs.executeUpdate();
+        return waitingListId;
+    }
+
+    private void addWaitingListEntry(Connection conn, String waitingListId, String bookingId) throws SQLException {
+        String sql = "INSERT INTO WaitingListEntry (id, waitingList_id, booking_id, registered_at, status, updated_at) "
+            + "VALUES (?, ?, ?, NOW(), ?, NOW())";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setString(1, UUID.randomUUID().toString());
+        ps.setString(2, waitingListId);
+        ps.setString(3, bookingId);
+        ps.setString(4, "WAITING");
+        ps.executeUpdate();
+    }
+
+    private static class ParkCapacity {
+        private final int effectiveCapacity;
+
+        private ParkCapacity(int effectiveCapacity) {
+            this.effectiveCapacity = effectiveCapacity;
+        }
+    }
+
+    private static final class BookingAvailabilityResult {
+        private final boolean requiresWaitlistConfirmation;
+        private final Booking booking;
+
+        private BookingAvailabilityResult(boolean requiresWaitlistConfirmation, Booking booking) {
+            this.requiresWaitlistConfirmation = requiresWaitlistConfirmation;
+            this.booking = booking;
+        }
     }
 
     private ArrayList<Booking> getTravelerBookings(String travelerId) throws SQLException {
         ArrayList<Booking> bookings = new ArrayList<>();
         Connection conn = DBConnection.getStaticConnection();
-        String sql = "SELECT * FROM booking WHERE traveler_id = ? ORDER BY visitorTime";
+        String sql = "SELECT b.*, u.firstName, u.email, u.phoneNumber "
+            + "FROM booking b JOIN `user` u ON u.user_id = b.traveler_id "
+            + "WHERE b.traveler_id = ? ORDER BY b.visitorTime";
         PreparedStatement ps = conn.prepareStatement(sql);
         ps.setString(1, travelerId);
         ResultSet rs = ps.executeQuery();
@@ -435,22 +564,68 @@ public class ParkServer extends AbstractServer {
         return ps.executeUpdate() > 0;
     }
 
-    private boolean cancelBooking(Booking booking) throws SQLException {
+    private synchronized boolean cancelBooking(Booking booking) throws SQLException {
         if (booking == null || booking.getBookingId() == null || booking.getTravelerId() == null) {
             throw new IllegalArgumentException("Booking details are missing.");
         }
 
         Connection conn = DBConnection.getStaticConnection();
-        String sql = "UPDATE booking SET status = ? WHERE booking_id = ? AND traveler_id = ? "
-            + "AND status NOT IN (?, ?, ?)";
+        boolean previousAutoCommit = conn.getAutoCommit();
+        conn.setAutoCommit(false);
+
+        try {
+            Booking existingBooking = getBookingByIdForUpdate(conn, booking.getBookingId());
+            if (existingBooking == null || !booking.getTravelerId().equals(existingBooking.getTravelerId())) {
+                conn.rollback();
+                return false;
+            }
+
+            String sql = "UPDATE booking SET status = ? WHERE booking_id = ? AND traveler_id = ? "
+                + "AND status NOT IN (?, ?, ?)";
+            PreparedStatement ps = conn.prepareStatement(sql);
+            ps.setString(1, Booking.STATUS_CANCELLED);
+            ps.setString(2, booking.getBookingId());
+            ps.setString(3, booking.getTravelerId());
+            ps.setString(4, Booking.STATUS_CANCELLED);
+            ps.setString(5, Booking.STATUS_CHECKED_IN);
+            ps.setString(6, Booking.STATUS_CHECKED_OUT);
+            boolean cancelled = ps.executeUpdate() > 0;
+
+            if (cancelled) {
+                markCancelledWaitingListEntry(conn, booking.getBookingId());
+                if (Booking.STATUS_CONFIRMED.equals(existingBooking.getStatus())
+                    || Booking.STATUS_PENDING_REMINDER_CONFIRMATION.equals(existingBooking.getStatus())
+                    || Booking.STATUS_PENDING_WAITLIST_CONFIRMATION.equals(existingBooking.getStatus())) {
+                    BookingLifecycleService.handleConfirmedBookingCancelled(conn, existingBooking);
+                }
+            }
+
+            conn.commit();
+            return cancelled;
+        } catch (SQLException | RuntimeException e) {
+            conn.rollback();
+            throw e;
+        } finally {
+            conn.setAutoCommit(previousAutoCommit);
+        }
+    }
+
+    private Booking getBookingByIdForUpdate(Connection conn, String bookingId) throws SQLException {
+        String sql = "SELECT * FROM booking WHERE booking_id = ? FOR UPDATE";
         PreparedStatement ps = conn.prepareStatement(sql);
-        ps.setString(1, Booking.STATUS_CANCELLED);
-        ps.setString(2, booking.getBookingId());
-        ps.setString(3, booking.getTravelerId());
-        ps.setString(4, Booking.STATUS_CANCELLED);
-        ps.setString(5, Booking.STATUS_CHECKED_IN);
-        ps.setString(6, Booking.STATUS_CHECKED_OUT);
-        return ps.executeUpdate() > 0;
+        ps.setString(1, bookingId);
+        ResultSet rs = ps.executeQuery();
+        if (rs.next()) return mapBooking(rs);
+        return null;
+    }
+
+    private void markCancelledWaitingListEntry(Connection conn, String bookingId) throws SQLException {
+        String sql = "UPDATE WaitingListEntry SET status = ?, updated_at = NOW() WHERE booking_id = ? AND status = ?";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setString(1, "CANCELLED");
+        ps.setString(2, bookingId);
+        ps.setString(3, "WAITING");
+        ps.executeUpdate();
     }
 
     private void validateBooking(Booking booking) {
@@ -459,6 +634,15 @@ public class ParkServer extends AbstractServer {
         }
         if (booking.getTravelerId() == null || booking.getTravelerId().isBlank()) {
             throw new IllegalArgumentException("Traveler is missing.");
+        }
+        if (booking.getTravelerName() == null || booking.getTravelerName().isBlank()) {
+            throw new IllegalArgumentException("Traveler name is missing.");
+        }
+        if (booking.getTravelerEmail() == null || booking.getTravelerEmail().isBlank()) {
+            throw new IllegalArgumentException("Traveler email is missing.");
+        }
+        if (booking.getTravelerPhoneNumber() == null || booking.getTravelerPhoneNumber().isBlank()) {
+            throw new IllegalArgumentException("Traveler phone number is missing.");
         }
         if (booking.getParkId() < 1 || booking.getParkId() > 4) {
             throw new IllegalArgumentException("Please choose a valid park.");
@@ -506,6 +690,9 @@ public class ParkServer extends AbstractServer {
         return new Booking(
             rs.getString("booking_id"),
             rs.getString("traveler_id"),
+            getOptionalColumn(rs, "fullName"),
+            getOptionalColumn(rs, "email"),
+            getOptionalColumn(rs, "phoneNumber"),
             rs.getInt("park_id"),
             rs.getInt("numberOfVisitors"),
             visitorTimestamp.toLocalDateTime(),
@@ -515,16 +702,39 @@ public class ParkServer extends AbstractServer {
         );
     }
 
+    private void upsertTravelerContactInfo(Connection conn, Booking booking) throws SQLException {
+        String sql = "UPDATE `user` SET firstName = ?, email = ?, phoneNumber = ? WHERE user_id = ?";
+        PreparedStatement ps = conn.prepareStatement(sql);
+    ps.setString(1, booking.getTravelerName().trim());
+        ps.setString(2, booking.getTravelerEmail().trim());
+        ps.setString(3, booking.getTravelerPhoneNumber().trim());
+        ps.setString(4, booking.getTravelerId());
+
+        if (ps.executeUpdate() == 0) {
+            throw new IllegalArgumentException("Traveler user record was not found.");
+        }
+    }
+
+    private String getOptionalColumn(ResultSet rs, String columnName) {
+        try {
+            return rs.getString(columnName);
+        } catch (SQLException e) {
+            return null;
+        }
+    }
+
     private VisitorLoginResult loginOrRegisterVisitor(String nationalId) throws SQLException {
         Connection conn = DBConnection.getStaticConnection();
         int nationalIdNumber = Integer.parseInt(nationalId);
 
-        String selectSql = "SELECT traveler_id FROM traveler WHERE nationalId = ?";
+        String selectSql = "SELECT traveler_id, guide, clubMember FROM traveler WHERE nationalId = ?";
         PreparedStatement selectPs = conn.prepareStatement(selectSql);
         selectPs.setInt(1, nationalIdNumber);
         ResultSet rs = selectPs.executeQuery();
         if (rs.next()) {
-            return new VisitorLoginResult(rs.getString("traveler_id"), nationalId, false);
+            boolean isGuide = rs.getBoolean("guide");
+            boolean isClubMember = rs.getBoolean("clubMember");
+            return new VisitorLoginResult(rs.getString("traveler_id"), nationalId, false, isGuide, isClubMember);
         }
 
         String travelerId = UUID.randomUUID().toString();
@@ -605,7 +815,9 @@ public class ParkServer extends AbstractServer {
 
     private Booking getBookingById(String bookingId) throws SQLException {
         Connection conn = DBConnection.getStaticConnection();
-        String sql = "SELECT * FROM booking WHERE booking_id = ?";
+        String sql = "SELECT b.*, u.fullName, u.email, u.phoneNumber "
+            + "FROM booking b JOIN `user` u ON u.user_id = b.traveler_id "
+            + "WHERE b.booking_id = ?";
         PreparedStatement ps = conn.prepareStatement(sql);
         ps.setString(1, bookingId);
         ResultSet rs = ps.executeQuery();
@@ -621,13 +833,19 @@ public class ParkServer extends AbstractServer {
 
         Connection conn = DBConnection.getStaticConnection();
 
+<<<<<<< HEAD
         // Update booking status to CHECKED_IN and set visitorsInside = numberOfVisitors
         String updateBooking = "UPDATE booking SET status = ?, visitorsInside = numberOfVisitors, entryTime = NOW() " +
                 "WHERE booking_id = ? AND status = ? AND park_id = ?";
+=======
+    // Update confirmed booking status to CHECKED_IN and set visitorsInside = numberOfVisitors
+        String updateBooking = "UPDATE booking SET status = ?, visitorsInside = numberOfVisitors " +
+                               "WHERE booking_id = ? AND status = ? AND park_id = ?";
+>>>>>>> origin/dev
         PreparedStatement ps = conn.prepareStatement(updateBooking);
         ps.setString(1, Booking.STATUS_CHECKED_IN);
         ps.setString(2, booking.getBookingId());
-        ps.setString(3, Booking.STATUS_PENDING);
+    ps.setString(3, Booking.STATUS_CONFIRMED);
         ps.setInt(4, employeeParkId);
         int rows = ps.executeUpdate();
 
@@ -692,6 +910,11 @@ public class ParkServer extends AbstractServer {
      parkPs.setInt(1, request.getVisitorsLeaving());
      parkPs.setInt(2, request.getParkId());
      parkPs.executeUpdate();
+
+     Booking updatedBooking = getBookingById(request.getBookingId());
+     if (updatedBooking != null && Booking.STATUS_CHECKED_OUT.equals(updatedBooking.getStatus())) {
+         BookingLifecycleService.handleSpotFreed(conn, updatedBooking.getParkId(), updatedBooking.getVisitorTime());
+     }
 
      return true;
  }

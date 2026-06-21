@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import common.ParkSubmittedReport;
 import common.ParkReportRequest;
 import common.ParkVisitorsReportResult;
 import common.ParkUsageReportResult;
@@ -151,7 +152,35 @@ public class ParkServer extends AbstractServer {
 
         return results;
     }
+    
+    private ArrayList<ParkSubmittedReport> getSubmittedReports(int parkId) throws SQLException {
 
+        ArrayList<ParkSubmittedReport> reports = new ArrayList<>();
+
+        String sql =
+                "SELECT park_id, reportTitle, content, employee_id " +
+                "FROM report " +
+                "WHERE park_id = ?";
+
+        Connection conn = DBConnection.getStaticConnection();
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setInt(1, parkId);
+
+        ResultSet rs = ps.executeQuery();
+
+        while (rs.next()) {
+
+            reports.add(new ParkSubmittedReport(
+                    rs.getInt("park_id"),
+                    rs.getString("reportTitle"),
+                    rs.getString("content"),
+                    rs.getInt("employee_id")
+            ));
+        }
+
+        return reports;
+    }
+    
     @Override
     protected void handleMessageFromClient(Object msg, ConnectionToClient client) {
         System.out.println("Message received from client: " + msg);
@@ -369,6 +398,12 @@ public class ParkServer extends AbstractServer {
                      Object[] promoApprovalData = (Object[]) message.getData();
                      handlePromotionApproval((String) promoApprovalData[0], (boolean) promoApprovalData[1], client);
                      break;
+                     
+                 case "GET_SUBMITTED_REPORTS":
+                	    int parkIdForReports = (int) message.getData();
+                	    ArrayList<ParkSubmittedReport> reports = getSubmittedReports(parkIdForReports);
+                	    client.sendToClient(new Message("SUBMITTED_REPORTS_RESULT", reports));
+                	    break;
                      
                  case "GET_TODAY_BOOKINGS":
                 	    int parkIdForToday = (int) message.getData();

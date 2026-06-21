@@ -3,6 +3,7 @@ package client;
 import java.util.ArrayList;
 import java.util.Map;
 
+import common.ParkSubmittedReport;
 import common.Booking;
 import common.Employee;
 import common.Order;
@@ -48,4 +49,5 @@ public interface ServerResponseListener {
     default void onPromotionRequestResult(boolean success) {}
     default void onPromotionApprovalResult(String requestId, boolean approved) {}
     default void onPromotionRequestNotification(PromotionRequest request) {}
+    default void onSubmittedReportsResult(ArrayList<ParkSubmittedReport> reports) {}
 }

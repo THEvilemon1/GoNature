@@ -11,7 +11,6 @@
 
     <VBox styleClass="screen-card" prefWidth="960" maxWidth="1040" alignment="TOP_CENTER">
 
-        <!-- Top bar -->
         <HBox styleClass="top-bar" alignment="CENTER_LEFT" spacing="12">
             <Label styleClass="screen-title" text="Department Overview" />
             <HBox HBox.hgrow="ALWAYS" />
@@ -19,12 +18,21 @@
             <Button styleClass="btn-secondary" text="Logout" onAction="#handleLogout" />
         </HBox>
 
-        <VBox styleClass="content-area" spacing="20" VBox.vgrow="ALWAYS">
+        <VBox styleClass="content-area" spacing="18" VBox.vgrow="ALWAYS">
 
-            <!-- Empty space for other team members to fill -->
-            <VBox VBox.vgrow="ALWAYS" />
+            <Label styleClass="field-label" text="SUBMITTED PARK REPORTS" />
 
-            <!-- Requests section at the bottom -->
+            <TableView fx:id="tblReports" styleClass="list-view" prefHeight="220">
+                <columns>
+                    <TableColumn fx:id="colReportParkId" text="Park ID" prefWidth="90" />
+                    <TableColumn fx:id="colReportTitle" text="Report Title" prefWidth="320" />
+                    <TableColumn fx:id="colReportEmployeeId" text="Employee ID" prefWidth="120" />
+                    <TableColumn fx:id="colReportContent" text="Content" prefWidth="430" />
+                </columns>
+            </TableView>
+
+            <Separator styleClass="card-sep" />
+
             <Label styleClass="field-label" text="PARK MANAGER REQUESTS" />
 
             <TableView fx:id="tblRequests" styleClass="list-view" prefHeight="250">

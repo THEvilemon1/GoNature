@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Map;
 
+import common.ParkSubmittedReport;
 import common.ParkChangeRequest;
 import common.Booking;
 import common.Employee;
@@ -156,6 +157,9 @@ public class ParkClient extends AbstractClient {
                     break;
                 case "PARK_VISITORS_REPORT_RESULT":
                     listener.onParkVisitorsReportResult((ParkVisitorsReportResult) message.getData());
+                    break;
+                case "SUBMITTED_REPORTS_RESULT":
+                    listener.onSubmittedReportsResult((ArrayList<ParkSubmittedReport>) message.getData());
                     break;
             }
         }

@@ -47,6 +47,9 @@
             <Label fx:id="lblMessage" styleClass="lbl-message" text=""
                    wrapText="true" maxWidth="700" visible="false" />
 
+            <Button text="Visits Report" onAction="#handleVisitsReport" prefWidth="220" />
+            <Button text="Cancellations Report" onAction="#handleCancellationsReport" prefWidth="220" />
+            <Button styleClass="btn-secondary" text="Logout" onAction="#handleLogout" prefWidth="120" />
         </VBox>
     </VBox>
 </StackPane>

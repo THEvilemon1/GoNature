@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<StackPane xmlns="http://javafx.com/javafx/17"
+           xmlns:fx="http://javafx.com/fxml/1"
+           fx:controller="gui.employee.PromotionsViewController"
+           styleClass="root-pane"
+           stylesheets="@EmployeeScreens.css">
+
+    <VBox styleClass="screen-card" prefWidth="960" maxWidth="1040" alignment="TOP_CENTER">
+
+        <!-- Top bar -->
+        <HBox styleClass="top-bar" alignment="CENTER_LEFT" spacing="12">
+            <Label styleClass="screen-title" text="Promotions Management" />
+            <HBox HBox.hgrow="ALWAYS" />
+            <Button styleClass="btn-secondary" text="Close" onAction="#handleClose" />
+        </HBox>
+
+        <VBox styleClass="content-area" spacing="20">
+
+            <!-- Existing promotions table -->
+            <Label styleClass="field-label" text="CURRENT PROMOTIONS" />
+
+            <TableView fx:id="tblPromotions" styleClass="list-view" prefHeight="200">
+                <columns>
+                    <TableColumn fx:id="colPromoCode" text="Code" prefWidth="100" />
+                    <TableColumn fx:id="colPercentage" text="Discount %" prefWidth="100" />
+                    <TableColumn fx:id="colEndDate" text="End Date" prefWidth="160" />
+                    <TableColumn fx:id="colDescription" text="Description" prefWidth="260" />
+                    <TableColumn fx:id="colEdit" text="" prefWidth="90" />
+                    <TableColumn fx:id="colDelete" text="" prefWidth="90" />
+                </columns>
+            </TableView>
+
+            <Separator styleClass="card-sep" />
+
+            <!-- Add / Edit promotion form -->
+            <Label fx:id="lblFormTitle" styleClass="field-label" text="ADD NEW PROMOTION" />
+
+            <GridPane hgap="16" vgap="14">
+                <Label styleClass="field-label" text="Promo Code:"
+                       GridPane.columnIndex="0" GridPane.rowIndex="0" />
+                <TextField fx:id="txtPromoCode" styleClass="field-input"
+                           promptText="e.g. 1001" prefWidth="180"
+                           GridPane.columnIndex="1" GridPane.rowIndex="0" />
+
+                <Label styleClass="field-label" text="Discount Percentage:"
+                       GridPane.columnIndex="0" GridPane.rowIndex="1" />
+                <TextField fx:id="txtPercentage" styleClass="field-input"
+                           promptText="e.g. 15" prefWidth="180"
+                           GridPane.columnIndex="1" GridPane.rowIndex="1" />
+
+                <Label styleClass="field-label" text="End Date (yyyy-MM-dd):"
+                       GridPane.columnIndex="0" GridPane.rowIndex="2" />
+                <TextField fx:id="txtEndDate" styleClass="field-input"
+                           promptText="e.g. 2026-12-31" prefWidth="180"
+                           GridPane.columnIndex="1" GridPane.rowIndex="2" />
+
+                <Label styleClass="field-label" text="Description:"
+                       GridPane.columnIndex="0" GridPane.rowIndex="3" />
+                <TextField fx:id="txtDescription" styleClass="field-input"
+                           promptText="e.g. Summer Special" prefWidth="180"
+                           GridPane.columnIndex="1" GridPane.rowIndex="3" />
+            </GridPane>
+
+            <HBox spacing="12">
+                <Button fx:id="btnSubmit" styleClass="btn-primary" text="Submit Add Request"
+                        onAction="#handleSubmit" prefWidth="180" />
+                <Button fx:id="btnCancelEdit" styleClass="btn-secondary" text="Cancel Edit"
+                        onAction="#handleCancelEdit" prefWidth="140" visible="false" managed="false" />
+            </HBox>
+
+            <Label fx:id="lblMessage" styleClass="lbl-message" text=""
+                   wrapText="true" maxWidth="700" visible="false" />
+
+        </VBox>
+    </VBox>
+</StackPane>

@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import common.SubscriberRequest;
 
 import common.Booking;
 import common.ContactInfoValidator;
@@ -274,6 +275,12 @@ public class ParkServer extends AbstractServer {
                 	    ArrayList<Booking> todayBookings = getTodayBookings(parkIdForToday);
                 	    client.sendToClient(new Message("TODAY_BOOKINGS_RESULT", todayBookings));
                 	    break;
+                	    
+                 case "REGISTER_TRAVELER":
+                	    SubscriberRequest subReq = (SubscriberRequest) message.getData();
+                	    String registerResult = registerTraveler(subReq);
+                	    client.sendToClient(new Message("REGISTER_TRAVELER_RESULT", registerResult));
+                	    break;
 
                 default:
                     client.sendToClient(new Message("ERROR", "Unknown command"));
@@ -286,6 +293,125 @@ public class ParkServer extends AbstractServer {
                 ex.printStackTrace();
             }
             e.printStackTrace();
+        }
+    }
+    
+    
+
+    /**
+     * Registers a traveler as a club member or tour guide.
+     * If a traveler with this national ID already exists, upgrades them
+     * (sets the relevant flag and updates their user details).
+     * Returns "SUCCESS" or an error message string.
+     */  
+    private String registerTraveler(SubscriberRequest req) throws SQLException {
+        Connection conn = DBConnection.getStaticConnection();
+        int nationalIdNumber;
+        try {
+            nationalIdNumber = Integer.parseInt(req.getNationalId().trim());
+        } catch (NumberFormatException e) {
+            return "National ID must be a number.";
+        }
+     
+        boolean isGuide = SubscriberRequest.TYPE_GUIDE.equals(req.getType());
+        boolean isClubMember = SubscriberRequest.TYPE_CLUB_MEMBER.equals(req.getType());
+     
+        boolean previousAutoCommit = conn.getAutoCommit();
+        conn.setAutoCommit(false);
+     
+        try {
+            // Check if traveler already exists
+            String selectSql = "SELECT traveler_id, user_id, guide, clubMember FROM traveler WHERE nationalId = ?";
+            PreparedStatement selectPs = conn.prepareStatement(selectSql);
+            selectPs.setInt(1, nationalIdNumber);
+            ResultSet rs = selectPs.executeQuery();
+     
+            if (rs.next()) {
+                // Traveler exists — upgrade them
+                String travelerId = rs.getString("traveler_id");
+                String userId = rs.getString("user_id");
+                boolean alreadyGuide = rs.getBoolean("guide");
+                boolean alreadyClub = rs.getBoolean("clubMember");
+     
+                if (isGuide && alreadyGuide) {
+                    conn.rollback();
+                    return "This person is already registered as a tour guide.";
+                }
+                if (isClubMember && alreadyClub) {
+                    conn.rollback();
+                    return "This person is already registered as a club member.";
+                }
+     
+                // Update the traveler flags + club-member fields
+                String updateTravelerSql =
+                    "UPDATE traveler SET guide = ?, clubMember = ?, familyMembers = ?, creditCard = ? WHERE traveler_id = ?";
+                PreparedStatement updTravelerPs = conn.prepareStatement(updateTravelerSql);
+                updTravelerPs.setBoolean(1, alreadyGuide || isGuide);
+                updTravelerPs.setBoolean(2, alreadyClub || isClubMember);
+                if (isClubMember) {
+                    updTravelerPs.setInt(3, req.getFamilyMembers());
+                    if (req.getCreditCard() == null) updTravelerPs.setNull(4, Types.VARCHAR);
+                    else updTravelerPs.setString(4, req.getCreditCard());
+                } else {
+                    // Guide upgrade — leave family/credit fields as they were (set null)
+                    updTravelerPs.setNull(3, Types.INTEGER);
+                    updTravelerPs.setNull(4, Types.VARCHAR);
+                }
+                updTravelerPs.setString(5, travelerId);
+                updTravelerPs.executeUpdate();
+     
+                // Update user details
+                String updateUserSql = "UPDATE `user` SET firstName = ?, lastName = ?, email = ?, phoneNumber = ? WHERE user_id = ?";
+                PreparedStatement updUserPs = conn.prepareStatement(updateUserSql);
+                updUserPs.setString(1, req.getFirstName());
+                updUserPs.setString(2, req.getLastName());
+                updUserPs.setString(3, req.getEmail());
+                updUserPs.setString(4, req.getPhoneNumber());
+                updUserPs.setString(5, userId);
+                updUserPs.executeUpdate();
+     
+                conn.commit();
+                return "SUCCESS";
+            } else {
+                // New traveler — create user + traveler rows
+                String travelerId = UUID.randomUUID().toString();
+     
+                String insertUserSql = "INSERT INTO `user` (user_id, firstName, lastName, email, phoneNumber) VALUES (?, ?, ?, ?, ?)";
+                PreparedStatement insertUserPs = conn.prepareStatement(insertUserSql);
+                insertUserPs.setString(1, travelerId);
+                insertUserPs.setString(2, req.getFirstName());
+                insertUserPs.setString(3, req.getLastName());
+                insertUserPs.setString(4, req.getEmail());
+                insertUserPs.setString(5, req.getPhoneNumber());
+                insertUserPs.executeUpdate();
+     
+                String insertTravelerSql =
+                    "INSERT INTO traveler (traveler_id, nationalId, guide, clubMember, user_id, familyMembers, creditCard) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)";
+                PreparedStatement insertTravelerPs = conn.prepareStatement(insertTravelerSql);
+                insertTravelerPs.setString(1, travelerId);
+                insertTravelerPs.setInt(2, nationalIdNumber);
+                insertTravelerPs.setBoolean(3, isGuide);
+                insertTravelerPs.setBoolean(4, isClubMember);
+                insertTravelerPs.setString(5, travelerId);
+                if (isClubMember) {
+                    insertTravelerPs.setInt(6, req.getFamilyMembers());
+                    if (req.getCreditCard() == null) insertTravelerPs.setNull(7, Types.VARCHAR);
+                    else insertTravelerPs.setString(7, req.getCreditCard());
+                } else {
+                    insertTravelerPs.setNull(6, Types.INTEGER);
+                    insertTravelerPs.setNull(7, Types.VARCHAR);
+                }
+                insertTravelerPs.executeUpdate();
+     
+                conn.commit();
+                return "SUCCESS";
+            }
+        } catch (SQLException e) {
+            conn.rollback();
+            throw e;
+        } finally {
+            conn.setAutoCommit(previousAutoCommit);
         }
     }
     
@@ -726,13 +852,14 @@ public class ParkServer extends AbstractServer {
         	insertUserPs.executeUpdate();
             System.out.println("Inserted user row for visitor: " + travelerId);
 
-            String insertTravelerSql = "INSERT INTO traveler (traveler_id, nationalId, guide, clubMember) VALUES (?, ?, ?, ?)";
+            String insertTravelerSql = "INSERT INTO traveler (traveler_id, nationalId, guide, clubMember, user_id) VALUES (?, ?, ?, ?, ?)";
             PreparedStatement insertTravelerPs = conn.prepareStatement(insertTravelerSql);
             System.out.println("Registering traveler details for national ID: " + nationalId);
             insertTravelerPs.setString(1, travelerId);
             insertTravelerPs.setInt(2, nationalIdNumber);
             insertTravelerPs.setBoolean(3, false);
             insertTravelerPs.setBoolean(4, false);
+            insertTravelerPs.setString(5, travelerId); //user_id
             insertTravelerPs.executeUpdate();
             System.out.println("Inserted traveler row for visitor: " + travelerId);
 

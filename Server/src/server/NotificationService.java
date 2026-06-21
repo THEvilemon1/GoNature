@@ -1,7 +1,5 @@
 package server;
 
-import gui.ServerPortFrameController;
-
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -128,10 +126,7 @@ public class NotificationService {
     }
 
     private static void log(String message) {
-        System.out.println("[NotificationService] " + message);
-        if (ServerPortFrameController.instance != null) {
-            ServerPortFrameController.instance.log("[Notification] " + message);
-        }
+        Utils.log("NotificationService", message);
     }
 
     private static final class BookingNotificationContext {

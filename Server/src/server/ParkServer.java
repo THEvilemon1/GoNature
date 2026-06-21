@@ -304,7 +304,7 @@ public class ParkServer extends AbstractServer {
         ps.setInt(1, parkId);
         ResultSet rs = ps.executeQuery();
         while (rs.next()) {
-            list.add(mapBooking(rs));
+            list.add(Utils.mapBooking(rs));
         }
         return list;
     }
@@ -369,9 +369,9 @@ public class ParkServer extends AbstractServer {
 
         try {
             String bookingId = String.valueOf(1000000 + new java.util.Random().nextInt(9000000));
-            ParkCapacity capacity = getParkCapacityForUpdate(conn, booking.getParkId());
+            int capacity = Utils.getParkEffectiveCapacity(conn, booking.getParkId());
             int confirmedVisitors = getConfirmedVisitorsForSlot(conn, booking.getParkId(), booking.getVisitorTime());
-            boolean isFull = confirmedVisitors + booking.getNumberOfVisitors() > capacity.effectiveCapacity;
+            boolean isFull = confirmedVisitors + booking.getNumberOfVisitors() > capacity;
             String status = isFull
                 ? Booking.STATUS_WAITING_LIST
                 : Booking.STATUS_CONFIRMED;
@@ -423,17 +423,6 @@ public class ParkServer extends AbstractServer {
         return createBooking(booking, true).booking;
     }
 
-    private ParkCapacity getParkCapacityForUpdate(Connection conn, int parkId) throws SQLException {
-        String sql = "SELECT maxCapacity, gap FROM park WHERE park_id = ? FOR UPDATE";
-        PreparedStatement ps = conn.prepareStatement(sql);
-        ps.setInt(1, parkId);
-        ResultSet rs = ps.executeQuery();
-        if (!rs.next()) {
-            throw new IllegalArgumentException("Selected park does not exist in the database.");
-        }
-        return new ParkCapacity(Math.max(0, rs.getInt("maxCapacity") - rs.getInt("gap")));
-    }
-
     private int getConfirmedVisitorsForSlot(Connection conn, int parkId, LocalDateTime visitorTime) throws SQLException {
         String sql = "SELECT COALESCE(SUM(numberOfVisitors), 0) AS confirmedVisitors "
             + "FROM booking WHERE park_id = ? AND visitorTime = ? AND status = ? FOR UPDATE";
@@ -477,14 +466,6 @@ public class ParkServer extends AbstractServer {
         ps.executeUpdate();
     }
 
-    private static class ParkCapacity {
-        private final int effectiveCapacity;
-
-        private ParkCapacity(int effectiveCapacity) {
-            this.effectiveCapacity = effectiveCapacity;
-        }
-    }
-
     private static final class BookingAvailabilityResult {
         private final boolean requiresWaitlistConfirmation;
         private final Booking booking;
@@ -504,7 +485,7 @@ public class ParkServer extends AbstractServer {
         ResultSet rs = ps.executeQuery();
 
         while (rs.next()) {
-            bookings.add(mapBooking(rs));
+            bookings.add(Utils.mapBooking(rs));
         }
 
         return bookings;
@@ -555,7 +536,7 @@ public class ParkServer extends AbstractServer {
         conn.setAutoCommit(false);
 
         try {
-            Booking existingBooking = getBookingByIdForUpdate(conn, booking.getBookingId());
+            Booking existingBooking = Utils.getBookingByIdForUpdate(conn, booking.getBookingId());
             if (existingBooking == null || !booking.getTravelerId().equals(existingBooking.getTravelerId())) {
                 conn.rollback();
                 return false;
@@ -573,7 +554,7 @@ public class ParkServer extends AbstractServer {
             boolean cancelled = ps.executeUpdate() > 0;
 
             if (cancelled) {
-                markCancelledWaitingListEntry(conn, booking.getBookingId());
+                Utils.updateWaitingListEntryByBooking(conn, booking.getBookingId(), "WAITING", "CANCELLED");
                 if (Booking.STATUS_CONFIRMED.equals(existingBooking.getStatus())
                     || Booking.STATUS_PENDING_REMINDER_CONFIRMATION.equals(existingBooking.getStatus())
                     || Booking.STATUS_PENDING_WAITLIST_CONFIRMATION.equals(existingBooking.getStatus())) {
@@ -589,24 +570,6 @@ public class ParkServer extends AbstractServer {
         } finally {
             conn.setAutoCommit(previousAutoCommit);
         }
-    }
-
-    private Booking getBookingByIdForUpdate(Connection conn, String bookingId) throws SQLException {
-        String sql = "SELECT * FROM booking WHERE booking_id = ? FOR UPDATE";
-        PreparedStatement ps = conn.prepareStatement(sql);
-        ps.setString(1, bookingId);
-        ResultSet rs = ps.executeQuery();
-        if (rs.next()) return mapBooking(rs);
-        return null;
-    }
-
-    private void markCancelledWaitingListEntry(Connection conn, String bookingId) throws SQLException {
-        String sql = "UPDATE WaitingListEntry SET status = ?, updated_at = NOW() WHERE booking_id = ? AND status = ?";
-        PreparedStatement ps = conn.prepareStatement(sql);
-        ps.setString(1, "CANCELLED");
-        ps.setString(2, bookingId);
-        ps.setString(3, "WAITING");
-        ps.executeUpdate();
     }
 
     private void validateBooking(Booking booking) {
@@ -658,31 +621,6 @@ public class ParkServer extends AbstractServer {
         }
 
         return parks;
-    }
-
-    private Booking mapBooking(ResultSet rs) throws SQLException {
-        Timestamp visitorTimestamp = rs.getTimestamp("visitorTime");
-        return new Booking(
-            rs.getString("booking_id"),
-            rs.getString("traveler_id"),
-            getOptionalColumn(rs, "travelerName"),
-            getOptionalColumn(rs, "travelerEmail"),
-            getOptionalColumn(rs, "travelerPhoneNumber"),
-            rs.getInt("park_id"),
-            rs.getInt("numberOfVisitors"),
-            visitorTimestamp.toLocalDateTime(),
-            rs.getString("status"),
-            rs.getBoolean("organizedBooking"),
-            rs.getInt("price")
-        );
-    }
-
-    private String getOptionalColumn(ResultSet rs, String columnName) {
-        try {
-            return rs.getString(columnName);
-        } catch (SQLException e) {
-            return null;
-        }
     }
 
     private TravelerProfile getTravelerProfile(String travelerId) throws SQLException {
@@ -832,7 +770,7 @@ public class ParkServer extends AbstractServer {
         PreparedStatement ps = conn.prepareStatement(sql);
         ps.setString(1, bookingId);
         ResultSet rs = ps.executeQuery();
-        if (rs.next()) return mapBooking(rs);
+        if (rs.next()) return Utils.mapBooking(rs);
         return null;
     }
 

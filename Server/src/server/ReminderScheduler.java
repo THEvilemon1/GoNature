@@ -1,7 +1,5 @@
 package server;
 
-import gui.ServerPortFrameController;
-
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -74,8 +72,6 @@ public class ReminderScheduler {
     // -------------------------------------------------------------------------
 
     private void log(String message) {
-        System.out.println("[ReminderScheduler] " + message);
-        if (ServerPortFrameController.instance != null)
-            ServerPortFrameController.instance.log("[ReminderScheduler] " + message);
+        Utils.log("ReminderScheduler", message);
     }
 }

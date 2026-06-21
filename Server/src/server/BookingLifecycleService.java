@@ -1,8 +1,6 @@
 package server;
 
 import common.Booking;
-import gui.ServerPortFrameController;
-
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
@@ -81,7 +79,7 @@ public final class BookingLifecycleService {
         conn.setAutoCommit(false);
 
         try {
-            Booking booking = getBookingByIdForUpdate(conn, bookingId);
+            Booking booking = Utils.getBookingByIdForUpdate(conn, bookingId);
             if (booking == null || !travelerId.equals(booking.getTravelerId())) {
                 conn.rollback();
                 return false;
@@ -89,7 +87,7 @@ public final class BookingLifecycleService {
 
             if (Booking.STATUS_PENDING_WAITLIST_CONFIRMATION.equals(booking.getStatus())) {
                 updateBookingStatus(conn, bookingId, Booking.STATUS_CONFIRMED, null, null, null);
-                markWaitingListEntryStatus(conn, bookingId, "OFFERED", "CONFIRMED");
+                Utils.updateWaitingListEntryByBooking(conn,bookingId, "OFFERED", "CONFIRMED");
                 sendSpotConfirmedNotification(conn, bookingId);
                 conn.commit();
                 return true;
@@ -119,7 +117,7 @@ public final class BookingLifecycleService {
 
         for (Booking booking : expiredBookings) {
             systemCancelBooking(conn, booking, "WAITLIST_TIME_ARRIVED", false);
-            markWaitingListEntryStatus(conn, booking.getBookingId(), "WAITING", "EXPIRED");
+            Utils.updateWaitingListEntryByBooking(conn,booking.getBookingId(), "WAITING", "EXPIRED");
             sendWaitlistExpiredNotification(conn, booking.getBookingId());
         }
     }
@@ -131,7 +129,7 @@ public final class BookingLifecycleService {
 
         for (Booking booking : expiredBookings) {
             systemCancelBooking(conn, booking, "WAITLIST_CONFIRMATION_TIMEOUT", true);
-            markWaitingListEntryStatus(conn, booking.getBookingId(), "OFFERED", "EXPIRED");
+            Utils.updateWaitingListEntryByBooking(conn,booking.getBookingId(), "OFFERED", "EXPIRED");
             sendWaitlistOfferExpiredNotification(conn, booking.getBookingId());
         }
     }
@@ -149,7 +147,7 @@ public final class BookingLifecycleService {
         ResultSet rs = ps.executeQuery();
 
         while (rs.next()) {
-            Booking booking = mapBooking(rs);
+            Booking booking = Utils.mapBooking(rs);
             // LocalDateTime deadline = now.plusHours(REMINDER_CONFIRMATION_WINDOW_HOURS);
             LocalDateTime deadline = now.plusSeconds(30); // For testing purposes, set to 30 seconds instead of 1 hour
             updateBookingStatus(conn,
@@ -174,7 +172,7 @@ public final class BookingLifecycleService {
     }
 
     private static void offerSpotToNextWaitingTraveler(Connection conn, int parkId, LocalDateTime slotTime) throws SQLException {
-        ParkCapacity capacity = getParkCapacityForUpdate(conn, parkId);
+        int capacity = Utils.getParkEffectiveCapacity(conn, parkId);
         int occupiedVisitors = getOccupiedVisitorsForSlot(conn, parkId, slotTime);
 
         String sql = "SELECT wle.id, b.* FROM WaitingList wl "
@@ -193,9 +191,9 @@ public final class BookingLifecycleService {
             return;
         }
 
-        Booking waitingBooking = mapBooking(rs);
+        Booking waitingBooking = Utils.mapBooking(rs);
         String waitingEntryId = rs.getString("id");
-        if (occupiedVisitors + waitingBooking.getNumberOfVisitors() > capacity.effectiveCapacity) {
+        if (occupiedVisitors + waitingBooking.getNumberOfVisitors() > capacity) {
             return;
         }
 
@@ -208,7 +206,7 @@ public final class BookingLifecycleService {
             now,
             deadline,
             "WAITLIST_SPOT_OFFERED");
-        updateWaitingListEntryStatusById(conn, waitingEntryId, "OFFERED");
+        Utils.updateWaitingListEntryById(conn,waitingEntryId, "OFFERED");
         NotificationService.sendWaitlistPromotionOffer(conn, waitingBooking.getBookingId(), deadline);
     }
 
@@ -228,8 +226,8 @@ public final class BookingLifecycleService {
             + "last_notification_type = ? WHERE booking_id = ?";
         PreparedStatement ps = conn.prepareStatement(sql);
         ps.setString(1, status);
-        setTimestampOrNull(ps, 2, actionRequiredAt);
-        setTimestampOrNull(ps, 3, actionDeadline);
+        Utils.setTimestampOrNull(ps,2, actionRequiredAt);
+        Utils.setTimestampOrNull(ps,3, actionDeadline);
         ps.setString(4, notificationType);
         ps.setString(5, notificationType);
         ps.setString(6, bookingId);
@@ -257,26 +255,9 @@ public final class BookingLifecycleService {
     private static List<Booking> readBookings(ResultSet rs) throws SQLException {
         List<Booking> bookings = new ArrayList<>();
         while (rs.next()) {
-            bookings.add(mapBooking(rs));
+            bookings.add(Utils.mapBooking(rs));
         }
         return bookings;
-    }
-
-    private static void markWaitingListEntryStatus(Connection conn, String bookingId, String currentStatus, String nextStatus) throws SQLException {
-        String sql = "UPDATE WaitingListEntry SET status = ?, updated_at = NOW() WHERE booking_id = ? AND status = ?";
-        PreparedStatement ps = conn.prepareStatement(sql);
-        ps.setString(1, nextStatus);
-        ps.setString(2, bookingId);
-        ps.setString(3, currentStatus);
-        ps.executeUpdate();
-    }
-
-    private static void updateWaitingListEntryStatusById(Connection conn, String entryId, String nextStatus) throws SQLException {
-        String sql = "UPDATE WaitingListEntry SET status = ?, updated_at = NOW() WHERE id = ?";
-        PreparedStatement ps = conn.prepareStatement(sql);
-        ps.setString(1, nextStatus);
-        ps.setString(2, entryId);
-        ps.executeUpdate();
     }
 
     private static void sendWaitlistExpiredNotification(Connection conn, String bookingId) throws SQLException {
@@ -304,28 +285,6 @@ public final class BookingLifecycleService {
             "Your visit reminder was confirmed successfully.");
     }
 
-    private static Booking getBookingByIdForUpdate(Connection conn, String bookingId) throws SQLException {
-        String sql = "SELECT * FROM booking WHERE booking_id = ? FOR UPDATE";
-        PreparedStatement ps = conn.prepareStatement(sql);
-        ps.setString(1, bookingId);
-        ResultSet rs = ps.executeQuery();
-        if (rs.next()) {
-            return mapBooking(rs);
-        }
-        return null;
-    }
-
-    private static ParkCapacity getParkCapacityForUpdate(Connection conn, int parkId) throws SQLException {
-        String sql = "SELECT maxCapacity, gap FROM park WHERE park_id = ? FOR UPDATE";
-        PreparedStatement ps = conn.prepareStatement(sql);
-        ps.setInt(1, parkId);
-        ResultSet rs = ps.executeQuery();
-        if (!rs.next()) {
-            throw new IllegalArgumentException("Selected park does not exist in the database.");
-        }
-        return new ParkCapacity(Math.max(0, rs.getInt("maxCapacity") - rs.getInt("gap")));
-    }
-
     private static int getOccupiedVisitorsForSlot(Connection conn, int parkId, LocalDateTime visitorTime) throws SQLException {
         String sql = "SELECT COALESCE(SUM(numberOfVisitors), 0) AS occupiedVisitors FROM booking "
             + "WHERE park_id = ? AND visitorTime = ? AND status IN (?, ?, ?) FOR UPDATE";
@@ -339,20 +298,6 @@ public final class BookingLifecycleService {
         return rs.next() ? rs.getInt("occupiedVisitors") : 0;
     }
 
-    private static Booking mapBooking(ResultSet rs) throws SQLException {
-        Timestamp visitorTimestamp = rs.getTimestamp("visitorTime");
-        return new Booking(
-            rs.getString("booking_id"),
-            rs.getString("traveler_id"),
-            rs.getInt("park_id"),
-            rs.getInt("numberOfVisitors"),
-            visitorTimestamp.toLocalDateTime(),
-            rs.getString("status"),
-            rs.getBoolean("organizedBooking"),
-            rs.getInt("price")
-        );
-    }
-
     private static void ensureBookingColumn(Connection conn, String columnName, String definition) throws SQLException {
         DatabaseMetaData metaData = conn.getMetaData();
         ResultSet columns = metaData.getColumns(null, null, "booking", columnName);
@@ -362,26 +307,8 @@ public final class BookingLifecycleService {
         }
     }
 
-    private static void setTimestampOrNull(PreparedStatement ps, int parameterIndex, LocalDateTime value) throws SQLException {
-        if (value == null) {
-            ps.setNull(parameterIndex, java.sql.Types.TIMESTAMP);
-        } else {
-            ps.setTimestamp(parameterIndex, Timestamp.valueOf(value));
-        }
-    }
-
     private static void log(String message) {
-        System.out.println("[BookingLifecycleService] " + message);
-        if (ServerPortFrameController.instance != null) {
-            ServerPortFrameController.instance.log("[BookingLifecycleService] " + message);
-        }
+        Utils.log("BookingLifecycleService", message);
     }
 
-    private static final class ParkCapacity {
-        private final int effectiveCapacity;
-
-        private ParkCapacity(int effectiveCapacity) {
-            this.effectiveCapacity = effectiveCapacity;
-        }
-    }
 }

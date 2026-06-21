@@ -26,17 +26,17 @@ public class Booking implements Serializable {
     private LocalDateTime visitorTime;
     private String status;
     private boolean organizedBooking;
-    private int price;
+    private double price;
     private boolean paid;
 
     public Booking(String bookingId, String travelerId, int parkId, int numberOfVisitors,
-                   LocalDateTime visitorTime, String status, boolean organizedBooking, int price) {
+                   LocalDateTime visitorTime, String status, boolean organizedBooking, double price) {
         this(bookingId, travelerId, null, null, null, parkId, numberOfVisitors, visitorTime, status, organizedBooking, price);
     }
 
     public Booking(String bookingId, String travelerId, String travelerName,
                    String travelerEmail, String travelerPhoneNumber, int parkId, int numberOfVisitors,
-                   LocalDateTime visitorTime, String status, boolean organizedBooking, int price) {
+                   LocalDateTime visitorTime, String status, boolean organizedBooking, double price) {
         this.bookingId = bookingId;
         this.travelerId = travelerId;
         this.travelerName = travelerName;
@@ -60,8 +60,8 @@ public class Booking implements Serializable {
     public LocalDateTime getVisitorTime() { return visitorTime; }
     public String getStatus() { return status; }
     public boolean isOrganizedBooking() { return organizedBooking; }
-    public int getPrice() { return price; }
+    public double getPrice() { return price; }
     public boolean isPaid() { return paid; }
     public void setPaid(boolean paid) { this.paid = paid; }
-    public void setPrice(int price) { this.price = price; }
+    public void setPrice(double price) { this.price = price; }
 }

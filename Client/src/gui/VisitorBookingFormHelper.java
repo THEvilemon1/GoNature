@@ -117,7 +117,7 @@ class VisitorBookingFormHelper {
             throw new IllegalArgumentException("Booking date and time must be in the future.");
         }
 
-        int price = calculateTotalPrice(park, visitors);
+        double price = calculateTotalPrice(park, visitors);
         String bookingId = editingBooking == null ? null : editingBooking.getBookingId();
         return new Booking(bookingId, currentUser.getTravelerId(), requireText(txtName, "Please enter your name."),
             requireText(txtEmail, "Please enter email address."),
@@ -209,17 +209,17 @@ class VisitorBookingFormHelper {
             return;
         }
 
-        int pricePerPerson = park.getPrice();
-        int totalPrice = calculateTotalPrice(park, spnVisitors.getValue());
-        lblSelectedParkPrice.setText(park.getName() + ": " + pricePerPerson + " ILS per person.");
-        lblPricePerPerson.setText("Price per person: " + pricePerPerson + " ILS");
-        lblTotalPrice.setText("Total: " + totalPrice + " ILS" + discountText());
+        double pricePerPerson = park.getPrice();
+        double totalPrice = calculateTotalPrice(park, spnVisitors.getValue());
+        lblSelectedParkPrice.setText(park.getName() + ": " + String.format("%.2f", pricePerPerson) + " ILS per person.");
+        lblPricePerPerson.setText("Price per person: " + String.format("%.2f", pricePerPerson) + " ILS");
+        lblTotalPrice.setText("Total: " + String.format("%.2f", totalPrice) + " ILS" + discountText());
     }
 
-    private int calculateTotalPrice(ParkOption park, int visitors) {
+    private double calculateTotalPrice(ParkOption park, int visitors) {
         boolean guide = currentUser != null && currentUser.isGuide();
         int billableVisitors = guide ? Math.max(0, visitors - 1) : visitors;
-        return (int) Math.round(park.getPrice() * billableVisitors * discountFactor());
+        return park.getPrice() * billableVisitors * discountFactor();
     }
 
     private double discountFactor() {

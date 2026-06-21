@@ -7,9 +7,9 @@ public class ParkOption implements Serializable {
 
     private final int id;
     private final String name;
-    private final int price;
+    private final double price;
 
-    public ParkOption(int id, String name, int price) {
+    public ParkOption(int id, String name, double price) {
         this.id = id;
         this.name = name;
         this.price = price;
@@ -23,7 +23,7 @@ public class ParkOption implements Serializable {
         return name;
     }
 
-    public int getPrice() {
+    public double getPrice() {
         return price;
     }
 

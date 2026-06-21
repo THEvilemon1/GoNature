@@ -116,7 +116,7 @@ class VisitorBookingsViewHelper {
 
         Label details = new Label(booking.getVisitorTime().format(DATE_TIME_FORMAT)
             + " | Visitors: " + booking.getNumberOfVisitors()
-            + " | Price: " + booking.getPrice() + " ILS");
+            + " | Price: " + String.format("%.2f", booking.getPrice()) + " ILS");
         details.getStyleClass().add("booking-row-details");
 
         Label description = new Label(getStatusDescription(booking.getStatus()));

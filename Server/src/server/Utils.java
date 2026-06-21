@@ -14,6 +14,10 @@ import java.time.LocalDateTime;
  * happen in one place, and every caller automatically benefits.
  */
 public final class Utils {
+    public static final double GUIDE_DISCOUNT = 0.75; // 25% off for guides
+    public static final double CLUB_MEMBER_DISCOUNT = 0.9; // 10%
+    public static final double DIGITAL_BOOKING_DISCOUNT = 0.85; // 15%
+    public static final double PREPAYMENT_DISCOUNT = 0.88; // 12% off for prepayment ONLY FOR GUIDES.
 
     private Utils() {}
 
@@ -54,7 +58,7 @@ public final class Utils {
             visitorTimestamp.toLocalDateTime(),
             rs.getString("status"),
             rs.getBoolean("organizedBooking"),
-            rs.getInt("price")
+            rs.getDouble("price")
         );
     }
 
@@ -141,6 +145,34 @@ public final class Utils {
         }
     }
 
+    // ── Traveler role checks ──────────────────────────────────────────────────
+
+    /**
+     * Returns true if the traveler is registered as a guide in the DB.
+     * Guides get a discount on bookings and are allowed to book for groups.
+     * Returns false if the traveler_id does not exist.
+     */
+    public static boolean isGuide(Connection conn, String travelerId) throws SQLException {
+        String sql = "SELECT guide FROM traveler WHERE traveler_id = ?";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setString(1, travelerId);
+        ResultSet rs = ps.executeQuery();
+        return rs.next() && rs.getBoolean("guide");
+    }
+
+    /**
+     * Returns true if the traveler holds an active club membership.
+     * Club members receive a discount calculated in calculatePrice.
+     * Returns false if the traveler_id does not exist.
+     */
+    public static boolean isClubMember(Connection conn, String travelerId) throws SQLException {
+        String sql = "SELECT clubMember FROM traveler WHERE traveler_id = ?";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setString(1, travelerId);
+        ResultSet rs = ps.executeQuery();
+        return rs.next() && rs.getBoolean("clubMember");
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     /**
@@ -156,5 +188,4 @@ public final class Utils {
             return null;
         }
     }
-
 }

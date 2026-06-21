@@ -477,11 +477,11 @@ public class VisitorHomeController implements ServerResponseListener {
     }
 
     private void offerAdvancePay(Booking booking) {
-        int discounted = (int) Math.round(booking.getPrice() * 0.88);
+        double discounted = booking.getPrice() * 0.88;
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
         alert.setTitle("Pay in Advance");
         alert.setHeaderText("Save 12% by paying in advance!");
-        alert.setContentText("Pay now: " + discounted + " ILS instead of " + booking.getPrice() + " ILS.\n\nWould you like to pay in advance?");
+        alert.setContentText("Pay now: " + String.format("%.2f", discounted) + " ILS instead of " + String.format("%.2f", booking.getPrice()) + " ILS.\n\nWould you like to pay in advance?");
         alert.showAndWait().ifPresent(result -> {
             if (result == javafx.scene.control.ButtonType.OK) {
                 booking.setPrice(discounted);

@@ -116,12 +116,12 @@
                                wrapText="true" />
                     </VBox>
 
-                    <VBox styleClass="price-summary" spacing="6" prefWidth="260">
+                    <VBox styleClass="price-summary" spacing="6" prefWidth="300" maxWidth="300">
                         <Label styleClass="price-summary-title" text="Booking Price" />
                         <Label fx:id="lblPricePerPerson" styleClass="price-summary-line"
-                               text="Price per person: --" />
+                               text="Price per person: --" wrapText="true" />
                         <Label fx:id="lblTotalPrice" styleClass="price-summary-total"
-                               text="Total: --" />
+                               text="Total: --" wrapText="true" />
                     </VBox>
                 </HBox>
 

@@ -149,7 +149,7 @@ public class EnterVisitorViewController {
                         "Booking ID: " + booking.getBookingId() + "\n" +
                         "Visitors: " + booking.getNumberOfVisitors() + "\n" +
                         "Time: " + booking.getVisitorTime() + "\n" +
-                        "Price: " + booking.getPrice() + " ILS"
+                        "Price: " + String.format("%.2f", booking.getPrice()) + " ILS"
                     );
                     showStatus("Booking found. Click Check In to proceed.", false);
                     btnCheckIn.setVisible(true);

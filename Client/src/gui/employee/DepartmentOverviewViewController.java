@@ -26,6 +26,43 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
     }
 
     @FXML
+    public void handleVisitsReport(ActionEvent event) {
+        try {
+            FXMLLoader loader = new FXMLLoader(
+                    getClass().getResource("/gui/employee/VisitorsReportView.fxml"));
+
+            Parent root = loader.load();
+
+            Stage stage = new Stage();
+            stage.setTitle("Visits Report");
+            stage.setScene(new Scene(root));
+            stage.show();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @FXML
+    public void handleCancellationsReport(ActionEvent event) {
+        try {
+            FXMLLoader loader = new FXMLLoader(
+                getClass().getResource("/gui/employee/CancellationsReportView.fxml")
+            );
+
+            Parent root = loader.load();
+
+            Stage stage = new Stage();
+            stage.setTitle("Cancellations Report");
+            stage.setScene(new Scene(root));
+            stage.show();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    
+    @FXML
     public void handleLogout(ActionEvent event) throws Exception {
         // Send logout to server
         ParkClient client = ParkClient.getInstance();

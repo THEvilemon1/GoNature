@@ -21,6 +21,9 @@ import common.VisitorLoginResult;
 import gui.ServerPortFrameController;
 import ocsf.server.AbstractServer;
 import ocsf.server.ConnectionToClient;
+import common.VisitsReportRequest;
+import common.VisitsReportResult;
+import java.util.ArrayList;
 
 public class ParkServer extends AbstractServer {
 
@@ -78,7 +81,46 @@ public class ParkServer extends AbstractServer {
             EmployeeLoginRepository.logoutEmployee((String) employeeUsername);
         }
     }
+    private ArrayList<VisitsReportResult> getVisitsReport(VisitsReportRequest req) throws SQLException {
+        ArrayList<VisitsReportResult> results = new ArrayList<>();
 
+        Connection conn = DBConnection.getStaticConnection();
+
+        String sql =
+            "SELECT " +
+            "CASE WHEN organizedBooking = 1 THEN 'Organized Group' ELSE 'Individual Visitors' END AS visitorType, " +
+            "COUNT(*) AS visitsCount, " +
+            "AVG(TIMESTAMPDIFF(MINUTE, entryTime, exitTime)) AS avgStayMinutes, " +
+            "MIN(entryTime) AS firstEntryTime, " +
+            "MAX(entryTime) AS lastEntryTime " +
+            "FROM booking " +
+            "WHERE park_id = ? " +
+            "AND status = 'CHECKED_OUT' " +
+            "AND entryTime IS NOT NULL " +
+            "AND exitTime IS NOT NULL " +
+            "AND DATE(entryTime) BETWEEN ? AND ? " +
+            "GROUP BY visitorType";
+
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setInt(1, req.getParkId());
+        ps.setDate(2, java.sql.Date.valueOf(req.getFromDate()));
+        ps.setDate(3, java.sql.Date.valueOf(req.getToDate()));
+
+        ResultSet rs = ps.executeQuery();
+
+        while (rs.next()) {
+            results.add(new VisitsReportResult(
+                rs.getString("visitorType"),
+                rs.getInt("visitsCount"),
+                rs.getDouble("avgStayMinutes"),
+                rs.getString("firstEntryTime"),
+                rs.getString("lastEntryTime")
+            ));
+        }
+
+        return results;
+    }
+    
     @Override
     protected void handleMessageFromClient(Object msg, ConnectionToClient client) {
         System.out.println("Message received from client: " + msg);
@@ -117,6 +159,12 @@ public class ParkServer extends AbstractServer {
                     Order updatedOrder = (Order) message.getData();
                     boolean updated = updateOrder(updatedOrder);
                     client.sendToClient(new Message("UPDATE_ORDER_RESULT", updated));
+                    break;
+                    
+                case "GET_VISITS_REPORT":
+                    VisitsReportRequest req = (VisitsReportRequest) message.getData();
+                    ArrayList<VisitsReportResult> visitsResult = getVisitsReport(req);
+                    client.sendToClient(new Message("VISITS_REPORT_RESULT", visitsResult));
                     break;
 
                 case "CREATE_BOOKING":
@@ -574,8 +622,8 @@ public class ParkServer extends AbstractServer {
         Connection conn = DBConnection.getStaticConnection();
 
         // Update booking status to CHECKED_IN and set visitorsInside = numberOfVisitors
-        String updateBooking = "UPDATE booking SET status = ?, visitorsInside = numberOfVisitors " +
-                               "WHERE booking_id = ? AND status = ? AND park_id = ?";
+        String updateBooking = "UPDATE booking SET status = ?, visitorsInside = numberOfVisitors, entryTime = NOW() " +
+                "WHERE booking_id = ? AND status = ? AND park_id = ?";
         PreparedStatement ps = conn.prepareStatement(updateBooking);
         ps.setString(1, Booking.STATUS_CHECKED_IN);
         ps.setString(2, booking.getBookingId());
@@ -630,11 +678,12 @@ public class ParkServer extends AbstractServer {
 
      // Update booking: reduce visitorsInside, set CHECKED_OUT if everyone left
      String newStatus = (remaining == 0) ? Booking.STATUS_CHECKED_OUT : Booking.STATUS_CHECKED_IN;
-     String updateBooking = "UPDATE booking SET visitorsInside = ?, status = ? WHERE booking_id = ?";
+     String updateBooking = "UPDATE booking SET visitorsInside = ?, status = ?, exitTime = CASE WHEN ? = 0 THEN NOW() ELSE exitTime END WHERE booking_id = ?";
      PreparedStatement updatePs = conn.prepareStatement(updateBooking);
      updatePs.setInt(1, remaining);
      updatePs.setString(2, newStatus);
-     updatePs.setString(3, request.getBookingId());
+     updatePs.setInt(3, remaining);
+     updatePs.setString(4, request.getBookingId());
      updatePs.executeUpdate();
 
      // Decrease currentVisitors in park
@@ -667,8 +716,9 @@ public class ParkServer extends AbstractServer {
 	
 	  // Create booking record with CHECKED_IN status and visitorsInside set
 	  String bookingId = UUID.randomUUID().toString();
-	  String sql = "INSERT INTO booking (booking_id, traveler_id, park_id, numberOfVisitors, visitorTime, status, organizedBooking, price, visitorsInside) " +
-	      "VALUES (?, ?, ?, ?, NOW(), ?, false, ?, ?)";
+	  String sql = "INSERT INTO booking " +
+			    "(booking_id, traveler_id, park_id, numberOfVisitors, visitorTime, status, organizedBooking, price, visitorsInside, entryTime) " +
+			    "VALUES (?, ?, ?, ?, NOW(), ?, false, ?, ?, NOW())";
 	  PreparedStatement ps = conn.prepareStatement(sql);
 	  ps.setString(1, bookingId);
 	  ps.setString(2, travelerId); // now a valid traveler_id, not the raw national ID

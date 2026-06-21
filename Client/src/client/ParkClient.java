@@ -56,6 +56,11 @@ public class ParkClient extends AbstractClient {
         if (msg instanceof Message && listener != null) {
             Message message = (Message) msg;
             switch (message.getCommand()) {
+            case "VISITS_REPORT_RESULT":
+                listener.onVisitsReportResult(
+                    (java.util.ArrayList<common.VisitsReportResult>) message.getData()
+                );
+                break;
                 case "ORDER_EXISTS_RESULT":
                     listener.onOrderExistsResult((boolean) message.getData());
                     break;

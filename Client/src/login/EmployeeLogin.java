@@ -1,5 +1,8 @@
 package login;
 
+import client.ParkClient;
+import common.Message;
+
 /**
  * EmployeeLogin (ECB - Boundary Layer)
  *
@@ -56,9 +59,13 @@ public class EmployeeLogin implements Login {
     @Override
     public void logInUser() {
         System.out.println("[EmployeeLogin] Sending employee login request for ID: " + employeeId);
-        // TODO: Build a Message object and send via client:
-        //   Message msg = new Message("EMPLOYEE_LOGIN", employeeId, password);
-        //   ParkClient.getClient().sendToServer(msg);
+
+        try {
+            Message msg = new Message("EMPLOYEE_LOGIN",new String[] { employeeId, password});
+            ParkClient.getInstance().sendToServer(msg);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     // -------------------------------------------------------------------------

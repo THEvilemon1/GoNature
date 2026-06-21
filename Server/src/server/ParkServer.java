@@ -368,6 +368,12 @@ public class ParkServer extends AbstractServer {
         conn.setAutoCommit(false);
 
         try {
+            if (Utils.hasActiveBookingAtTime(conn, booking.getTravelerId(), booking.getVisitorTime())) {
+                conn.rollback();
+                throw new IllegalArgumentException(
+                    "You already have a booking at this date and time. Please choose a different time slot.");
+            }
+
             String bookingId = String.valueOf(1000000 + new java.util.Random().nextInt(9000000));
             int capacity = Utils.getParkEffectiveCapacity(conn, booking.getParkId());
             int confirmedVisitors = getConfirmedVisitorsForSlot(conn, booking.getParkId(), booking.getVisitorTime());

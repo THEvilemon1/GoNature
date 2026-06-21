@@ -174,12 +174,20 @@ public final class BookingLifecycleService {
     private static void offerSpotToNextWaitingTraveler(Connection conn, int parkId, LocalDateTime slotTime) throws SQLException {
         int capacity = Utils.getParkEffectiveCapacity(conn, parkId);
         int occupiedVisitors = getOccupiedVisitorsForSlot(conn, parkId, slotTime);
+        int remainingCapacity = capacity - occupiedVisitors;
 
+        if (remainingCapacity <= 0) {
+            return;
+        }
+
+        // Fetch all waiting entries in registration order (no LIMIT) so we can fill
+        // multiple bookings when a large cancellation frees enough room for several groups.
+        // FOR UPDATE locks every row so concurrent transitions cannot race on the same entries.
         String sql = "SELECT wle.id, b.* FROM WaitingList wl "
             + "JOIN WaitingListEntry wle ON wle.waitingList_id = wl.waitingList_id "
             + "JOIN booking b ON b.booking_id = wle.booking_id "
             + "WHERE wl.park_id = ? AND wl.slot_time = ? AND wle.status = ? AND b.status = ? "
-            + "ORDER BY wle.registered_at ASC LIMIT 1 FOR UPDATE";
+            + "ORDER BY wle.registered_at ASC FOR UPDATE";
         PreparedStatement ps = conn.prepareStatement(sql);
         ps.setInt(1, parkId);
         ps.setTimestamp(2, Timestamp.valueOf(slotTime));
@@ -187,27 +195,31 @@ public final class BookingLifecycleService {
         ps.setString(4, Booking.STATUS_WAITING_LIST);
         ResultSet rs = ps.executeQuery();
 
-        if (!rs.next()) {
-            return;
-        }
-
-        Booking waitingBooking = Utils.mapBooking(rs);
-        String waitingEntryId = rs.getString("id");
-        if (occupiedVisitors + waitingBooking.getNumberOfVisitors() > capacity) {
-            return;
-        }
-
         LocalDateTime now = LocalDateTime.now();
-        // LocalDateTime deadline = now.plusHours(WAITLIST_CONFIRMATION_WINDOW_HOURS);
-        LocalDateTime deadline = now.plusSeconds(10); // For testing purposes, set to 10 seconds instead of 1 hour
-        updateBookingStatus(conn,
-            waitingBooking.getBookingId(),
-            Booking.STATUS_PENDING_WAITLIST_CONFIRMATION,
-            now,
-            deadline,
-            "WAITLIST_SPOT_OFFERED");
-        Utils.updateWaitingListEntryById(conn,waitingEntryId, "OFFERED");
-        NotificationService.sendWaitlistPromotionOffer(conn, waitingBooking.getBookingId(), deadline);
+
+        while (rs.next() && remainingCapacity > 0) {
+            Booking waitingBooking = Utils.mapBooking(rs);
+            String waitingEntryId = rs.getString("id");
+
+            // Skip this group if it's too large for what's left — a smaller group
+            // later in the queue might still fit (e.g. freed 3 spots, queue: [4, 1, 2]).
+            if (waitingBooking.getNumberOfVisitors() > remainingCapacity) {
+                continue;
+            }
+
+            // LocalDateTime deadline = now.plusHours(WAITLIST_CONFIRMATION_WINDOW_HOURS);
+            LocalDateTime deadline = now.plusSeconds(10); // For testing purposes, set to 10 seconds instead of 1 hour
+            updateBookingStatus(conn,
+                waitingBooking.getBookingId(),
+                Booking.STATUS_PENDING_WAITLIST_CONFIRMATION,
+                now,
+                deadline,
+                "WAITLIST_SPOT_OFFERED");
+            Utils.updateWaitingListEntryById(conn, waitingEntryId, "OFFERED");
+            NotificationService.sendWaitlistPromotionOffer(conn, waitingBooking.getBookingId(), deadline);
+
+            remainingCapacity -= waitingBooking.getNumberOfVisitors();
+        }
     }
 
     private static void systemCancelBooking(Connection conn, Booking booking, String reason, boolean offerNextSpot) throws SQLException {

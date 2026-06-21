@@ -62,6 +62,28 @@ public final class Utils {
         );
     }
 
+    /**
+     * Returns true if the traveler already has an active booking at the given
+     * time slot. "Active" means any status other than CANCELLED, CHECKED_OUT,
+     * or SYSTEM_CANCEL — a person cannot physically be in two places at once.
+     *
+     * Call this inside an open transaction before inserting a new booking so
+     * the check and the insert are atomic and no concurrent request slips through.
+     */
+    public static boolean hasActiveBookingAtTime(Connection conn, String travelerId,
+            LocalDateTime visitorTime) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM booking WHERE traveler_id = ? AND visitorTime = ? "
+            + "AND status NOT IN (?, ?, ?)";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setString(1, travelerId);
+        ps.setTimestamp(2, Timestamp.valueOf(visitorTime));
+        ps.setString(3, Booking.STATUS_CANCELLED);
+        ps.setString(4, Booking.STATUS_CHECKED_OUT);
+        ps.setString(5, Booking.STATUS_SYSTEM_CANCEL);
+        ResultSet rs = ps.executeQuery();
+        return rs.next() && rs.getInt(1) > 0;
+    }
+
     // ── Park ─────────────────────────────────────────────────────────────────
 
     /**

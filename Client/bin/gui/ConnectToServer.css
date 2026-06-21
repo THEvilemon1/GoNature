@@ -1,0 +1,75 @@
+.root-pane {
+    -fx-background-color: linear-gradient(to bottom right, #1a2e1a, #2d4a2d);
+    -fx-padding: 32;
+}
+
+.connect-card {
+    -fx-background-color: #f8f6f0;
+    -fx-background-radius: 16;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.45), 24, 0, 0, 6);
+    -fx-padding: 42 52 42 52;
+}
+
+.screen-title {
+    -fx-font-size: 28px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #2e7d32;
+}
+
+.screen-subtitle,
+.status-label {
+    -fx-font-size: 13px;
+    -fx-text-fill: #6b7280;
+}
+
+.field-label {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #374151;
+}
+
+.field-input {
+    -fx-pref-height: 42;
+    -fx-font-size: 14px;
+    -fx-background-color: white;
+    -fx-background-radius: 8;
+    -fx-border-color: #d1d5db;
+    -fx-border-radius: 8;
+    -fx-border-width: 1.5;
+    -fx-padding: 0 12 0 12;
+}
+
+.field-input:focused {
+    -fx-border-color: #2e7d32;
+}
+
+.btn-primary,
+.btn-secondary {
+    -fx-pref-height: 38;
+    -fx-min-width: 110;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-cursor: hand;
+}
+
+.btn-primary {
+    -fx-background-color: #2e7d32;
+    -fx-text-fill: white;
+}
+
+.btn-primary:hover {
+    -fx-background-color: #1b5e20;
+}
+
+.btn-secondary {
+    -fx-background-color: white;
+    -fx-text-fill: #2e7d32;
+    -fx-border-color: #2e7d32;
+    -fx-border-width: 1.5;
+}
+
+.btn-secondary:hover {
+    -fx-background-color: #f0f9f0;
+}

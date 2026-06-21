@@ -281,6 +281,9 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
 
             Parent root = loader.load();
 
+            VisitorsReportViewController controller = loader.getController();
+            controller.setEmployee(employee);
+
             Stage stage = new Stage();
             stage.setTitle("Visits Report");
             stage.setScene(new Scene(root));

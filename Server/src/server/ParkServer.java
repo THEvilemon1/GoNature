@@ -5,9 +5,7 @@ import java.sql.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -17,6 +15,7 @@ import common.Employee;
 import common.Message;
 import common.Order;
 import common.TravelerProfile;
+import common.ParkOption;
 import common.WalkInRequest;
 import common.ExitRequest;
 import common.VisitorLoginResult;
@@ -144,8 +143,8 @@ public class ParkServer extends AbstractServer {
                     client.sendToClient(new Message("TRAVELER_BOOKINGS_RESULT", getTravelerBookings(travelerId)));
                     break;
 
-                case "GET_PARK_PRICES":
-                    client.sendToClient(new Message("PARK_PRICES_RESULT", getParkPrices()));
+                case "GET_PARKS":
+                    client.sendToClient(new Message("PARKS_RESULT", getParkOptions()));
                     break;
 
                 case "GET_TRAVELER_PROFILE":
@@ -172,6 +171,12 @@ public class ParkServer extends AbstractServer {
                     String[] confirmationData = (String[]) message.getData();
                     boolean confirmed = BookingLifecycleService.confirmBooking(confirmationData[0], confirmationData[1]);
                     client.sendToClient(new Message("CONFIRM_BOOKING_RESULT", confirmed));
+                    break;
+
+                case "PAY_IN_ADVANCE":
+                    Booking payBooking = (Booking) message.getData();
+                    boolean payResult = payInAdvance(payBooking);
+                    client.sendToClient(new Message("PAY_IN_ADVANCE_RESULT", payResult));
                     break;
 
                 case "TRAVELER_LOGIN":
@@ -505,8 +510,16 @@ public class ParkServer extends AbstractServer {
         return bookings;
     }
 
+    private boolean payInAdvance(Booking booking) throws SQLException {
+        Connection conn = DBConnection.getStaticConnection();
+        String sql = "UPDATE booking SET paid = 1, price = ? WHERE booking_id = ?";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setInt(1, booking.getPrice());
+        ps.setString(2, booking.getBookingId());
+        return ps.executeUpdate() > 0;
+    }
+
     private boolean updateBooking(Booking booking) throws SQLException {
-        validateBooking(booking);
 
         Connection conn = DBConnection.getStaticConnection();
         int price = calculatePrice(conn, booking.getParkId(), booking.getNumberOfVisitors());
@@ -633,18 +646,18 @@ public class ParkServer extends AbstractServer {
         return rs.getInt("pricePerPerson") * numberOfVisitors;
     }
 
-    private Map<Integer, Integer> getParkPrices() throws SQLException {
-        Map<Integer, Integer> prices = new HashMap<>();
+    private ArrayList<ParkOption> getParkOptions() throws SQLException {
+        ArrayList<ParkOption> parks = new ArrayList<>();
         Connection conn = DBConnection.getStaticConnection();
-        String sql = "SELECT park_id, pricePerPerson FROM park ORDER BY park_id";
+        String sql = "SELECT park_id, name, pricePerPerson FROM park ORDER BY park_id";
         PreparedStatement ps = conn.prepareStatement(sql);
         ResultSet rs = ps.executeQuery();
 
         while (rs.next()) {
-            prices.put(rs.getInt("park_id"), rs.getInt("pricePerPerson"));
+            parks.add(new ParkOption(rs.getInt("park_id"), rs.getString("name"), rs.getInt("pricePerPerson")));
         }
 
-        return prices;
+        return parks;
     }
 
     private Booking mapBooking(ResultSet rs) throws SQLException {

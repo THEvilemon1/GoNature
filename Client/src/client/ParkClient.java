@@ -2,12 +2,12 @@ package client;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Map;
 
 import common.Booking;
 import common.Employee;
 import common.Message;
 import common.Order;
+import common.ParkOption;
 import common.VisitorLoginResult;
 import javafx.application.Platform;
 import javafx.scene.control.Alert;
@@ -71,8 +71,8 @@ public class ParkClient extends AbstractClient {
                 case "TRAVELER_BOOKINGS_RESULT":
                     listener.onTravelerBookingsResult((ArrayList<Booking>) message.getData());
                     break;
-                case "PARK_PRICES_RESULT":
-                    listener.onParkPricesResult((Map<Integer, Integer>) message.getData());
+                case "PARKS_RESULT":
+                    listener.onParksResult((ArrayList<ParkOption>) message.getData());
                     break;
                 case "TRAVELER_PROFILE_RESULT":
                     listener.onTravelerProfileResult((common.TravelerProfile) message.getData());

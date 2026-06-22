@@ -29,12 +29,10 @@ public class EmployeeLoginRepository {
         }
 
         Connection conn = DBConnection.getStaticConnection();
-        String sql = "SELECT e.employee_id, e.salary, e.park_id, e.username, e.role, e.user_id, " +
-                     "u.firstName, u.lastName, u.email, u.phoneNumber " +
-                     "FROM employee e " +
-                     "JOIN user u ON e.user_id = u.user_id " +
-                     "WHERE e.username = ? AND e.password = ?";
-
+String sql = "SELECT e.employee_id, e.salary, e.park_id, u.username, e.role, e.user_id, " +
+             "u.firstName, u.lastName, u.email, u.phoneNumber " +
+             "FROM employee e, user u " +
+             "WHERE e.user_id = u.user_id AND u.username = ? AND u.password = ?";
         PreparedStatement ps = conn.prepareStatement(sql);
         ps.setString(1, username);
         ps.setString(2, password);
@@ -47,7 +45,7 @@ public class EmployeeLoginRepository {
                 rs.getInt("park_id"),
                 rs.getString("username"),
                 rs.getString("role"),
-                rs.getInt("user_id"),
+                rs.getString("user_id"),
                 rs.getString("firstName"),
                 rs.getString("lastName"),
                 rs.getString("email"),

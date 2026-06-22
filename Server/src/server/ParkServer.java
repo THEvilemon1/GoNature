@@ -32,6 +32,9 @@ import common.Promotion;
 import common.PromotionRequest;
 import common.VisitsReportRequest;
 import common.VisitsReportResult;
+import common.ParkVisitorsCount;
+import common.CancellationsReportRequest;
+import common.CancellationsReportResult;
 import gui.ServerPortFrameController;
 import ocsf.server.AbstractServer;
 import ocsf.server.ConnectionToClient;
@@ -168,18 +171,16 @@ public class ParkServer extends AbstractServer {
 
         String sql =
             "SELECT " +
-            "CASE WHEN organizedBooking = 1 THEN 'Organized Group' ELSE 'Individual Visitors' END AS visitorType, " +
-            "COUNT(*) AS visitsCount, " +
-            "AVG(TIMESTAMPDIFF(MINUTE, entryTime, exitTime)) AS avgStayMinutes, " +
-            "MIN(entryTime) AS firstEntryTime, " +
-            "MAX(entryTime) AS lastEntryTime " +
+            "CASE WHEN organizedBooking = 1 THEN 'Organized Group' ELSE 'Individual' END AS visitorType, " +
+            "DATE_FORMAT(entryTime, '%Y-%m-%d %H:%i') AS entryTime, " +
+            "CASE WHEN exitTime IS NOT NULL " +
+            "     THEN TIMESTAMPDIFF(MINUTE, entryTime, exitTime) " +
+            "     ELSE NULL END AS stayMinutes " +
             "FROM booking " +
             "WHERE park_id = ? " +
-            "AND status = 'CHECKED_OUT' " +
             "AND entryTime IS NOT NULL " +
-            "AND exitTime IS NOT NULL " +
             "AND DATE(entryTime) BETWEEN ? AND ? " +
-            "GROUP BY visitorType";
+            "ORDER BY organizedBooking, entryTime";
 
         PreparedStatement ps = conn.prepareStatement(sql);
         ps.setInt(1, req.getParkId());
@@ -189,12 +190,79 @@ public class ParkServer extends AbstractServer {
         ResultSet rs = ps.executeQuery();
 
         while (rs.next()) {
+            int stayRaw = rs.getInt("stayMinutes");
+            Integer stayMinutes = rs.wasNull() ? null : stayRaw;
             results.add(new VisitsReportResult(
                 rs.getString("visitorType"),
-                rs.getInt("visitsCount"),
-                rs.getDouble("avgStayMinutes"),
-                rs.getString("firstEntryTime"),
-                rs.getString("lastEntryTime")
+                rs.getString("entryTime"),
+                stayMinutes
+            ));
+        }
+
+        return results;
+    }
+
+    /**
+     * Reads the live visitor count and capacity of every park.
+     * Used by the department manager overview screen so the manager can see,
+     * at a glance, how busy each park in the region is right now.
+     */
+    private ArrayList<ParkVisitorsCount> getAllParksVisitors(int managerEmployeeId) throws SQLException {
+        ArrayList<ParkVisitorsCount> list = new ArrayList<>();
+
+        Connection conn = DBConnection.getStaticConnection();
+        String sql = "SELECT park_id, name, currentVisitors, maxCapacity FROM park WHERE department_manager_id = ? ORDER BY park_id";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setInt(1, managerEmployeeId);
+        ResultSet rs = ps.executeQuery();
+
+        while (rs.next()) {
+            list.add(new ParkVisitorsCount(
+                rs.getInt("park_id"),
+                rs.getString("name"),
+                rs.getInt("currentVisitors"),
+                rs.getInt("maxCapacity")
+            ));
+        }
+
+        return list;
+    }
+
+    /**
+     * Builds the cancellations report for every park in the given date range.
+     * For each park it counts:
+     *   - CANCELLED bookings (the traveler cancelled),
+     *   - SYSTEM_CANCEL bookings (expired without the traveler confirming),
+     *   - the total number of bookings (to work out the cancellation rate).
+     * A LEFT JOIN is used so parks with no bookings still appear with zeros.
+     */
+    private ArrayList<CancellationsReportResult> getCancellationsReport(CancellationsReportRequest req) throws SQLException {
+        ArrayList<CancellationsReportResult> results = new ArrayList<>();
+
+        Connection conn = DBConnection.getStaticConnection();
+        String sql =
+            "SELECT p.name AS parkName, " +
+            "SUM(CASE WHEN b.status = 'CANCELLED' THEN 1 ELSE 0 END) AS cancelledCount, " +
+            "SUM(CASE WHEN b.status = 'SYSTEM_CANCEL' THEN 1 ELSE 0 END) AS expiredCount, " +
+            "COUNT(b.booking_id) AS totalBookings " +
+            "FROM park p " +
+            "LEFT JOIN booking b ON b.park_id = p.park_id " +
+            "AND DATE(b.visitorTime) BETWEEN ? AND ? " +
+            "GROUP BY p.park_id, p.name " +
+            "ORDER BY p.park_id";
+
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setDate(1, java.sql.Date.valueOf(req.getFromDate()));
+        ps.setDate(2, java.sql.Date.valueOf(req.getToDate()));
+
+        ResultSet rs = ps.executeQuery();
+
+        while (rs.next()) {
+            results.add(new CancellationsReportResult(
+                rs.getString("parkName"),
+                rs.getInt("cancelledCount"),
+                rs.getInt("expiredCount"),
+                rs.getInt("totalBookings")
             ));
         }
 
@@ -387,6 +455,13 @@ public class ParkServer extends AbstractServer {
                      client.sendToClient(new Message("PARK_VISITORS_RESULT", currentVisitors));
                      break;
 
+                 // Department manager: live visitor counts for every park in the region.
+                 case "GET_ALL_PARKS_VISITORS":
+                    int managerEmployeeId = (int) message.getData();
+                     ArrayList<ParkVisitorsCount> allParksVisitors = getAllParksVisitors(managerEmployeeId);
+                     client.sendToClient(new Message("ALL_PARKS_VISITORS_RESULT", allParksVisitors));
+                     break;
+
                  case "GET_EFFECTIVE_AVAILABLE_SPOTS":
                      int parkIdForSpots = (int) message.getData();
                      int effectiveSpots = getEffectiveAvailableSpots(parkIdForSpots);
@@ -478,6 +553,13 @@ public class ParkServer extends AbstractServer {
                      VisitsReportRequest visitsReq = (VisitsReportRequest) message.getData();
                      ArrayList<VisitsReportResult> visitsResult = getVisitsReport(visitsReq);
                      client.sendToClient(new Message("VISITS_REPORT_RESULT", visitsResult));
+                     break;
+
+                 // Department manager: cancelled vs expired orders for every park.
+                 case "GET_CANCELLATIONS_REPORT":
+                     CancellationsReportRequest cancelReq = (CancellationsReportRequest) message.getData();
+                     ArrayList<CancellationsReportResult> cancelResult = getCancellationsReport(cancelReq);
+                     client.sendToClient(new Message("CANCELLATIONS_REPORT_RESULT", cancelResult));
                      break;
 
                  case "PROMOTION_REQUEST":
@@ -971,7 +1053,7 @@ public class ParkServer extends AbstractServer {
             throw new IllegalArgumentException("Selected park does not exist in the database.");
         }
 
-        double parkPrice = rs.getInt("pricePerPerson");
+        double parkPrice = rs.getDouble("pricePerPerson");
         boolean guide = Utils.isGuide(conn, travelerId);
         if (digitalBooking){
             parkPrice = (double) (parkPrice * Utils.DIGITAL_BOOKING_DISCOUNT); // Apply 15% discount for digital bookings
@@ -999,21 +1081,21 @@ public class ParkServer extends AbstractServer {
         ResultSet rs = ps.executeQuery();
 
         while (rs.next()) {
-            parks.add(new ParkOption(rs.getInt("park_id"), rs.getString("name"), rs.getInt("pricePerPerson")));
+            parks.add(new ParkOption(rs.getInt("park_id"), rs.getString("name"), rs.getDouble("pricePerPerson")));
         }
 
         return parks;
     }
 
-    private Map<Integer, Integer> getParkPrices() throws SQLException {
-        Map<Integer, Integer> prices = new HashMap<>();
+    private Map<Integer, Double> getParkPrices() throws SQLException {
+        Map<Integer, Double> prices = new HashMap<>();
         Connection conn = DBConnection.getStaticConnection();
         String sql = "SELECT park_id, pricePerPerson FROM park ORDER BY park_id";
         PreparedStatement ps = conn.prepareStatement(sql);
         ResultSet rs = ps.executeQuery();
 
         while (rs.next()) {
-            prices.put(rs.getInt("park_id"), rs.getInt("pricePerPerson"));
+            prices.put(rs.getInt("park_id"), rs.getDouble("pricePerPerson"));
         }
 
         return prices;
@@ -1353,7 +1435,9 @@ public class ParkServer extends AbstractServer {
     }
 
     private String getUsernameForEmployeeId(Connection conn, int employeeId) throws SQLException {
-        String sql = "SELECT username FROM employee WHERE employee_id = ?";
+        String sql = "SELECT u.username FROM employee e " +
+                     "JOIN `user` u ON e.user_id = u.user_id " +
+                     "WHERE e.employee_id = ?";
         PreparedStatement ps = conn.prepareStatement(sql);
         ps.setInt(1, employeeId);
         ResultSet rs = ps.executeQuery();
@@ -1433,8 +1517,9 @@ public class ParkServer extends AbstractServer {
             }
         }
 
-        String getRequesterSql = "SELECT e.username FROM managerRequests r " +
+        String getRequesterSql = "SELECT u.username FROM managerRequests r " +
                                   "JOIN employee e ON r.employee_id = e.employee_id " +
+                                  "JOIN `user` u ON e.user_id = u.user_id " +
                                   "WHERE r.request_Id = ?";
         PreparedStatement getRequesterPs = conn.prepareStatement(getRequesterSql);
         getRequesterPs.setString(1, requestId);
@@ -1592,8 +1677,9 @@ public class ParkServer extends AbstractServer {
             }
         }
 
-        String getRequesterSql = "SELECT e.username FROM promotion_request r " +
+        String getRequesterSql = "SELECT u.username FROM promotion_request r " +
                                   "JOIN employee e ON r.employee_id = e.employee_id " +
+                                  "JOIN `user` u ON e.user_id = u.user_id " +
                                   "WHERE r.request_id = ?";
         PreparedStatement getRequesterPs = conn.prepareStatement(getRequesterSql);
         getRequesterPs.setString(1, requestId);

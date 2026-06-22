@@ -20,6 +20,24 @@
 
         <VBox styleClass="content-area" spacing="18" VBox.vgrow="ALWAYS">
 
+            <HBox alignment="CENTER_LEFT" spacing="12">
+                <Label styleClass="field-label" text="LIVE VISITORS IN ALL PARKS" />
+                <HBox HBox.hgrow="ALWAYS" />
+                <Button text="Refresh" onAction="#handleRefreshVisitors" prefWidth="110" />
+            </HBox>
+
+            <TableView fx:id="tblVisitors" styleClass="list-view" prefHeight="180">
+                <columns>
+                    <TableColumn fx:id="colVisitorsParkId" text="Park ID" prefWidth="90" />
+                    <TableColumn fx:id="colVisitorsParkName" text="Park" prefWidth="260" />
+                    <TableColumn fx:id="colVisitorsCurrent" text="Visitors Inside" prefWidth="160" />
+                    <TableColumn fx:id="colVisitorsCapacity" text="Max Capacity" prefWidth="160" />
+                    <TableColumn fx:id="colVisitorsFree" text="Free Spots" prefWidth="160" />
+                </columns>
+            </TableView>
+
+            <Separator styleClass="card-sep" />
+
             <Label styleClass="field-label" text="SUBMITTED PARK REPORTS" />
 
             <TableView fx:id="tblReports" styleClass="list-view" prefHeight="220">

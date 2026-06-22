@@ -469,6 +469,13 @@ public class ParkServer extends AbstractServer {
                 	                    usageRequest.getParkId(),
                 	                    usageRequest.getFromDate(),
                 	                    usageRequest.getToDate());
+                	    saveParkUsageReport(
+                	            usageRequest.getParkId(),
+                	            usageRequest.getEmployeeId(),
+                	            usageRequest.getFromDate(),
+                	            usageRequest.getToDate(),
+                	            usageResults
+                	    );
 
                 	    client.sendToClient(
                 	            new Message("PARK_USAGE_REPORT_RESULT", usageResults));
@@ -539,6 +546,35 @@ public class ParkServer extends AbstractServer {
             ps.setInt(1, parkId);
             ps.setString(2, reportTitle);
             ps.setString(3, content);
+            ps.setInt(4, employeeId);
+
+            ps.executeUpdate();
+    }
+
+    private void saveParkUsageReport(int parkId, int employeeId,
+            java.time.LocalDate fromDate,
+            java.time.LocalDate toDate,
+            ArrayList<ParkUsageReportResult> results) throws SQLException {
+
+            Connection conn = DBConnection.getStaticConnection();
+
+            String reportTitle = "Park Usage Report - " + fromDate.getMonth() + " " + fromDate.getYear();
+
+            StringBuilder content = new StringBuilder();
+            content.append("Usage Report\n\n");
+            content.append("Period: ").append(fromDate).append(" to ").append(toDate).append("\n\n");
+            for (ParkUsageReportResult r : results) {
+                content.append(r.getDate()).append(": ")
+                       .append(r.getVisitorsCount()).append("/").append(r.getMaxCapacity())
+                       .append(" (").append(String.format("%.1f", r.getUsagePercent())).append("%)\n");
+            }
+
+            String sql = "INSERT INTO report (park_id, reportTitle, content, employee_id) " + "VALUES (?, ?, ?, ?)";
+
+            PreparedStatement ps = conn.prepareStatement(sql);
+            ps.setInt(1, parkId);
+            ps.setString(2, reportTitle);
+            ps.setString(3, content.toString());
             ps.setInt(4, employeeId);
 
             ps.executeUpdate();
@@ -1421,7 +1457,6 @@ public class ParkServer extends AbstractServer {
                     case "MAX_CAPACITY":      column = "maxCapacity";    break;
                     case "GAP":               column = "gap";            break;
                     case "DEFAULT_STAY_TIME": column = "defaultStayTime"; break;
-                    case "PRICE_PER_PERSON":  column = "pricePerPerson"; break;
                     default: throw new IllegalArgumentException("Unknown parameter: " + paramType);
                 }
 

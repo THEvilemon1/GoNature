@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.geometry.Insets?>
 <?import javafx.scene.chart.*?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
@@ -11,51 +10,35 @@
            styleClass="root-pane"
            stylesheets="@EmployeeScreens.css">
 
-    <VBox styleClass="screen-card"
-          spacing="18"
-          prefWidth="900"
-          maxWidth="950"
-          alignment="TOP_CENTER">
+    <VBox styleClass="screen-card" prefWidth="900" maxWidth="980" alignment="TOP_CENTER">
 
-        <BorderPane prefWidth="850">
-            <center>
-                <Label styleClass="screen-title"
-                       text="Park Visitors Report" />
-            </center>
-
-            <right>
-                <Button styleClass="btn-secondary"
-                        text="✕ Close"
-                        onAction="#handleClose" />
-            </right>
-        </BorderPane>
-
-        <HBox spacing="12" alignment="CENTER">
-            <Label styleClass="field-label" text="Month:" />
-            <ComboBox fx:id="monthComboBox"
-                      promptText="Select Month"
-                      prefWidth="160" />
-
-            <Label styleClass="field-label" text="Year:" />
-            <ComboBox fx:id="yearComboBox"
-                      promptText="Select Year"
-                      prefWidth="120" />
-
-            <Button styleClass="btn-primary"
-                    text="Generate Report"
-                    onAction="#handleGenerateReport" />
+        <!-- Top bar -->
+        <HBox styleClass="top-bar" alignment="CENTER_LEFT" spacing="0">
+            <Label styleClass="screen-title" text="Park Visitors Report" />
+            <Region HBox.hgrow="ALWAYS" minWidth="20" />
+            <Button styleClass="btn-secondary" text="✕ Close" onAction="#handleClose" />
         </HBox>
 
-        <TextArea fx:id="reportArea"
-                  prefHeight="190"
-                  prefWidth="760"
-                  editable="false"
-                  wrapText="true" />
+        <!-- Content -->
+        <VBox styleClass="content-area" spacing="18">
 
-        <PieChart fx:id="visitorsPieChart"
-                  prefHeight="340"
-                  prefWidth="760"
-                  title="Visitors by Type" />
+            <!-- Filters -->
+            <HBox spacing="12" alignment="CENTER_LEFT">
+                <Label styleClass="field-label" text="Month:" />
+                <ComboBox fx:id="monthComboBox" promptText="Select Month" prefWidth="160" />
+                <Label styleClass="field-label" text="Year:" />
+                <ComboBox fx:id="yearComboBox" promptText="Select Year" prefWidth="120" />
+                <Region HBox.hgrow="ALWAYS" />
+                <Button styleClass="btn-primary" text="Generate Report"
+                        onAction="#handleGenerateReport" prefWidth="170" />
+            </HBox>
 
+            <Separator styleClass="card-sep" />
+
+            <TextArea fx:id="reportArea" prefHeight="180" editable="false" wrapText="true" />
+
+            <PieChart fx:id="visitorsPieChart" prefHeight="320" title="Visitors by Type" />
+
+        </VBox>
     </VBox>
 </StackPane>

@@ -176,6 +176,9 @@ public class ParkClient extends AbstractClient {
                 case "PARK_VISITORS_REPORT_RESULT":
                     listener.onParkVisitorsReportResult((ParkVisitorsReportResult) message.getData());
                     break;
+                case "PARK_USAGE_REPORT_RESULT":
+                    listener.onParkUsageReportResult((ArrayList<common.ParkUsageReportResult>) message.getData());
+                    break;
                 case "SUBMITTED_REPORTS_RESULT":
                     listener.onSubmittedReportsResult((ArrayList<ParkSubmittedReport>) message.getData());
                     break;

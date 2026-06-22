@@ -60,16 +60,6 @@
                         onAction="#handleUpdateStayTime" prefWidth="130"
                         GridPane.columnIndex="2" GridPane.rowIndex="2" />
 
-                <!-- Price Per Person -->
-                <Label styleClass="field-label" text="New Price Per Person (₪):"
-                       GridPane.columnIndex="0" GridPane.rowIndex="3" />
-                <TextField fx:id="txtNewPrice" styleClass="field-input"
-                           promptText="e.g. 50" prefWidth="180"
-                           GridPane.columnIndex="1" GridPane.rowIndex="3" />
-                <Button styleClass="btn-primary" text="Send Request"
-                        onAction="#handleUpdatePrice" prefWidth="130"
-                        GridPane.columnIndex="2" GridPane.rowIndex="3" />
-
             </GridPane>
 
             <!-- Status message -->

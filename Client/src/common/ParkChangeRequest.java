@@ -5,7 +5,9 @@ import java.io.Serializable;
 public class ParkChangeRequest implements Serializable {
     private static final long serialVersionUID = 1L;
 
-    public enum ParameterType { MAX_CAPACITY, GAP, DEFAULT_STAY_TIME, PRICE_PER_PERSON }
+    // Per spec, the park manager controls exactly three parameters; the full
+    // entry price is set by the Ministry of Tourism, not the park manager.
+    public enum ParameterType { MAX_CAPACITY, GAP, DEFAULT_STAY_TIME }
 
     private int parkId;
     private ParameterType parameterType;

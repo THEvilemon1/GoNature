@@ -206,6 +206,7 @@ public class TravelerRegistrationViewController implements EmployeeAwareControll
     }
     
     
+    
  // National ID: exactly 9 digits
     private boolean isValidNationalId(String id) {
         return id.matches("\\d{9}");

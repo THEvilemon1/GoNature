@@ -32,6 +32,7 @@ public interface ServerResponseListener {
     default void onUpdateBookingResult(boolean success) {}
     default void onCancelBookingResult(boolean success) {}
     default void onParkVisitorsReportResult(ParkVisitorsReportResult result) {}
+    default void onParkUsageReportResult(java.util.ArrayList<common.ParkUsageReportResult> results) {}
     default void onConfirmBookingResult(boolean success) {}
 
     // Employee login

@@ -28,7 +28,6 @@ public class ParkControlViewController implements EmployeeAwareController {
     @FXML private TextField txtNewMaxCapacity;
     @FXML private TextField txtNewGap;
     @FXML private TextField txtNewStayTime;
-    @FXML private TextField txtNewPrice;
 
     private Employee employee;
     private Map<String, String> requestIdToLogText = new HashMap<>();
@@ -132,6 +131,8 @@ public class ParkControlViewController implements EmployeeAwareController {
             Stage stage = new Stage();
             stage.setTitle("Park Visitors Report");
             stage.setScene(new Scene(root));
+            // Report screens hijack the shared single listener; restore ours on close.
+            stage.setOnHidden(e -> registerListener());
             WindowUtil.showMaximized(stage);
 
         } catch (Exception e) {
@@ -145,10 +146,14 @@ public class ParkControlViewController implements EmployeeAwareController {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/gui/employee/ParkUsageReportView.fxml"));
             Parent root = loader.load();
+            ParkUsageReportViewController controller = loader.getController();
+            controller.setEmployee(employee);
 
             Stage stage = new Stage();
             stage.setTitle("Park Usage Report");
             stage.setScene(new Scene(root));
+            // Report screens hijack the shared single listener; restore ours on close.
+            stage.setOnHidden(e -> registerListener());
             WindowUtil.showMaximized(stage);
 
         } catch (Exception e) {
@@ -174,12 +179,6 @@ public class ParkControlViewController implements EmployeeAwareController {
     public void handleUpdateStayTime(ActionEvent event) {
         sendRequest(txtNewStayTime, ParkChangeRequest.ParameterType.DEFAULT_STAY_TIME,
                 "Default Stay Time", 1, 24);
-    }
-
-    @FXML
-    public void handleUpdatePrice(ActionEvent event) {
-        sendRequest(txtNewPrice, ParkChangeRequest.ParameterType.PRICE_PER_PERSON,
-                "Price Per Person", 1, 10000);
     }
 
     private void sendRequest(TextField field, ParkChangeRequest.ParameterType type,

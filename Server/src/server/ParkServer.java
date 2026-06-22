@@ -228,6 +228,32 @@ public class ParkServer extends AbstractServer {
         return list;
     }
 
+    private void pushVisitorCountsToDepartmentManager(int parkId) {
+        try {
+            Connection conn = DBConnection.getStaticConnection();
+            String sql = "SELECT department_manager_id FROM park WHERE park_id = ?";
+            PreparedStatement ps = conn.prepareStatement(sql);
+            ps.setInt(1, parkId);
+            ResultSet rs = ps.executeQuery();
+            if (!rs.next()) return;
+            int managerId = rs.getInt("department_manager_id");
+            if (rs.wasNull() || managerId == 0) return;
+
+            ArrayList<ParkVisitorsCount> counts = getAllParksVisitors(managerId);
+            for (Thread t : getClientConnections()) {
+                if (!(t instanceof ConnectionToClient)) continue;
+                ConnectionToClient c = (ConnectionToClient) t;
+                Object storedId = c.getInfo("EMPLOYEE_ID");
+                if (storedId != null && (int) storedId == managerId) {
+                    c.sendToClient(new Message("ALL_PARKS_VISITORS_RESULT", counts));
+                    break;
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("[PUSH] Failed to push visitor counts to department manager: " + e.getMessage());
+        }
+    }
+
     /**
      * Builds the cancellations report for every park in the given date range.
      * For each park it counts:
@@ -439,6 +465,7 @@ public class ParkServer extends AbstractServer {
                         client.setInfo("EMPLOYEE_USERNAME", employee.getUsername());
                         client.setInfo("EMPLOYEE_PARK_ID", employee.getParkId());
                         client.setInfo("EMPLOYEE_ROLE", employee.getRole());
+                        client.setInfo("EMPLOYEE_ID", employee.getEmployeeId());
                         client.sendToClient(new Message("EMPLOYEE_LOGIN_SUCCESS", loginResult1));
                     }
                     break;
@@ -482,18 +509,21 @@ public class ParkServer extends AbstractServer {
                      }
                      boolean checkInSuccess = checkInVisitor(bookingToCheckIn, employeeParkId);
                      client.sendToClient(new Message("CHECK_IN_RESULT", checkInSuccess));
+                     if (checkInSuccess) pushVisitorCountsToDepartmentManager(bookingToCheckIn.getParkId());
                      break;
 
                  case "CHECK_OUT_VISITOR":
                      ExitRequest exitRequest = (ExitRequest) message.getData();
                      boolean checkOutSuccess = checkOutVisitor(exitRequest);
                      client.sendToClient(new Message("CHECK_OUT_RESULT", checkOutSuccess));
+                     if (checkOutSuccess) pushVisitorCountsToDepartmentManager(exitRequest.getParkId());
                      break;
 
                  case "WALK_IN_VISITOR":
                      WalkInRequest walkInRequest = (WalkInRequest) message.getData();
                      Booking walkInBooking = processWalkIn(walkInRequest);
                      client.sendToClient(new Message("WALK_IN_RESULT", walkInBooking));
+                     pushVisitorCountsToDepartmentManager(walkInRequest.getParkId());
                      break;
 
                  case "PARK_CHANGE_REQUEST":

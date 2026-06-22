@@ -97,14 +97,6 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
         }
     }
 
-    @FXML   
-    public void handleRefreshVisitors(ActionEvent event) {
-        // Re-register our listener in case a report window took it over,
-        // then ask the server for fresh numbers.
-        listenForRequests();
-        requestAllParksVisitors();
-    }
-
     private void requestSubmittedReports() {
         ParkClient client = ParkClient.getInstance();
         if (client == null || !client.isConnected()) return;

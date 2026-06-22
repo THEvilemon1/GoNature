@@ -20,11 +20,7 @@
 
         <VBox styleClass="content-area" spacing="18" VBox.vgrow="ALWAYS">
 
-            <HBox alignment="CENTER_LEFT" spacing="12">
-                <Label styleClass="field-label" text="LIVE VISITORS IN ALL PARKS" />
-                <HBox HBox.hgrow="ALWAYS" />
-                <Button text="Refresh" onAction="#handleRefreshVisitors" prefWidth="110" />
-            </HBox>
+            <Label styleClass="field-label" text="LIVE VISITORS IN ALL PARKS" />
 
             <TableView fx:id="tblVisitors" styleClass="list-view" prefHeight="180">
                 <columns>

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.chart.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<StackPane xmlns="http://javafx.com/javafx/17"
+           xmlns:fx="http://javafx.com/fxml/1"
+           fx:controller="gui.employee.CancellationsReportViewController"
+           styleClass="root-pane"
+           stylesheets="@EmployeeScreens.css">
+
+    <VBox styleClass="screen-card"
+          spacing="18"
+          prefWidth="900"
+          maxWidth="950"
+          alignment="TOP_CENTER">
+
+        <BorderPane prefWidth="850">
+            <center>
+                <Label styleClass="screen-title" text="Cancellations Report" />
+            </center>
+            <right>
+                <Button styleClass="btn-secondary"
+                        text="✕ Close"
+                        onAction="#handleClose" />
+            </right>
+        </BorderPane>
+
+        <HBox spacing="12" alignment="CENTER">
+            <Label styleClass="field-label" text="Month:" />
+            <ComboBox fx:id="monthComboBox"
+                      promptText="Select Month"
+                      prefWidth="160" />
+
+            <Label styleClass="field-label" text="Year:" />
+            <ComboBox fx:id="yearComboBox"
+                      promptText="Select Year"
+                      prefWidth="120" />
+
+            <Button styleClass="btn-primary"
+                    text="Generate Report"
+                    onAction="#handleGenerateReport" />
+        </HBox>
+
+        <TextArea fx:id="reportArea"
+                  prefHeight="180"
+                  prefWidth="760"
+                  editable="false"
+                  wrapText="true" />
+
+        <BarChart fx:id="cancellationsBarChart"
+                  prefHeight="340"
+                  prefWidth="760"
+                  title="Cancelled vs Expired Bookings per Park">
+            <xAxis>
+                <CategoryAxis label="Park" />
+            </xAxis>
+            <yAxis>
+                <NumberAxis label="Number of Bookings" />
+            </yAxis>
+        </BarChart>
+
+    </VBox>
+</StackPane>

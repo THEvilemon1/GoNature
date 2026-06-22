@@ -1,5 +1,6 @@
 package gui.employee;
 
+import javafx.beans.property.SimpleStringProperty;
 import client.ParkClient;
 import client.ServerResponseListener;
 import client.WindowUtil;
@@ -7,10 +8,10 @@ import common.Employee;
 import common.Message;
 import common.ParkChangeRequest;
 import common.ParkSubmittedReport;
+import common.ParkVisitorsCount;
 import common.PromotionRequest;
 import gui.login.EmployeeAwareController;
 import javafx.application.Platform;
-import javafx.beans.property.SimpleStringProperty;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -27,6 +28,13 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
 
     @FXML private Label lblWelcome;
     @FXML private Label lblMessage;
+
+    @FXML private TableView<ParkVisitorsCount> tblVisitors;
+    @FXML private TableColumn<ParkVisitorsCount, String> colVisitorsParkId;
+    @FXML private TableColumn<ParkVisitorsCount, String> colVisitorsParkName;
+    @FXML private TableColumn<ParkVisitorsCount, String> colVisitorsCurrent;
+    @FXML private TableColumn<ParkVisitorsCount, String> colVisitorsCapacity;
+    @FXML private TableColumn<ParkVisitorsCount, String> colVisitorsFree;
 
     @FXML private TableView<ParkSubmittedReport> tblReports;
     @FXML private TableColumn<ParkSubmittedReport, String> colReportParkId;
@@ -48,11 +56,45 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
         this.employee = employee;
         lblWelcome.setText("Welcome, " + employee.getFirstName() + " " + employee.getLastName() + "!");
 
+        setupVisitorsTable();
         setupReportsTable();
         setupTable();
         listenForRequests();
         requestPendingRequests();
         requestSubmittedReports();
+        requestAllParksVisitors();
+    }
+
+    private void setupVisitorsTable() {
+        colVisitorsParkId.setCellValueFactory(data ->
+                new SimpleStringProperty(String.valueOf(data.getValue().getParkId())));
+
+        colVisitorsParkName.setCellValueFactory(data ->
+                new SimpleStringProperty(data.getValue().getParkName()));
+
+        colVisitorsCurrent.setCellValueFactory(data ->
+                new SimpleStringProperty(String.valueOf(data.getValue().getCurrentVisitors())));
+
+        colVisitorsCapacity.setCellValueFactory(data ->
+                new SimpleStringProperty(String.valueOf(data.getValue().getMaxCapacity())));
+
+        // Free spots = how many more visitors can still enter the park right now.
+        colVisitorsFree.setCellValueFactory(data -> {
+            ParkVisitorsCount park = data.getValue();
+            int free = park.getMaxCapacity() - park.getCurrentVisitors();
+            return new SimpleStringProperty(String.valueOf(free));
+        });
+    }
+
+    private void requestAllParksVisitors() {
+        ParkClient client = ParkClient.getInstance();
+        if (client == null || !client.isConnected()) return;
+
+        try {
+            client.sendToServer(new Message("GET_ALL_PARKS_VISITORS", employee.getEmployeeId()));
+        } catch (Exception e) {
+            showError("Failed to load live visitor counts.");
+        }
     }
 
     private void requestSubmittedReports() {
@@ -217,6 +259,14 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
             }
 
             @Override
+            public void onAllParksVisitorsResult(ArrayList<ParkVisitorsCount> parks) {
+                Platform.runLater(() -> {
+                    tblVisitors.getItems().clear();
+                    tblVisitors.getItems().addAll(parks);
+                });
+            }
+
+            @Override
             public void onParkChangeRequestNotification(ParkChangeRequest request) {
                 Platform.runLater(() -> {
                     statusMap.put(request, "⏳ Waiting");
@@ -302,6 +352,9 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
             );
 
             Parent root = loader.load();
+
+            CancellationsReportViewController controller = loader.getController();
+            controller.setEmployee(employee);
 
             Stage stage = new Stage();
             stage.setTitle("Cancellations Report");

@@ -96,35 +96,74 @@ public class VisitorsReportViewController implements ServerResponseListener {
         Platform.runLater(() -> {
             visitsBarChart.getData().clear();
 
-            XYChart.Series<String, Number> countSeries = new XYChart.Series<>();
-            countSeries.setName("Visit Count");
-
-            XYChart.Series<String, Number> avgStaySeries = new XYChart.Series<>();
-            avgStaySeries.setName("Avg Stay (min)");
-
             StringBuilder sb = new StringBuilder("Visits Report\n\n");
 
             if (results == null || results.isEmpty()) {
                 sb.append("No data found for the selected period.");
-            } else {
-                for (VisitsReportResult r : results) {
-                    countSeries.getData().add(
-                        new XYChart.Data<>(r.getVisitorType(), r.getVisitsCount()));
-                    avgStaySeries.getData().add(
-                        new XYChart.Data<>(r.getVisitorType(), r.getAvgStayMinutes()));
+                reportArea.setText(sb.toString());
+                return;
+            }
 
-                    sb.append("Type: ").append(r.getVisitorType()).append("\n")
-                      .append("  Visits: ").append(r.getVisitsCount()).append("\n")
-                      .append("  Avg Stay: ").append(String.format("%.1f", r.getAvgStayMinutes())).append(" min\n")
-                      .append("  First Entry: ").append(r.getFirstEntryTime()).append("\n")
-                      .append("  Last Entry: ").append(r.getLastEntryTime()).append("\n\n");
+            ArrayList<VisitsReportResult> individuals = new ArrayList<>();
+            ArrayList<VisitsReportResult> organized = new ArrayList<>();
+            for (VisitsReportResult r : results) {
+                if ("Organized Group".equals(r.getVisitorType())) {
+                    organized.add(r);
+                } else {
+                    individuals.add(r);
                 }
             }
+
+            appendSection(sb, "Individual Visitors", individuals);
+            sb.append("\n");
+            appendSection(sb, "Organized Groups", organized);
+
+            long indivStayCount = 0;
+            long indivStaySum = 0;
+            for (VisitsReportResult r : individuals) {
+                if (r.getStayMinutes() != null) {
+                    indivStaySum += r.getStayMinutes();
+                    indivStayCount++;
+                }
+            }
+            long orgStayCount = 0;
+            long orgStaySum = 0;
+            for (VisitsReportResult r : organized) {
+                if (r.getStayMinutes() != null) {
+                    orgStaySum += r.getStayMinutes();
+                    orgStayCount++;
+                }
+            }
+            double avgIndiv = indivStayCount > 0 ? (double) indivStaySum / indivStayCount : 0;
+            double avgOrg  = orgStayCount  > 0 ? (double) orgStaySum  / orgStayCount  : 0;
+
+            XYChart.Series<String, Number> countSeries = new XYChart.Series<>();
+            countSeries.setName("Visit Count");
+            countSeries.getData().add(new XYChart.Data<>("Individual", individuals.size()));
+            countSeries.getData().add(new XYChart.Data<>("Organized Group", organized.size()));
+
+            XYChart.Series<String, Number> avgStaySeries = new XYChart.Series<>();
+            avgStaySeries.setName("Avg Stay (min)");
+            avgStaySeries.getData().add(new XYChart.Data<>("Individual", avgIndiv));
+            avgStaySeries.getData().add(new XYChart.Data<>("Organized Group", avgOrg));
 
             visitsBarChart.getData().add(countSeries);
             visitsBarChart.getData().add(avgStaySeries);
             reportArea.setText(sb.toString());
         });
+    }
+
+    private void appendSection(StringBuilder sb, String title, ArrayList<VisitsReportResult> visits) {
+        sb.append("=== ").append(title).append(" (").append(visits.size()).append(" visits) ===\n");
+        for (VisitsReportResult r : visits) {
+            sb.append("  Entry: ").append(r.getEntryTime());
+            if (r.getStayMinutes() != null) {
+                sb.append(" | Stay: ").append(r.getStayMinutes()).append(" min");
+            } else {
+                sb.append(" | Stay: still in park");
+            }
+            sb.append("\n");
+        }
     }
 
     @FXML

@@ -16,7 +16,7 @@ public class Employee implements Serializable {
     private int parkId;
     private String username;
     private String role;
-    private int userId;
+    private String userId;
 
     // User fields (from user table)
     private String firstName;
@@ -25,7 +25,7 @@ public class Employee implements Serializable {
     private String phoneNumber;
 
     public Employee(int employeeId, int salary, int parkId, String username,
-                    String role, int userId, String firstName, String lastName,
+                    String role, String userId, String firstName, String lastName,
                     String email, String phoneNumber) {
         this.employeeId = employeeId;
         this.salary = salary;
@@ -44,7 +44,7 @@ public class Employee implements Serializable {
     public int getParkId()        { return parkId; }
     public String getUsername()   { return username; }
     public String getRole()       { return role; }
-    public int getUserId()        { return userId; }
+    public String getUserId()     { return userId; }
     public String getFirstName()  { return firstName; }
     public String getLastName()   { return lastName; }
     public String getEmail()      { return email; }

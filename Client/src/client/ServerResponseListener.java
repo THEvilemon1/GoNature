@@ -23,7 +23,7 @@ public interface ServerResponseListener {
 
     default void onVisitorLoginResult(VisitorLoginResult result) {}
     default void onTravelerBookingsResult(ArrayList<Booking> bookings) {}
-    default void onParkPricesResult(Map<Integer, Integer> pricesByParkId) {}
+    default void onParkPricesResult(Map<Integer, Double> pricesByParkId) {}
     default void onTravelerProfileResult(TravelerProfile profile) {}
     default void onUpdateTravelerProfileResult(boolean success) {}
     default void onParksResult(ArrayList<ParkOption> parks) {}
@@ -59,4 +59,8 @@ public interface ServerResponseListener {
     default void onPromotionRequestNotification(PromotionRequest request) {}
     default void onSubmittedReportsResult(ArrayList<ParkSubmittedReport> reports) {}
     default void onRegisterTravelerResult(String result) {}
+
+    // Department manager reports
+    default void onAllParksVisitorsResult(ArrayList<common.ParkVisitorsCount> parks) {}
+    default void onCancellationsReportResult(ArrayList<common.CancellationsReportResult> results) {}
 }

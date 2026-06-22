@@ -30,9 +30,11 @@ public class EmployeeLoginRepository {
 
         Connection conn = DBConnection.getStaticConnection();
         String sql = "SELECT e.employee_id, e.salary, e.park_id, e.username, e.role, e.user_id, " +
-                     "u.firstName, u.lastName, u.email, u.phoneNumber " +
+                     "u.firstName, u.lastName, u.email, u.phoneNumber, " +
+                     "p.maxCapacity, p.gap, p.defaultStayTime " +
                      "FROM employee e " +
                      "JOIN user u ON e.user_id = u.user_id " +
+                     "LEFT JOIN park p ON e.park_id = p.park_id " +
                      "WHERE e.username = ? AND e.password = ?";
 
         PreparedStatement ps = conn.prepareStatement(sql);
@@ -51,7 +53,10 @@ public class EmployeeLoginRepository {
                 rs.getString("firstName"),
                 rs.getString("lastName"),
                 rs.getString("email"),
-                rs.getString("phoneNumber")
+                rs.getString("phoneNumber"),
+                getNullableInt(rs, "maxCapacity"),
+                getNullableInt(rs, "gap"),
+                getNullableInt(rs, "defaultStayTime")
             );
             loggedInEmployees.add(username);
             System.out.println("[EmployeeLoginRepository] Employee logged in: " + username);
@@ -73,5 +78,10 @@ public class EmployeeLoginRepository {
      */
     public static boolean isLoggedIn(String username) {
         return loggedInEmployees.contains(username);
+    }
+
+    private static Integer getNullableInt(ResultSet rs, String columnName) throws SQLException {
+        int value = rs.getInt(columnName);
+        return rs.wasNull() ? null : value;
     }
 }

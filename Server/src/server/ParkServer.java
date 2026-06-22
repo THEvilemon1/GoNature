@@ -387,6 +387,11 @@ public class ParkServer extends AbstractServer {
                      client.sendToClient(new Message("PARK_VISITORS_RESULT", currentVisitors));
                      break;
 
+                 case "GET_PARK_SETTINGS":
+                     int parkIdForSettings = (int) message.getData();
+                     client.sendToClient(new Message("PARK_SETTINGS_RESULT", getParkSettings(parkIdForSettings)));
+                     break;
+
                  case "GET_EFFECTIVE_AVAILABLE_SPOTS":
                      int parkIdForSpots = (int) message.getData();
                      int effectiveSpots = getEffectiveAvailableSpots(parkIdForSpots);
@@ -516,7 +521,7 @@ public class ParkServer extends AbstractServer {
                 	    break;
 
                 default:
-                    client.sendToClient(new Message("ERROR", "Unknown command"));
+                    client.sendToClient(new Message("ERROR", "Unknown command: " + message.getCommand()));
             }
 
         } catch (Exception e) {
@@ -1166,6 +1171,27 @@ public class ParkServer extends AbstractServer {
         return 0;
     }
 
+    private Object[] getParkSettings(int parkId) throws SQLException {
+        Connection conn = DBConnection.getStaticConnection();
+        String sql = "SELECT maxCapacity, gap, defaultStayTime FROM park WHERE park_id = ?";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setInt(1, parkId);
+        ResultSet rs = ps.executeQuery();
+        if (!rs.next()) {
+            throw new IllegalArgumentException("Selected park does not exist in the database.");
+        }
+        return new Object[]{
+            getNullableInt(rs, "maxCapacity"),
+            getNullableInt(rs, "gap"),
+            getNullableInt(rs, "defaultStayTime")
+        };
+    }
+
+    private Integer getNullableInt(ResultSet rs, String columnName) throws SQLException {
+        int value = rs.getInt(columnName);
+        return rs.wasNull() ? null : value;
+    }
+
     private int getEffectiveAvailableSpots(int parkId) throws SQLException {
         Connection conn = DBConnection.getStaticConnection();
 
@@ -1436,11 +1462,15 @@ public class ParkServer extends AbstractServer {
     private void handleParkChangeApproval(String requestId, boolean approved, ConnectionToClient client) throws Exception {
         Connection conn = DBConnection.getStaticConnection();
 
-        String updateSql = "UPDATE managerRequests SET approved = ? WHERE request_Id = ?";
+        String updateSql = "UPDATE managerRequests SET approved = ? WHERE request_Id = ? AND approved IS NULL";
         PreparedStatement updatePs = conn.prepareStatement(updateSql);
         updatePs.setInt(1, approved ? 1 : 0);
         updatePs.setString(2, requestId);
-        updatePs.executeUpdate();
+        int updatedRows = updatePs.executeUpdate();
+        if (updatedRows == 0) {
+            client.sendToClient(new Message("ERROR", "This request has already been processed."));
+            return;
+        }
 
         if (approved) {
             String getSql = "SELECT park_id, parameter_type, new_value FROM managerRequests WHERE request_Id = ?";

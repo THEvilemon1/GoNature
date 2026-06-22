@@ -28,7 +28,7 @@
 .screen-title {
     -fx-font-size: 20px;
     -fx-font-weight: bold;
-    -fx-text-fill: green;
+    -fx-text-fill: white;
     -fx-font-family: "Arial";
 }
 
@@ -47,6 +47,19 @@
 /* ── Welcome label ──────────────────────────────────────────────── */
 .welcome-label {
     -fx-font-size: 13px;
+    -fx-text-fill: #6b7280;
+    -fx-font-family: "Arial";
+}
+
+.section-title {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1c1c1e;
+    -fx-font-family: "Arial";
+}
+
+.field-help {
+    -fx-font-size: 11px;
     -fx-text-fill: #6b7280;
     -fx-font-family: "Arial";
 }

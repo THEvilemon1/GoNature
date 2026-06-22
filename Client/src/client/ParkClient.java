@@ -128,6 +128,10 @@ public class ParkClient extends AbstractClient {
                 case "EFFECTIVE_AVAILABLE_SPOTS_RESULT":
                     listener.onEffectiveAvailableSpotsResult((int) message.getData());
                     break;
+                case "PARK_SETTINGS_RESULT":
+                    Object[] parkSettings = (Object[]) message.getData();
+                    listener.onParkSettingsResult((Integer) parkSettings[0], (Integer) parkSettings[1], (Integer) parkSettings[2]);
+                    break;
                 case "BOOKING_RESULT":
                     listener.onBookingResult((common.Booking) message.getData());
                     break;

@@ -42,6 +42,7 @@ public interface ServerResponseListener {
     // Park worker operations
     default void onParkVisitorsResult(int currentVisitors) {}
     default void onEffectiveAvailableSpotsResult(int spots) {}
+    default void onParkSettingsResult(Integer maxCapacity, Integer gap, Integer defaultStayTime) {}
     default void onBookingResult(Booking booking) {}
     default void onCheckInResult(boolean success) {}
     default void onCheckOutResult(boolean success) {}

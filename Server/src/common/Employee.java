@@ -23,10 +23,21 @@ public class Employee implements Serializable {
     private String lastName;
     private String email;
     private String phoneNumber;
+    private Integer parkMaxCapacity;
+    private Integer parkGap;
+    private Integer parkDefaultStayTime;
 
     public Employee(int employeeId, int salary, int parkId, String username,
                     String role, int userId, String firstName, String lastName,
                     String email, String phoneNumber) {
+        this(employeeId, salary, parkId, username, role, userId, firstName, lastName,
+            email, phoneNumber, null, null, null);
+    }
+
+    public Employee(int employeeId, int salary, int parkId, String username,
+                    String role, int userId, String firstName, String lastName,
+                    String email, String phoneNumber, Integer parkMaxCapacity,
+                    Integer parkGap, Integer parkDefaultStayTime) {
         this.employeeId = employeeId;
         this.salary = salary;
         this.parkId = parkId;
@@ -37,6 +48,9 @@ public class Employee implements Serializable {
         this.lastName = lastName;
         this.email = email;
         this.phoneNumber = phoneNumber;
+        this.parkMaxCapacity = parkMaxCapacity;
+        this.parkGap = parkGap;
+        this.parkDefaultStayTime = parkDefaultStayTime;
     }
 
     public int getEmployeeId()    { return employeeId; }
@@ -49,6 +63,9 @@ public class Employee implements Serializable {
     public String getLastName()   { return lastName; }
     public String getEmail()      { return email; }
     public String getPhoneNumber(){ return phoneNumber; }
+    public Integer getParkMaxCapacity()     { return parkMaxCapacity; }
+    public Integer getParkGap()             { return parkGap; }
+    public Integer getParkDefaultStayTime() { return parkDefaultStayTime; }
 
     @Override
     public String toString() {

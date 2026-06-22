@@ -11,9 +11,8 @@
 
     <VBox styleClass="screen-card" prefWidth="960" maxWidth="1040" alignment="TOP_CENTER">
 
-        <!-- Top bar -->
         <HBox styleClass="top-bar" alignment="CENTER_LEFT" spacing="12">
-            <Label styleClass="screen-title" text="Park Manager — Control Panel" />
+            <Label styleClass="screen-title" text="Park Manager Dashboard" />
             <HBox HBox.hgrow="ALWAYS" />
             <Label fx:id="lblWelcome" styleClass="top-bar-info" text="" />
             <Button styleClass="btn-secondary" text="Promotions" onAction="#handleOpenPromotions" />
@@ -24,53 +23,73 @@
 
         <VBox styleClass="content-area" spacing="20">
 
-            <Label styleClass="field-label" text="REQUEST PARAMETER CHANGE" />
-            <Label styleClass="welcome-label"
-                   text="All changes require department manager approval before taking effect." />
+            <VBox spacing="4">
+                <Label styleClass="section-title" text="Park Settings Requests" />
+                <Label styleClass="field-help"
+                       text="Submit capacity and visit-duration changes for department manager approval." />
+            </VBox>
 
-            <GridPane hgap="16" vgap="14">
+            <GridPane hgap="16" vgap="6">
 
-                <!-- Max Capacity -->
-                <Label styleClass="field-label" text="New Max Capacity:"
+                <Label styleClass="field-label" text="New Total Park Capacity:"
                        GridPane.columnIndex="0" GridPane.rowIndex="0" />
-                <TextField fx:id="txtNewMaxCapacity" styleClass="field-input"
-                           promptText="e.g. 300" prefWidth="180"
-                           GridPane.columnIndex="1" GridPane.rowIndex="0" />
+                <VBox spacing="3" GridPane.columnIndex="1" GridPane.rowIndex="0">
+                    <TextField fx:id="txtNewMaxCapacity" styleClass="field-input"
+                               promptText="e.g. 300" prefWidth="180" />
+                    <Label fx:id="lblCurrentMaxCapacity" styleClass="field-help" text="Current park capacity: --" />
+                </VBox>
                 <Button styleClass="btn-primary" text="Send Request"
                         onAction="#handleUpdateMaxCapacity" prefWidth="130"
                         GridPane.columnIndex="2" GridPane.rowIndex="0" />
+                <Label styleClass="field-help"
+                       text="Maximum number of visitors allowed inside the entire park at the same time."
+                       GridPane.columnIndex="1" GridPane.rowIndex="1" GridPane.columnSpan="2" />
 
-                <!-- Gap for Walk-Ins -->
-                <Label styleClass="field-label" text="New Gap for Walk-Ins:"
-                       GridPane.columnIndex="0" GridPane.rowIndex="1" />
-                <TextField fx:id="txtNewGap" styleClass="field-input"
-                           promptText="e.g. 20" prefWidth="180"
-                           GridPane.columnIndex="1" GridPane.rowIndex="1" />
+                <Label styleClass="field-label" text="Walk-In Reserved Spots:"
+                       GridPane.columnIndex="0" GridPane.rowIndex="2" />
+                <VBox spacing="3" GridPane.columnIndex="1" GridPane.rowIndex="2">
+                    <TextField fx:id="txtNewGap" styleClass="field-input"
+                               promptText="e.g. 20" prefWidth="180" />
+                    <Label fx:id="lblCurrentGap" styleClass="field-help" text="Current walk-in reserve: --" />
+                </VBox>
                 <Button styleClass="btn-primary" text="Send Request"
                         onAction="#handleUpdateGap" prefWidth="130"
-                        GridPane.columnIndex="2" GridPane.rowIndex="1" />
+                        GridPane.columnIndex="2" GridPane.rowIndex="2" />
+                <Label styleClass="field-help"
+                       text="Number of park spots kept available for visitors without reservations."
+                       GridPane.columnIndex="1" GridPane.rowIndex="3" GridPane.columnSpan="2" />
 
-                <!-- Default Stay Time -->
-                <Label styleClass="field-label" text="New Default Stay Time (hours):"
-                       GridPane.columnIndex="0" GridPane.rowIndex="2" />
-                <TextField fx:id="txtNewStayTime" styleClass="field-input"
-                           promptText="e.g. 4" prefWidth="180"
-                           GridPane.columnIndex="1" GridPane.rowIndex="2" />
+                <Label styleClass="field-label" text="Default Visitor Stay Duration (hours):"
+                       GridPane.columnIndex="0" GridPane.rowIndex="4" />
+                <VBox spacing="3" GridPane.columnIndex="1" GridPane.rowIndex="4">
+                    <TextField fx:id="txtNewStayTime" styleClass="field-input"
+                               promptText="e.g. 4" prefWidth="180" />
+                    <Label fx:id="lblCurrentStayTime" styleClass="field-help" text="Current stay duration: --" />
+                </VBox>
                 <Button styleClass="btn-primary" text="Send Request"
                         onAction="#handleUpdateStayTime" prefWidth="130"
-                        GridPane.columnIndex="2" GridPane.rowIndex="2" />
+                        GridPane.columnIndex="2" GridPane.rowIndex="4" />
+                <Label styleClass="field-help"
+                       text="Default consecutive time each visitor is allowed to stay inside the park."
+                       GridPane.columnIndex="1" GridPane.rowIndex="5" GridPane.columnSpan="2" />
 
             </GridPane>
 
-            <!-- Status message -->
             <Label fx:id="lblMessage" styleClass="lbl-message" text=""
                    wrapText="true" maxWidth="700" visible="false" />
 
             <Separator styleClass="card-sep" />
 
-            <!-- Activity Log -->
             <Label styleClass="field-label" text="ACTIVITY LOG" />
-            <ListView fx:id="lstActivityLog" styleClass="list-view" prefHeight="200" />
+            <TableView fx:id="tblActivityLog" styleClass="list-view" prefHeight="220">
+                <columns>
+                    <TableColumn fx:id="colRequestNumber" text="Request #" prefWidth="90" />
+                    <TableColumn fx:id="colRequestDateTime" text="Request Date &amp; Time" prefWidth="170" />
+                    <TableColumn fx:id="colRequestDetails" text="Request Details" prefWidth="320" />
+                    <TableColumn fx:id="colRequestStatus" text="Request Status" prefWidth="150" />
+                    <TableColumn fx:id="colResponseDateTime" text="Response Date &amp; Time" prefWidth="170" />
+                </columns>
+            </TableView>
 
         </VBox>
     </VBox>

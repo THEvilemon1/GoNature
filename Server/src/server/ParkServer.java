@@ -621,12 +621,6 @@ public class ParkServer extends AbstractServer {
                 	    client.sendToClient(new Message("TODAY_BOOKINGS_RESULT", todayBookings));
                 	    break;
 
-                 case "REGISTER_TRAVELER":
-                	    SubscriberRequest subReq = (SubscriberRequest) message.getData();
-                	    String registerResult = registerTraveler(subReq);
-                	    client.sendToClient(new Message("REGISTER_TRAVELER_RESULT", registerResult));
-                	    break;
-
                 default:
                     client.sendToClient(new Message("ERROR", "Unknown command"));
             }
@@ -691,113 +685,6 @@ public class ParkServer extends AbstractServer {
 
             ps.executeUpdate();
     }
-
-
-    private String registerTraveler(SubscriberRequest req) throws SQLException {
-        Connection conn = DBConnection.getStaticConnection();
-        int nationalIdNumber;
-        try {
-            nationalIdNumber = Integer.parseInt(req.getNationalId().trim());
-        } catch (NumberFormatException e) {
-            return "National ID must be a number.";
-        }
-
-        boolean isGuide = SubscriberRequest.TYPE_GUIDE.equals(req.getType());
-        boolean isClubMember = SubscriberRequest.TYPE_CLUB_MEMBER.equals(req.getType());
-
-        boolean previousAutoCommit = conn.getAutoCommit();
-        conn.setAutoCommit(false);
-
-        try {
-            String selectSql = "SELECT traveler_id, user_id, guide, clubMember FROM traveler WHERE nationalId = ?";
-            PreparedStatement selectPs = conn.prepareStatement(selectSql);
-            selectPs.setInt(1, nationalIdNumber);
-            ResultSet rs = selectPs.executeQuery();
-
-            if (rs.next()) {
-                String travelerId = rs.getString("traveler_id");
-                String userId = rs.getString("user_id");
-                boolean alreadyGuide = rs.getBoolean("guide");
-                boolean alreadyClub = rs.getBoolean("clubMember");
-
-                if (isGuide && alreadyGuide) {
-                    conn.rollback();
-                    return "This person is already registered as a tour guide.";
-                }
-                if (isClubMember && alreadyClub) {
-                    conn.rollback();
-                    return "This person is already registered as a club member.";
-                }
-
-                String updateTravelerSql =
-                    "UPDATE traveler SET guide = ?, clubMember = ?, familyMembers = ?, creditCard = ? WHERE traveler_id = ?";
-                PreparedStatement updTravelerPs = conn.prepareStatement(updateTravelerSql);
-                updTravelerPs.setBoolean(1, alreadyGuide || isGuide);
-                updTravelerPs.setBoolean(2, alreadyClub || isClubMember);
-                if (isClubMember) {
-                    updTravelerPs.setInt(3, req.getFamilyMembers());
-                    if (req.getCreditCard() == null) updTravelerPs.setNull(4, Types.VARCHAR);
-                    else updTravelerPs.setString(4, req.getCreditCard());
-                } else {
-                    updTravelerPs.setNull(3, Types.INTEGER);
-                    updTravelerPs.setNull(4, Types.VARCHAR);
-                }
-                updTravelerPs.setString(5, travelerId);
-                updTravelerPs.executeUpdate();
-
-                String updateUserSql = "UPDATE `user` SET firstName = ?, lastName = ?, email = ?, phoneNumber = ? WHERE user_id = ?";
-                PreparedStatement updUserPs = conn.prepareStatement(updateUserSql);
-                updUserPs.setString(1, req.getFirstName());
-                updUserPs.setString(2, req.getLastName());
-                updUserPs.setString(3, req.getEmail());
-                updUserPs.setString(4, req.getPhoneNumber());
-                updUserPs.setString(5, userId);
-                updUserPs.executeUpdate();
-
-                conn.commit();
-                return "SUCCESS";
-            } else {
-                String travelerId = UUID.randomUUID().toString();
-
-                String insertUserSql = "INSERT INTO `user` (user_id, firstName, lastName, email, phoneNumber) VALUES (?, ?, ?, ?, ?)";
-                PreparedStatement insertUserPs = conn.prepareStatement(insertUserSql);
-                insertUserPs.setString(1, travelerId);
-                insertUserPs.setString(2, req.getFirstName());
-                insertUserPs.setString(3, req.getLastName());
-                insertUserPs.setString(4, req.getEmail());
-                insertUserPs.setString(5, req.getPhoneNumber());
-                insertUserPs.executeUpdate();
-
-                String insertTravelerSql =
-                    "INSERT INTO traveler (traveler_id, nationalId, guide, clubMember, user_id, familyMembers, creditCard) " +
-                    "VALUES (?, ?, ?, ?, ?, ?, ?)";
-                PreparedStatement insertTravelerPs = conn.prepareStatement(insertTravelerSql);
-                insertTravelerPs.setString(1, travelerId);
-                insertTravelerPs.setInt(2, nationalIdNumber);
-                insertTravelerPs.setBoolean(3, isGuide);
-                insertTravelerPs.setBoolean(4, isClubMember);
-                insertTravelerPs.setString(5, travelerId);
-                if (isClubMember) {
-                    insertTravelerPs.setInt(6, req.getFamilyMembers());
-                    if (req.getCreditCard() == null) insertTravelerPs.setNull(7, Types.VARCHAR);
-                    else insertTravelerPs.setString(7, req.getCreditCard());
-                } else {
-                    insertTravelerPs.setNull(6, Types.INTEGER);
-                    insertTravelerPs.setNull(7, Types.VARCHAR);
-                }
-                insertTravelerPs.executeUpdate();
-
-                conn.commit();
-                return "SUCCESS";
-            }
-        } catch (SQLException e) {
-            conn.rollback();
-            throw e;
-        } finally {
-            conn.setAutoCommit(previousAutoCommit);
-        }
-    }
-
 
     private ArrayList<Booking> getTodayBookings(int parkId) throws SQLException {
         ArrayList<Booking> list = new ArrayList<>();
@@ -1167,14 +1054,14 @@ public class ParkServer extends AbstractServer {
         return prices;
     }
 
-    private TravelerProfile getTravelerProfile(int travelerId) throws SQLException {
-        if (travelerId == 0) {
+    private TravelerProfile getTravelerProfile(String travelerId) throws SQLException {
+        if (travelerId == null || travelerId.isBlank()) {
             throw new IllegalArgumentException("Traveler is missing.");
         }
 
         Connection conn = DBConnection.getStaticConnection();
         String sql = "SELECT u.firstName, u.lastName, u.email, u.phoneNumber, t.clubMember "
-            + "FROM traveler t JOIN `user` u ON u.user_id = t.traveler_id "
+            + "FROM traveler t JOIN `user` u ON u.user_id = t.user_id "
             + "WHERE t.traveler_id = ?";
         PreparedStatement ps = conn.prepareStatement(sql);
         ps.setString(1, travelerId);
@@ -1210,7 +1097,6 @@ public class ParkServer extends AbstractServer {
         ps.setString(2, lastName);
         ps.setString(3, email);
         ps.setString(4, phoneNumber);
-        ps.setString(5, profile.getTravelerId());
         try {
             return ps.executeUpdate() > 0;
         } catch (SQLIntegrityConstraintViolationException e) {

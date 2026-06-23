@@ -58,7 +58,6 @@ public interface ServerResponseListener {
     default void onPromotionApprovalResult(String requestId, boolean approved) {}
     default void onPromotionRequestNotification(PromotionRequest request) {}
     default void onSubmittedReportsResult(ArrayList<ParkSubmittedReport> reports) {}
-    default void onRegisterTravelerResult(String result) {}
 
     // Department manager reports
     default void onAllParksVisitorsResult(ArrayList<common.ParkVisitorsCount> parks) {}

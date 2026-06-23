@@ -1091,16 +1091,17 @@ public class ParkServer extends AbstractServer {
         String phoneNumber = ContactInfoValidator.requirePhoneNumber(profile.getPhoneNumber());
 
         Connection conn = DBConnection.getStaticConnection();
-        String sql = "UPDATE `user` SET firstName = ?, lastName = ?, email = ?, phoneNumber = ? WHERE user_id = ?";
+        String sql = "UPDATE `user` SET firstName = ?, lastName = ?, email = ?, phoneNumber = ? WHERE user_id = (SELECT user_id FROM traveler WHERE traveler_id = ?)";
         PreparedStatement ps = conn.prepareStatement(sql);
         ps.setString(1, firstName);
         ps.setString(2, lastName);
         ps.setString(3, email);
         ps.setString(4, phoneNumber);
+        ps.setString(5, profile.getTravelerId());
         try {
             return ps.executeUpdate() > 0;
         } catch (SQLIntegrityConstraintViolationException e) {
-            throw new IllegalArgumentException("Email address is already used by another user.");
+            throw new IllegalArgumentException("Email already exists in the system.");
         }
     }
 

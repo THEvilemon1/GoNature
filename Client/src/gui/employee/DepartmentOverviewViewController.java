@@ -50,6 +50,7 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
 
     private Employee employee;
     private Map<Object, String> statusMap = new IdentityHashMap<>();
+    private ServerResponseListener overviewListener;
 
     @Override
     public void setEmployee(Employee employee) {
@@ -240,7 +241,7 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
         ParkClient client = ParkClient.getInstance();
         if (client == null || !client.isConnected()) return;
 
-        client.setListener(new ServerResponseListener() {
+        overviewListener = new ServerResponseListener() {
             @Override public void onOrderExistsResult(boolean e) {}
             @Override public void onOrderResult(common.Order o) {}
             @Override public void onUpdateOrderResult(boolean s) {}
@@ -283,7 +284,14 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
                     tblRequests.refresh();
                 });
             }
-        });
+        };
+
+        // Register as both the regular listener (for this screen's own request/response
+        // traffic) and the notification listener. The notification listener keeps
+        // receiving live visitor counts and pending requests even after a report window
+        // temporarily takes over the regular listener via setListener().
+        client.setListener(overviewListener);
+        client.setNotificationListener(overviewListener);
     }
 
     private void sendDecision(Object requestObj, boolean approved) {
@@ -369,6 +377,10 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
     @FXML
     public void handleLogout(ActionEvent event) throws Exception {
         ParkClient client = ParkClient.getInstance();
+
+        if (client != null) {
+            client.clearNotificationListener(overviewListener);
+        }
 
         if (client != null && client.isConnected()) {
             try {

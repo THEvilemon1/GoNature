@@ -1232,34 +1232,34 @@ public class ParkServer extends AbstractServer {
             return new VisitorLoginResult(rs.getString("traveler_id"), nationalId, false, isGuide, isClubMember);
         }
 
-        String travelerId = UUID.randomUUID().toString();
         boolean previousAutoCommit = conn.getAutoCommit();
         conn.setAutoCommit(false);
 
         try {
         	String insertUserSql = "INSERT INTO `user` (user_id, firstName, lastName, email, phoneNumber) VALUES (?, ?, ?, ?, ?)";
+            int userId = (int)(Math.random() * 900000000) + 100000000;
         	PreparedStatement insertUserPs = conn.prepareStatement(insertUserSql);
-            insertUserPs.setString(1, travelerId);
+            insertUserPs.setInt(1, userId);
         	insertUserPs.setString(2, "Visitor");
         	insertUserPs.setString(3, "Guest");
-        	insertUserPs.setString(4, "visitor-" + nationalId + "@gonature.local");
+        	insertUserPs.setNull(4, Types.VARCHAR);
         	insertUserPs.setNull(5, Types.VARCHAR);
         	insertUserPs.executeUpdate();
-            System.out.println("Inserted user row for visitor: " + travelerId);
 
             String insertTravelerSql = "INSERT INTO traveler (traveler_id, nationalId, guide, clubMember, user_id) VALUES (?, ?, ?, ?, ?)";
             PreparedStatement insertTravelerPs = conn.prepareStatement(insertTravelerSql);
-            System.out.println("Registering traveler details for national ID: " + nationalId);
-            insertTravelerPs.setString(1, travelerId);
+            
+            int travelerId = (int)(Math.random() * 900000000) + 100000000;;
+            insertTravelerPs.setInt(1, travelerId);
             insertTravelerPs.setInt(2, nationalIdNumber);
             insertTravelerPs.setBoolean(3, false);
             insertTravelerPs.setBoolean(4, false);
-            insertTravelerPs.setString(5, travelerId); //user_id
+            insertTravelerPs.setInt(5, userId);
             insertTravelerPs.executeUpdate();
             System.out.println("Inserted traveler row for visitor: " + travelerId);
 
             conn.commit();
-            return new VisitorLoginResult(travelerId, nationalId, true);
+            return new VisitorLoginResult(String.valueOf(travelerId), nationalId, true);
         } catch (SQLException e) {
             conn.rollback();
             throw e;

@@ -1167,8 +1167,8 @@ public class ParkServer extends AbstractServer {
         return prices;
     }
 
-    private TravelerProfile getTravelerProfile(String travelerId) throws SQLException {
-        if (travelerId == null || travelerId.isBlank()) {
+    private TravelerProfile getTravelerProfile(int travelerId) throws SQLException {
+        if (travelerId == 0) {
             throw new IllegalArgumentException("Traveler is missing.");
         }
 
@@ -1237,9 +1237,9 @@ public class ParkServer extends AbstractServer {
 
         try {
         	String insertUserSql = "INSERT INTO `user` (user_id, firstName, lastName, email, phoneNumber) VALUES (?, ?, ?, ?, ?)";
-            int userId = (int)(Math.random() * 900000000) + 100000000;
+            String userId = generateUniqueId(conn, "`user`", "user_id");
         	PreparedStatement insertUserPs = conn.prepareStatement(insertUserSql);
-            insertUserPs.setInt(1, userId);
+            insertUserPs.setString(1, userId);
         	insertUserPs.setString(2, "Visitor");
         	insertUserPs.setString(3, "Guest");
         	insertUserPs.setNull(4, Types.VARCHAR);
@@ -1248,24 +1248,37 @@ public class ParkServer extends AbstractServer {
 
             String insertTravelerSql = "INSERT INTO traveler (traveler_id, nationalId, guide, clubMember, user_id) VALUES (?, ?, ?, ?, ?)";
             PreparedStatement insertTravelerPs = conn.prepareStatement(insertTravelerSql);
-            
-            int travelerId = (int)(Math.random() * 900000000) + 100000000;;
-            insertTravelerPs.setInt(1, travelerId);
+
+            String travelerId = generateUniqueId(conn, "traveler", "traveler_id");
+            insertTravelerPs.setString(1, travelerId);
             insertTravelerPs.setInt(2, nationalIdNumber);
             insertTravelerPs.setBoolean(3, false);
             insertTravelerPs.setBoolean(4, false);
-            insertTravelerPs.setInt(5, userId);
+            insertTravelerPs.setString(5, userId);
             insertTravelerPs.executeUpdate();
             System.out.println("Inserted traveler row for visitor: " + travelerId);
 
             conn.commit();
-            return new VisitorLoginResult(String.valueOf(travelerId), nationalId, true);
+            return new VisitorLoginResult(travelerId, nationalId, true);
         } catch (SQLException e) {
             conn.rollback();
             throw e;
         } finally {
             conn.setAutoCommit(previousAutoCommit);
         }
+    }
+
+    private String generateUniqueId(Connection conn, String table, String column) throws SQLException {
+        String sql = "SELECT 1 FROM " + table + " WHERE " + column + " = ?";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        String id;
+        do {
+            id = UUID.randomUUID().toString();
+            ps.setString(1, id);
+            ResultSet rs = ps.executeQuery();
+            if (!rs.next()) break;
+        } while (true);
+        return id;
     }
 
     private int getParkCurrentVisitors(int parkId) throws SQLException {

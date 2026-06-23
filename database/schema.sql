@@ -26,7 +26,7 @@
 --  travelers have them NULL because they log in with their national ID.
 -- ----------------------------------------------------------------------------
 CREATE TABLE `user` (
-    user_id      VARCHAR(20)  NOT NULL,
+    user_id      VARCHAR(36)  NOT NULL,
     username     VARCHAR(50)  NULL,
     password     VARCHAR(100) NULL,
     firstName    VARCHAR(50)  NOT NULL,
@@ -66,11 +66,11 @@ CREATE TABLE park (
 --  both columns are kept because the code reads/writes both.
 -- ----------------------------------------------------------------------------
 CREATE TABLE traveler (
-    traveler_id   VARCHAR(20) NOT NULL,
+    traveler_id   VARCHAR(36) NOT NULL,
     nationalId    INT         NOT NULL,
     guide         BOOLEAN     NOT NULL DEFAULT FALSE,
     clubMember    BOOLEAN     NOT NULL DEFAULT FALSE,
-    user_id       VARCHAR(20) NOT NULL,
+    user_id       VARCHAR(36) NOT NULL,
     familyMembers INT         NULL,
     creditCard    VARCHAR(30) NULL,
     PRIMARY KEY (traveler_id),
@@ -88,8 +88,8 @@ CREATE TABLE traveler (
 --  via requests). role drives which screen the client opens after login.
 -- ----------------------------------------------------------------------------
 CREATE TABLE employee (
-    employee_id INT         NOT NULL,
-    user_id     VARCHAR(20) NOT NULL,
+    employee_id INT NOT NULL,
+    user_id     VARCHAR(36) NOT NULL,
     salary      INT         NULL,
     park_id     INT         NULL,
     role        ENUM('park_worker','park_manager','department_manager','service_rep') NOT NULL,
@@ -108,7 +108,7 @@ CREATE TABLE employee (
 -- ----------------------------------------------------------------------------
 CREATE TABLE booking (
     booking_id            INT   NOT NULL,
-    traveler_id           VARCHAR(20)   NULL,
+    traveler_id           VARCHAR(36)   NULL,
     travelerName          VARCHAR(100)  NULL,
     travelerEmail         VARCHAR(100)  NULL,
     travelerPhoneNumber   VARCHAR(20)   NULL,

@@ -86,15 +86,24 @@ public class ParkClient extends AbstractClient {
         if (!(msg instanceof Message)) return;
         Message message = (Message) msg;
 
-        // Server-initiated notifications for the department manager's overview are
-        // delivered to a dedicated listener that transient screens never replace,
+        // Delivered to a dedicated listener that transient screens never replace,
         // so live visitor counts keep updating even while a report window is open.
         if (notificationListener != null) {
             switch (message.getCommand()) {
-                case "ALL_PARKS_VISITORS_RESULT":
+                case "ALL_PARKS_VISITORS_RESULT":  // Proccess a live visitor count update for all parks, for the department manager's overview.
                     notificationListener.onAllParksVisitorsResult(
                         (ArrayList<common.ParkVisitorsCount>) message.getData());
                     return;
+                case "PARK_VISITORS_RESULT":  // Proccess a live visitor count update for the currently viewed park.
+                    notificationListener.onParkVisitorsResult((int) message.getData());
+                    break;
+                case "EFFECTIVE_AVAILABLE_SPOTS_RESULT":
+                    notificationListener.onEffectiveAvailableSpotsResult((int) message.getData());
+                    break;
+                case "TODAY_BOOKINGS_RESULT":
+                    notificationListener.onTodayBookingsResult(
+                        (java.util.ArrayList<common.Booking>) message.getData());
+                    break;
                 case "PARK_CHANGE_REQUEST_NOTIFICATION":
                     notificationListener.onParkChangeRequestNotification(
                         (ParkChangeRequest) message.getData());

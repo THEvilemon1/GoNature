@@ -14,6 +14,8 @@
         <!-- Top bar -->
         <HBox styleClass="top-bar" alignment="CENTER_LEFT">
             <Label styleClass="screen-title" text="Exit Visitor" />
+            <Region HBox.hgrow="ALWAYS" minWidth="20" />
+            <Label fx:id="lblCurrentVisitors" styleClass="top-bar-info" text="Current Visitors: --" />
         </HBox>
 
         <!-- Content -->

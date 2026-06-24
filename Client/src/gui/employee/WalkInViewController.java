@@ -34,14 +34,34 @@ public class WalkInViewController implements Initializable {
 
     private Employee employee;
     private Timer refreshTimer;
+    private ServerResponseListener liveSpotsListener;
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {}
 
     public void setEmployee(Employee employee) {
         this.employee = employee;
+        registerLiveSpotsListener();
         refreshAvailableSpots();
         startAutoRefresh();
+    }
+
+    private void registerLiveSpotsListener() {
+        ParkClient client = ParkClient.getInstance();
+        if (client == null || !client.isConnected()) return;
+
+        liveSpotsListener = new ServerResponseListener() {
+            @Override
+            public void onEffectiveAvailableSpotsResult(int spots) {
+                Platform.runLater(() -> updateAvailableSpots(spots));
+            }
+
+            @Override public void onOrderExistsResult(boolean exists) {}
+            @Override public void onOrderResult(Order order) {}
+            @Override public void onUpdateOrderResult(boolean success) {}
+            @Override public void onError(String msg) {}
+        };
+        client.setNotificationListener(liveSpotsListener);
     }
 
     // Refresh available spots every 30 seconds automatically
@@ -62,12 +82,7 @@ public class WalkInViewController implements Initializable {
         client.setListener(new ServerResponseListener() {
             @Override
             public void onEffectiveAvailableSpotsResult(int spots) {
-                Platform.runLater(() -> {
-                    lblAvailableSpots.setText("Available Spots: " + spots);
-                    lblAvailableSpots.setStyle(
-                        spots > 0 ? "-fx-text-fill: white;" : "-fx-text-fill: #ffcccc;"
-                    );
-                });
+                Platform.runLater(() -> updateAvailableSpots(spots));
             }
             @Override public void onOrderExistsResult(boolean exists) {}
             @Override public void onOrderResult(Order order) {}
@@ -80,6 +95,13 @@ public class WalkInViewController implements Initializable {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    private void updateAvailableSpots(int spots) {
+        lblAvailableSpots.setText("Available Spots: " + spots);
+        lblAvailableSpots.setStyle(
+            spots > 0 ? "-fx-text-fill: white;" : "-fx-text-fill: #ffcccc;"
+        );
     }
 
     @FXML
@@ -141,6 +163,7 @@ public class WalkInViewController implements Initializable {
     @FXML
     public void handleBack(ActionEvent event) throws Exception {
         if (refreshTimer != null) refreshTimer.cancel();
+        clearLiveSpotsListener();
 
         Stage currentStage = (Stage) txtNationalId.getScene().getWindow();
         currentStage.hide();
@@ -178,5 +201,12 @@ public class WalkInViewController implements Initializable {
         lblStatus.getStyleClass().add(isError ? "msg-error" : "msg-success");
         lblStatus.setVisible(!message.isEmpty());
         lblStatus.setManaged(!message.isEmpty());
+    }
+
+    private void clearLiveSpotsListener() {
+        ParkClient client = ParkClient.getInstance();
+        if (client != null) {
+            client.clearNotificationListener(liveSpotsListener);
+        }
     }
 }

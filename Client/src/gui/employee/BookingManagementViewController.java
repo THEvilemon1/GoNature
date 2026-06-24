@@ -55,6 +55,7 @@ public class BookingManagementViewController implements EmployeeAwareController,
     private Timer refreshTimer;
     private Booking selectedBooking;
     private boolean syncingSelection;
+    private ServerResponseListener liveUpdatesListener;
 
     private final ObservableList<Booking> pendingItems = FXCollections.observableArrayList();
     private final ObservableList<Booking> checkedInItems = FXCollections.observableArrayList();
@@ -110,8 +111,34 @@ public class BookingManagementViewController implements EmployeeAwareController,
     public void setEmployee(Employee employee) {
         this.employee = employee;
         lblWelcome.setText("Welcome, " + employee.getFirstName() + " " + employee.getLastName() + "!");
+        registerLiveUpdatesListener();
         refreshData();
         startAutoRefresh();
+    }
+
+    private void registerLiveUpdatesListener() {
+        ParkClient client = ParkClient.getInstance();
+        if (client == null || !client.isConnected()) return;
+
+        liveUpdatesListener = new ServerResponseListener() {
+            @Override
+            public void onParkVisitorsResult(int currentVisitors) {
+                Platform.runLater(() -> updateCurrentVisitors(currentVisitors));
+            }
+
+            @Override
+            public void onTodayBookingsResult(ArrayList<Booking> bookings) {
+                Platform.runLater(() -> populateLists(bookings));
+            }
+
+            @Override public void onOrderExistsResult(boolean exists) {}
+            @Override public void onOrderResult(Order order) {}
+            @Override public void onUpdateOrderResult(boolean success) {}
+            @Override public void onError(String msg) {}
+        };
+
+        client.setListener(liveUpdatesListener);
+        client.setNotificationListener(liveUpdatesListener);
     }
 
     // Auto-refresh both the visitor count and the booking lists every 30 seconds
@@ -129,23 +156,7 @@ public class BookingManagementViewController implements EmployeeAwareController,
         ParkClient client = ParkClient.getInstance();
         if (client == null || !client.isConnected()) return;
 
-        client.setListener(new ServerResponseListener() {
-            @Override
-            public void onParkVisitorsResult(int currentVisitors) {
-                Platform.runLater(() ->
-                    lblCurrentVisitors.setText("Current Visitors: " + currentVisitors));
-            }
-
-            @Override
-            public void onTodayBookingsResult(ArrayList<Booking> bookings) {
-                Platform.runLater(() -> populateLists(bookings));
-            }
-
-            @Override public void onOrderExistsResult(boolean exists) {}
-            @Override public void onOrderResult(Order order) {}
-            @Override public void onUpdateOrderResult(boolean success) {}
-            @Override public void onError(String msg) {}
-        });
+        client.setListener(liveUpdatesListener);
 
         try {
             client.sendToServer(new Message("GET_PARK_CURRENT_VISITORS", employee.getParkId()));
@@ -153,6 +164,10 @@ public class BookingManagementViewController implements EmployeeAwareController,
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    private void updateCurrentVisitors(int currentVisitors) {
+        lblCurrentVisitors.setText("Current Visitors: " + currentVisitors);
     }
 
     private void populateLists(ArrayList<Booking> bookings) {
@@ -483,6 +498,10 @@ public class BookingManagementViewController implements EmployeeAwareController,
         if (refreshTimer != null) {
             refreshTimer.cancel();
             refreshTimer = null;
+        }
+        ParkClient client = ParkClient.getInstance();
+        if (client != null) {
+            client.clearNotificationListener(liveUpdatesListener);
         }
     }
 }

@@ -21,12 +21,50 @@ public class ExitVisitorViewController {
 
     @FXML private TextField txtBookingId;
     @FXML private TextField txtVisitorsLeaving;
+    @FXML private Label lblCurrentVisitors;
     @FXML private Label lblStatus;
 
     private Employee employee;
+    private ServerResponseListener liveVisitorsListener;
 
     public void setEmployee(Employee employee) {
         this.employee = employee;
+        registerLiveVisitorsListener();
+        requestCurrentVisitors();
+    }
+
+    private void registerLiveVisitorsListener() {
+        ParkClient client = ParkClient.getInstance();
+        if (client == null || !client.isConnected()) return;
+
+        liveVisitorsListener = new ServerResponseListener() {
+            @Override
+            public void onParkVisitorsResult(int currentVisitors) {
+                Platform.runLater(() -> updateCurrentVisitors(currentVisitors));
+            }
+
+            @Override public void onOrderExistsResult(boolean exists) {}
+            @Override public void onOrderResult(Order order) {}
+            @Override public void onUpdateOrderResult(boolean success) {}
+            @Override public void onError(String msg) {}
+        };
+        client.setNotificationListener(liveVisitorsListener);
+    }
+
+    private void requestCurrentVisitors() {
+        ParkClient client = ParkClient.getInstance();
+        if (client == null || !client.isConnected()) return;
+
+        client.setListener(liveVisitorsListener);
+        try {
+            client.sendToServer(new Message("GET_PARK_CURRENT_VISITORS", employee.getParkId()));
+        } catch (Exception e) {
+            showStatus("Failed to load live visitor count.", true);
+        }
+    }
+
+    private void updateCurrentVisitors(int currentVisitors) {
+        lblCurrentVisitors.setText("Current Visitors: " + currentVisitors);
     }
 
     @FXML
@@ -65,6 +103,7 @@ public class ExitVisitorViewController {
                         showStatus("Exit recorded successfully.", false);
                         txtBookingId.clear();
                         txtVisitorsLeaving.clear();
+                        requestCurrentVisitors();
                     } else {
                         showStatus("Exit failed. Please check the booking ID.", true);
                     }
@@ -88,6 +127,7 @@ public class ExitVisitorViewController {
 
     @FXML
     public void handleBack(ActionEvent event) throws Exception {
+        clearLiveVisitorsListener();
         Stage currentStage = (Stage) txtBookingId.getScene().getWindow();
         currentStage.hide();
 
@@ -110,5 +150,12 @@ public class ExitVisitorViewController {
         lblStatus.getStyleClass().add(isError ? "msg-error" : "msg-success");
         lblStatus.setVisible(!message.isEmpty());
         lblStatus.setManaged(!message.isEmpty());
+    }
+
+    private void clearLiveVisitorsListener() {
+        ParkClient client = ParkClient.getInstance();
+        if (client != null) {
+            client.clearNotificationListener(liveVisitorsListener);
+        }
     }
 }

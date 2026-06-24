@@ -1,10 +1,12 @@
 package server;
 
 import common.Booking;
+import common.ParkVisitorsCount;
 import gui.ServerPortFrameController;
 
 import java.sql.*;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 
 /**
  * Shared static helpers used by ParkServer and BookingLifecycleService.
@@ -120,6 +122,78 @@ public final class Utils {
             throw new IllegalArgumentException("Selected park does not exist in the database.");
         }
         return Math.max(0, rs.getInt("maxCapacity") - rs.getInt("gap"));
+    }
+
+    /**
+     * Calculates the live number of people inside a park from checked-in
+     * bookings. This is the source of truth for "current visitors"; the park
+     * table is synced from this value after every enter/exit mutation.
+     */
+    public static int getParkCurrentVisitors(Connection conn, int parkId) throws SQLException {
+        String sql = "SELECT COALESCE(SUM(visitorsInside), 0) AS currentVisitors "
+            + "FROM booking WHERE park_id = ? AND status = ?";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setInt(1, parkId);
+        ps.setString(2, Booking.STATUS_CHECKED_IN);
+        ResultSet rs = ps.executeQuery();
+        return rs.next() ? rs.getInt("currentVisitors") : 0;
+    }
+
+    public static int syncParkCurrentVisitors(Connection conn, int parkId) throws SQLException {
+        int currentVisitors = getParkCurrentVisitors(conn, parkId);
+        String sql = "UPDATE park SET currentVisitors = ? WHERE park_id = ?";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setInt(1, currentVisitors);
+        ps.setInt(2, parkId);
+        ps.executeUpdate();
+        return currentVisitors;
+    }
+
+    public static int getEffectiveAvailableSpots(Connection conn, int parkId) throws SQLException {
+        String parkSql = "SELECT maxCapacity FROM park WHERE park_id = ?";
+        PreparedStatement parkPs = conn.prepareStatement(parkSql);
+        parkPs.setInt(1, parkId);
+        ResultSet parkRs = parkPs.executeQuery();
+        if (!parkRs.next()) return 0;
+
+        int maxCapacity = parkRs.getInt("maxCapacity");
+        int currentVisitors = getParkCurrentVisitors(conn, parkId);
+
+        String bookingSql = "SELECT COALESCE(SUM(numberOfVisitors), 0) AS bookedVisitors "
+            + "FROM booking WHERE park_id = ? "
+            + "AND status NOT IN (?, ?, ?, ?) "
+            + "AND visitorTime BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 4 HOUR)";
+        PreparedStatement bookingPs = conn.prepareStatement(bookingSql);
+        bookingPs.setInt(1, parkId);
+        bookingPs.setString(2, Booking.STATUS_CANCELLED);
+        bookingPs.setString(3, Booking.STATUS_CHECKED_IN);
+        bookingPs.setString(4, Booking.STATUS_CHECKED_OUT);
+        bookingPs.setString(5, Booking.STATUS_SYSTEM_CANCEL);
+        ResultSet bookingRs = bookingPs.executeQuery();
+        int bookedVisitors = bookingRs.next() ? bookingRs.getInt("bookedVisitors") : 0;
+
+        return Math.max(0, maxCapacity - currentVisitors - bookedVisitors);
+    }
+
+    public static ArrayList<ParkVisitorsCount> getAllParksVisitorsForDepartment(
+            Connection conn, int managerEmployeeId) throws SQLException {
+        ArrayList<ParkVisitorsCount> list = new ArrayList<>();
+        String sql = "SELECT park_id, name, maxCapacity FROM park WHERE department_manager_id = ? ORDER BY park_id";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setInt(1, managerEmployeeId);
+        ResultSet rs = ps.executeQuery();
+
+        while (rs.next()) {
+            int parkId = rs.getInt("park_id");
+            int currentVisitors = getParkCurrentVisitors(conn, parkId);
+            list.add(new ParkVisitorsCount(
+                parkId,
+                rs.getString("name"),
+                currentVisitors,
+                rs.getInt("maxCapacity")
+            ));
+        }
+        return list;
     }
 
     // ── WaitingListEntry ─────────────────────────────────────────────────────

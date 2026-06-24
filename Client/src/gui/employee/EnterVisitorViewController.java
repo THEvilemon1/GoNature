@@ -31,10 +31,30 @@ public class EnterVisitorViewController {
 
     private Employee employee;
     private Booking foundBooking;
+    private ServerResponseListener liveSpotsListener;
 
     public void setEmployee(Employee employee) {
         this.employee = employee;
+        registerLiveSpotsListener();
         refreshAvailableSpots();
+    }
+
+    private void registerLiveSpotsListener() {
+        ParkClient client = ParkClient.getInstance();
+        if (client == null || !client.isConnected()) return;
+
+        liveSpotsListener = new ServerResponseListener() {
+            @Override
+            public void onEffectiveAvailableSpotsResult(int spots) {
+                Platform.runLater(() -> updateAvailableSpots(spots));
+            }
+
+            @Override public void onOrderExistsResult(boolean exists) {}
+            @Override public void onOrderResult(Order order) {}
+            @Override public void onUpdateOrderResult(boolean success) {}
+            @Override public void onError(String msg) {}
+        };
+        client.setNotificationListener(liveSpotsListener);
     }
 
     private void refreshAvailableSpots() {
@@ -44,8 +64,7 @@ public class EnterVisitorViewController {
         client.setListener(new ServerResponseListener() {
             @Override
             public void onEffectiveAvailableSpotsResult(int spots) {
-                Platform.runLater(() ->
-                    lblAvailableSpots.setText("Available Spots: " + spots));
+                Platform.runLater(() -> updateAvailableSpots(spots));
             }
             @Override public void onOrderExistsResult(boolean exists) {}
             @Override public void onOrderResult(Order order) {}
@@ -58,6 +77,10 @@ public class EnterVisitorViewController {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    private void updateAvailableSpots(int spots) {
+        lblAvailableSpots.setText("Available Spots: " + spots);
     }
 
     @FXML
@@ -217,6 +240,7 @@ public class EnterVisitorViewController {
 
     @FXML
     public void handleWalkIn(ActionEvent event) throws Exception {
+        clearLiveSpotsListener();
         Stage currentStage = (Stage) txtBookingId.getScene().getWindow();
         currentStage.hide();
 
@@ -234,6 +258,7 @@ public class EnterVisitorViewController {
 
     @FXML
     public void handleBack(ActionEvent event) throws Exception {
+        clearLiveSpotsListener();
         Stage currentStage = (Stage) txtBookingId.getScene().getWindow();
         currentStage.hide();
 
@@ -269,5 +294,12 @@ public class EnterVisitorViewController {
         lblStatus.getStyleClass().add(isError ? "msg-error" : "msg-success");
         lblStatus.setVisible(!message.isEmpty());
         lblStatus.setManaged(!message.isEmpty());
+    }
+
+    private void clearLiveSpotsListener() {
+        ParkClient client = ParkClient.getInstance();
+        if (client != null) {
+            client.clearNotificationListener(liveSpotsListener);
+        }
     }
 }

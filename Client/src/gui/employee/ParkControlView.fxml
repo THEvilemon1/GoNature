@@ -15,6 +15,7 @@
         <HBox styleClass="top-bar" alignment="CENTER_LEFT" spacing="12">
             <Label styleClass="screen-title" text="Park Manager — Control Panel" />
             <HBox HBox.hgrow="ALWAYS" />
+            <Label fx:id="lblCurrentVisitors" styleClass="top-bar-info" text="Current Visitors: --" />
             <Label fx:id="lblWelcome" styleClass="top-bar-info" text="" />
             <Button styleClass="btn-secondary" text="Promotions" onAction="#handleOpenPromotions" />
             <Button styleClass="btn-secondary" text="Visitors Report" onAction="#handleVisitorsReport" />

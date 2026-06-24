@@ -22,6 +22,7 @@ import java.util.Map;
 public class ParkControlViewController implements EmployeeAwareController {
 
     @FXML private Label lblWelcome;
+    @FXML private Label lblCurrentVisitors;
     @FXML private Label lblMessage;
     @FXML private ListView<String> lstActivityLog;
 
@@ -31,6 +32,7 @@ public class ParkControlViewController implements EmployeeAwareController {
 
     private Employee employee;
     private Map<String, String> requestIdToLogText = new HashMap<>();
+    private ServerResponseListener liveVisitorsListener;
 
     // Holds the most recently sent request awaiting an PARK_CHANGE_REQUEST_RESULT
     private ParkChangeRequest pendingRequest;
@@ -40,7 +42,42 @@ public class ParkControlViewController implements EmployeeAwareController {
     public void setEmployee(Employee employee) {
         this.employee = employee;
         lblWelcome.setText("Welcome, " + employee.getFirstName() + " " + employee.getLastName() + "!");
+        registerLiveVisitorsListener();
+        requestCurrentVisitors();
         registerListener();
+    }
+
+    private void registerLiveVisitorsListener() {
+        ParkClient client = ParkClient.getInstance();
+        if (client == null || !client.isConnected()) return;
+
+        liveVisitorsListener = new ServerResponseListener() {
+            @Override
+            public void onParkVisitorsResult(int currentVisitors) {
+                Platform.runLater(() -> updateCurrentVisitors(currentVisitors));
+            }
+
+            @Override public void onOrderExistsResult(boolean e) {}
+            @Override public void onOrderResult(common.Order o) {}
+            @Override public void onUpdateOrderResult(boolean s) {}
+            @Override public void onError(String msg) {}
+        };
+        client.setNotificationListener(liveVisitorsListener);
+    }
+
+    private void requestCurrentVisitors() {
+        ParkClient client = ParkClient.getInstance();
+        if (client == null || !client.isConnected()) return;
+
+        try {
+            client.sendToServer(new Message("GET_PARK_CURRENT_VISITORS", employee.getParkId()));
+        } catch (Exception e) {
+            showError("Failed to load live visitor count.");
+        }
+    }
+
+    private void updateCurrentVisitors(int currentVisitors) {
+        lblCurrentVisitors.setText("Current Visitors: " + currentVisitors);
     }
 
     /**
@@ -58,6 +95,11 @@ public class ParkControlViewController implements EmployeeAwareController {
             @Override public void onUpdateOrderResult(boolean s) {}
             @Override public void onError(String msg) {
                 Platform.runLater(() -> showError("Error: " + msg));
+            }
+
+            @Override
+            public void onParkVisitorsResult(int currentVisitors) {
+                Platform.runLater(() -> updateCurrentVisitors(currentVisitors));
             }
 
             @Override
@@ -253,6 +295,7 @@ public class ParkControlViewController implements EmployeeAwareController {
     public void handleLogout(ActionEvent event) throws Exception {
         ParkClient client = ParkClient.getInstance();
         if (client != null && client.isConnected()) {
+            client.clearNotificationListener(liveVisitorsListener);
             try {
                 client.sendToServer(new Message("EMPLOYEE_LOGOUT", employee.getUsername()));
             } catch (Exception e) {

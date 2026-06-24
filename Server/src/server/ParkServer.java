@@ -208,24 +208,8 @@ public class ParkServer extends AbstractServer {
      * at a glance, how busy each park in the region is right now.
      */
     private ArrayList<ParkVisitorsCount> getAllParksVisitors(int managerEmployeeId) throws SQLException {
-        ArrayList<ParkVisitorsCount> list = new ArrayList<>();
-
         Connection conn = DBConnection.getStaticConnection();
-        String sql = "SELECT park_id, name, currentVisitors, maxCapacity FROM park WHERE department_manager_id = ? ORDER BY park_id";
-        PreparedStatement ps = conn.prepareStatement(sql);
-        ps.setInt(1, managerEmployeeId);
-        ResultSet rs = ps.executeQuery();
-
-        while (rs.next()) {
-            list.add(new ParkVisitorsCount(
-                rs.getInt("park_id"),
-                rs.getString("name"),
-                rs.getInt("currentVisitors"),
-                rs.getInt("maxCapacity")
-            ));
-        }
-
-        return list;
+        return Utils.getAllParksVisitorsForDepartment(conn, managerEmployeeId);
     }
 
     private void pushVisitorCountsToDepartmentManager(int parkId) {
@@ -251,6 +235,30 @@ public class ParkServer extends AbstractServer {
             }
         } catch (Exception e) {
             System.out.println("[PUSH] Failed to push visitor counts to department manager: " + e.getMessage());
+        }
+    }
+
+    private void pushLiveParkState(int parkId) {
+        try {
+            Connection conn = DBConnection.getStaticConnection();
+            int currentVisitors = Utils.getParkCurrentVisitors(conn, parkId);
+            int effectiveSpots = Utils.getEffectiveAvailableSpots(conn, parkId);
+            ArrayList<Booking> todayBookings = getTodayBookings(parkId);
+
+            for (Thread t : getClientConnections()) {
+                if (!(t instanceof ConnectionToClient)) continue;
+                ConnectionToClient c = (ConnectionToClient) t;
+                Object storedParkId = c.getInfo("EMPLOYEE_PARK_ID");
+                if (storedParkId != null && (int) storedParkId == parkId) {
+                    c.sendToClient(new Message("PARK_VISITORS_RESULT", currentVisitors));
+                    c.sendToClient(new Message("EFFECTIVE_AVAILABLE_SPOTS_RESULT", effectiveSpots));
+                    c.sendToClient(new Message("TODAY_BOOKINGS_RESULT", todayBookings));
+                }
+            }
+
+            pushVisitorCountsToDepartmentManager(parkId);
+        } catch (Exception e) {
+            System.out.println("[PUSH] Failed to push live park state: " + e.getMessage());
         }
     }
 
@@ -509,21 +517,21 @@ public class ParkServer extends AbstractServer {
                      }
                      boolean checkInSuccess = checkInVisitor(bookingToCheckIn, employeeParkId);
                      client.sendToClient(new Message("CHECK_IN_RESULT", checkInSuccess));
-                     if (checkInSuccess) pushVisitorCountsToDepartmentManager(bookingToCheckIn.getParkId());
+                     if (checkInSuccess) pushLiveParkState(employeeParkId);
                      break;
 
                  case "CHECK_OUT_VISITOR":
                      ExitRequest exitRequest = (ExitRequest) message.getData();
                      boolean checkOutSuccess = checkOutVisitor(exitRequest);
                      client.sendToClient(new Message("CHECK_OUT_RESULT", checkOutSuccess));
-                     if (checkOutSuccess) pushVisitorCountsToDepartmentManager(exitRequest.getParkId());
+                     if (checkOutSuccess) pushLiveParkState(exitRequest.getParkId());
                      break;
 
                  case "WALK_IN_VISITOR":
                      WalkInRequest walkInRequest = (WalkInRequest) message.getData();
                      Booking walkInBooking = processWalkIn(walkInRequest);
                      client.sendToClient(new Message("WALK_IN_RESULT", walkInBooking));
-                     pushVisitorCountsToDepartmentManager(walkInRequest.getParkId());
+                     pushLiveParkState(walkInRequest.getParkId());
                      break;
 
                  case "PARK_CHANGE_REQUEST":
@@ -1227,40 +1235,12 @@ public class ParkServer extends AbstractServer {
 
     private int getParkCurrentVisitors(int parkId) throws SQLException {
         Connection conn = DBConnection.getStaticConnection();
-        String sql = "SELECT currentVisitors FROM park WHERE park_id = ?";
-        PreparedStatement ps = conn.prepareStatement(sql);
-        ps.setInt(1, parkId);
-        ResultSet rs = ps.executeQuery();
-        if (rs.next()) return rs.getInt("currentVisitors");
-        return 0;
+        return Utils.getParkCurrentVisitors(conn, parkId);
     }
 
     private int getEffectiveAvailableSpots(int parkId) throws SQLException {
         Connection conn = DBConnection.getStaticConnection();
-
-        String parkSql = "SELECT maxCapacity, currentVisitors FROM park WHERE park_id = ?";
-        PreparedStatement parkPs = conn.prepareStatement(parkSql);
-        parkPs.setInt(1, parkId);
-        ResultSet parkRs = parkPs.executeQuery();
-        if (!parkRs.next()) return 0;
-
-        int maxCapacity = parkRs.getInt("maxCapacity");
-        int currentVisitors = parkRs.getInt("currentVisitors");
-
-        String bookingSql = "SELECT COALESCE(SUM(numberOfVisitors), 0) AS bookedVisitors " +
-            "FROM booking WHERE park_id = ? " +
-            "AND status NOT IN (?, ?) " +
-            "AND visitorTime BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 4 HOUR)";
-        PreparedStatement bookingPs = conn.prepareStatement(bookingSql);
-        bookingPs.setInt(1, parkId);
-        bookingPs.setString(2, Booking.STATUS_CANCELLED);
-        bookingPs.setString(3, Booking.STATUS_CHECKED_IN);
-        ResultSet bookingRs = bookingPs.executeQuery();
-        int bookedVisitors = 0;
-        if (bookingRs.next()) bookedVisitors = bookingRs.getInt("bookedVisitors");
-
-        int effectiveAvailable = maxCapacity - currentVisitors - bookedVisitors;
-        return Math.max(0, effectiveAvailable);
+        return Utils.getEffectiveAvailableSpots(conn, parkId);
     }
 
     private Booking getBookingById(int bookingId) throws SQLException {
@@ -1292,11 +1272,7 @@ public class ParkServer extends AbstractServer {
 
         if (rows == 0) return false;
 
-        String updatePark = "UPDATE park SET currentVisitors = currentVisitors + ? WHERE park_id = ?";
-        PreparedStatement parkPs = conn.prepareStatement(updatePark);
-        parkPs.setInt(1, booking.getNumberOfVisitors());
-        parkPs.setInt(2, booking.getParkId());
-        parkPs.executeUpdate();
+        Utils.syncParkCurrentVisitors(conn, employeeParkId);
 
         return true;
     }
@@ -1340,11 +1316,7 @@ public class ParkServer extends AbstractServer {
         updatePs.setInt(4, Integer.parseInt(request.getBookingId()));
         updatePs.executeUpdate();
 
-        String updatePark = "UPDATE park SET currentVisitors = GREATEST(0, currentVisitors - ?) WHERE park_id = ?";
-        PreparedStatement parkPs = conn.prepareStatement(updatePark);
-        parkPs.setInt(1, request.getVisitorsLeaving());
-        parkPs.setInt(2, request.getParkId());
-        parkPs.executeUpdate();
+        Utils.syncParkCurrentVisitors(conn, request.getParkId());
 
         Booking updatedBooking = getBookingById(Integer.parseInt(request.getBookingId()));
         if (updatedBooking != null && Booking.STATUS_CHECKED_OUT.equals(updatedBooking.getStatus())) {
@@ -1382,11 +1354,7 @@ public class ParkServer extends AbstractServer {
         ps.setInt(7, request.getNumberOfVisitors()); // visitorsInside = all visitors
         ps.executeUpdate();
 
-        String updatePark = "UPDATE park SET currentVisitors = currentVisitors + ? WHERE park_id = ?";
-        PreparedStatement parkPs = conn.prepareStatement(updatePark);
-        parkPs.setInt(1, request.getNumberOfVisitors());
-        parkPs.setInt(2, request.getParkId());
-        parkPs.executeUpdate();
+        Utils.syncParkCurrentVisitors(conn, request.getParkId());
 
         return new Booking(bookingId, travelerId, request.getParkId(),
             request.getNumberOfVisitors(), java.time.LocalDateTime.now(),

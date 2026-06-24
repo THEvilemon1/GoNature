@@ -53,6 +53,7 @@ public interface ServerResponseListener {
     default void onParkChangeRequestResult(boolean success) {}
     default void onParkChangeApprovalResult(String requestId, boolean approved) {}
     default void onParkChangeRequestNotification(ParkChangeRequest request) {}
+    default void onParkManagerActivityLogResult(ArrayList<common.ParkManagerActivityLogEntry> entries) {}
     
     default void onPromotionsListResult(java.util.ArrayList<Promotion> promotions) {}
     default void onPromotionRequestResult(boolean success) {}

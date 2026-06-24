@@ -6,6 +6,7 @@ import client.WindowUtil;
 import common.Employee;
 import common.Message;
 import common.ParkChangeRequest;
+import common.ParkManagerActivityLogEntry;
 import gui.login.EmployeeAwareController;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
@@ -19,6 +20,7 @@ import javafx.stage.Stage;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -66,6 +68,7 @@ public class ParkControlViewController implements EmployeeAwareController {
             employee.getParkGap(),
             employee.getParkDefaultStayTime());
         registerListener();
+        requestActivityLog();
     }
 
     private void setupActivityLogTable() {
@@ -131,7 +134,50 @@ public class ParkControlViewController implements EmployeeAwareController {
                     updateLogByRequestId(requestId, approved);
                 });
             }
+
+            @Override
+            public void onParkManagerActivityLogResult(ArrayList<ParkManagerActivityLogEntry> entries) {
+                Platform.runLater(() -> loadActivityLog(entries));
+            }
         });
+    }
+
+    private void requestActivityLog() {
+        ParkClient client = ParkClient.getInstance();
+        if (client == null || !client.isConnected()) return;
+
+        try {
+            client.sendToServer(new Message("GET_PARK_MANAGER_ACTIVITY_LOG", employee.getEmployeeId()));
+        } catch (Exception e) {
+            showError("Failed to load activity log.");
+        }
+    }
+
+    private void loadActivityLog(ArrayList<ParkManagerActivityLogEntry> entries) {
+        tblActivityLog.getItems().clear();
+        requestIdToLogEntry.clear();
+        nextRequestNumber = 1;
+
+        for (ParkManagerActivityLogEntry savedEntry : entries) {
+            ActivityLogEntry entry = new ActivityLogEntry(
+                    nextRequestNumber++,
+                    savedEntry.getRequestId(),
+                    null,
+                    savedEntry.getRequestTitle(),
+                    formatStatus(savedEntry.getApproved()),
+                    null,
+                    savedEntry.getParameterType(),
+                    savedEntry.getNewValue()
+            );
+            entry.setFinalStatus(savedEntry.getApproved() != null);
+            requestIdToLogEntry.put(savedEntry.getRequestId(), entry);
+            tblActivityLog.getItems().add(entry);
+        }
+    }
+
+    private String formatStatus(Boolean approved) {
+        if (approved == null) return "Waiting";
+        return approved ? "Confirmed" : "Rejected";
     }
 
     @FXML

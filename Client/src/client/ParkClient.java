@@ -207,6 +207,11 @@ public class ParkClient extends AbstractClient {
                     listener.onParkChangeRequestNotification(incomingRequest);
                     break;
 
+                case "PARK_MANAGER_ACTIVITY_LOG_RESULT":
+                    listener.onParkManagerActivityLogResult(
+                        (ArrayList<common.ParkManagerActivityLogEntry>) message.getData());
+                    break;
+
                 case "PROMOTIONS_LIST_RESULT":
                     listener.onPromotionsListResult((java.util.ArrayList<Promotion>) message.getData());
                     break;

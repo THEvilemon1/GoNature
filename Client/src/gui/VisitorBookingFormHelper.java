@@ -18,6 +18,9 @@ import javafx.scene.control.TextField;
 
 // Helper class for managing the visitor booking form, including input validation, price calculation, and form state management.
 class VisitorBookingFormHelper {
+    private static final LocalTime BOOKING_OPEN_TIME = LocalTime.of(8, 0);
+    private static final LocalTime BOOKING_CLOSE_TIME = LocalTime.of(16, 0);
+
     private final TextField txtName;
     private final TextField txtEmail;
     private final TextField txtPhoneNumber;
@@ -62,12 +65,12 @@ class VisitorBookingFormHelper {
             @Override
             public void updateItem(LocalDate date, boolean empty) {
                 super.updateItem(date, empty);
-                setDisable(empty || date.isBefore(LocalDate.now()));
+                setDisable(empty || isDateUnavailable(date));
             }
         });
 
         dateVisit.valueProperty().addListener((obs, oldValue, newValue) -> refreshTimeOptions());
-        dateVisit.setValue(LocalDate.now());
+        dateVisit.setValue(firstAvailableBookingDate());
         refreshTimeOptions();
         updatePriceSummary();
     }
@@ -102,6 +105,9 @@ class VisitorBookingFormHelper {
         String timeText = cmbTime.getValue();
         if (date == null) {
             throw new IllegalArgumentException("Please choose a date.");
+        }
+        if (isDateUnavailable(date)) {
+            throw new IllegalArgumentException("Booking is no longer available for today because the park is already closed.");
         }
         if (timeText == null || timeText.isBlank()) {
             throw new IllegalArgumentException("Please choose a time.");
@@ -149,7 +155,7 @@ class VisitorBookingFormHelper {
         txtPhoneNumber.clear();
         spnVisitors.getValueFactory().setValue(1);
         cmbPark.setValue(null);
-        dateVisit.setValue(LocalDate.now());
+        dateVisit.setValue(firstAvailableBookingDate());
         refreshTimeOptions();
         updatePriceSummary();
     }
@@ -253,7 +259,12 @@ class VisitorBookingFormHelper {
         }
 
         LocalDateTime now = LocalDateTime.now();
-        for (int hour = 8; hour <= 16; hour++) {
+        if (isDateUnavailable(selectedDate)) {
+            cmbTime.setValue(null);
+            return;
+        }
+
+        for (int hour = BOOKING_OPEN_TIME.getHour(); hour <= BOOKING_CLOSE_TIME.getHour(); hour++) {
             LocalTime time = LocalTime.of(hour, 0);
             if (LocalDateTime.of(selectedDate, time).isAfter(now)) {
                 cmbTime.getItems().add(time.toString());
@@ -264,7 +275,23 @@ class VisitorBookingFormHelper {
             cmbTime.setValue(selected);
         } else if (!cmbTime.getItems().isEmpty()) {
             cmbTime.setValue(cmbTime.getItems().get(0));
+        } else {
+            cmbTime.setValue(null);
         }
+    }
+
+    private boolean isDateUnavailable(LocalDate date) {
+        LocalDate today = LocalDate.now();
+        return date.isBefore(today) || (date.isEqual(today) && isTodayClosedForBookings());
+    }
+
+    private boolean isTodayClosedForBookings() {
+        return !LocalTime.now().isBefore(BOOKING_CLOSE_TIME);
+    }
+
+    private LocalDate firstAvailableBookingDate() {
+        LocalDate today = LocalDate.now();
+        return isTodayClosedForBookings() ? today.plusDays(1) : today;
     }
 
     private ParkOption findParkOption(int parkId) {

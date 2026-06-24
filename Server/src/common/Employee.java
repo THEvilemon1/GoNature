@@ -35,7 +35,7 @@ public class Employee implements Serializable {
     }
 
     public Employee(int employeeId, int salary, int parkId, String username,
-                    String role, int userId, String firstName, String lastName,
+                    String role, String userId, String firstName, String lastName,
                     String email, String phoneNumber, Integer parkMaxCapacity,
                     Integer parkGap, Integer parkDefaultStayTime) {
         this.employeeId = employeeId;

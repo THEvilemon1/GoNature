@@ -18,6 +18,7 @@ import common.ParkReportRequest;
 import common.ParkVisitorsReportResult;
 import common.ParkUsageReportResult;
 import common.ParkChangeRequest;
+import common.ParkManagerActivityLogEntry;
 import common.Booking;
 import common.ContactInfoValidator;
 import common.Employee;
@@ -40,6 +41,7 @@ import ocsf.server.AbstractServer;
 import ocsf.server.ConnectionToClient;
 
 public class ParkServer extends AbstractServer {
+    private static final java.time.LocalTime BOOKING_CLOSE_TIME = java.time.LocalTime.of(16, 0);
 
     // Thread-safe set to track disconnected clients
     private final Set<ConnectionToClient> disconnectedClients =
@@ -485,6 +487,7 @@ public class ParkServer extends AbstractServer {
                  case "GET_PARK_SETTINGS":
                      int parkIdForSettings = (int) message.getData();
                      client.sendToClient(new Message("PARK_SETTINGS_RESULT", getParkSettings(parkIdForSettings)));
+                     break;
                  // Department manager: live visitor counts for every park in the region.
                  case "GET_ALL_PARKS_VISITORS":
                     int managerEmployeeId = (int) message.getData();
@@ -547,6 +550,12 @@ public class ParkServer extends AbstractServer {
                  case "GET_PENDING_REQUESTS":
                      int parkIdForPending = (int) message.getData();
                      sendPendingRequestsToManager(parkIdForPending, client);
+                     break;
+
+                 case "GET_PARK_MANAGER_ACTIVITY_LOG":
+                     int activityLogEmployeeId = (int) message.getData();
+                     client.sendToClient(new Message("PARK_MANAGER_ACTIVITY_LOG_RESULT",
+                         getParkManagerActivityLog(activityLogEmployeeId)));
                      break;
 
                  case "PARK_VISITORS_REPORT":
@@ -1043,10 +1052,16 @@ public class ParkServer extends AbstractServer {
         if (booking.getNumberOfVisitors() < 1 || booking.getNumberOfVisitors() > 16) {
             throw new IllegalArgumentException("Visitors must be between 1 and 16.");
         }
+        LocalDateTime now = LocalDateTime.now();
+        if (booking.getVisitorTime() != null
+            && booking.getVisitorTime().toLocalDate().isEqual(now.toLocalDate())
+            && !now.toLocalTime().isBefore(BOOKING_CLOSE_TIME)) {
+            throw new IllegalArgumentException("Booking is no longer available for today because the park is already closed.");
+        }
         if (booking.getVisitorTime() == null || !booking.getVisitorTime().isAfter(LocalDateTime.now())) {
             throw new IllegalArgumentException("Booking date and time must be in the future.");
         }
-        if (booking.getVisitorTime().toLocalTime().isAfter(java.time.LocalTime.of(16, 0))) {
+        if (booking.getVisitorTime().toLocalTime().isAfter(BOOKING_CLOSE_TIME)) {
             throw new IllegalArgumentException("Bookings can only be made until 16:00.");
         }
     }
@@ -1476,6 +1491,34 @@ public class ParkServer extends AbstractServer {
         }
     }
 
+    private ArrayList<ParkManagerActivityLogEntry> getParkManagerActivityLog(int employeeId) throws SQLException {
+        ArrayList<ParkManagerActivityLogEntry> entries = new ArrayList<>();
+        Connection conn = DBConnection.getStaticConnection();
+
+        String sql = "SELECT request_Id, requestTitle, parameter_type, new_value, approved " +
+                     "FROM managerRequests " +
+                     "WHERE employee_id = ? " +
+                     "ORDER BY request_Id";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setInt(1, employeeId);
+        ResultSet rs = ps.executeQuery();
+
+        while (rs.next()) {
+            int approvedValue = rs.getInt("approved");
+            Boolean approved = rs.wasNull() ? null : approvedValue == 1;
+
+            entries.add(new ParkManagerActivityLogEntry(
+                rs.getString("request_Id"),
+                rs.getString("requestTitle"),
+                ParkChangeRequest.ParameterType.valueOf(rs.getString("parameter_type")),
+                rs.getInt("new_value"),
+                approved
+            ));
+        }
+
+        return entries;
+    }
+
     private String getUsernameForEmployeeId(Connection conn, int employeeId) throws SQLException {
         String sql = "SELECT u.username FROM employee e " +
                      "JOIN `user` u ON e.user_id = u.user_id " +
@@ -1489,18 +1532,30 @@ public class ParkServer extends AbstractServer {
 
     private void handleParkChangeRequest(ParkChangeRequest request, ConnectionToClient client) throws Exception {
         Connection conn = DBConnection.getStaticConnection();
+        Integer depManagerId = getDepartmentManagerIdForPark(conn, request.getParkId());
         String sql = "INSERT INTO managerRequests (request_Id, employee_id, dep_manager_id, " +
                      "requestTitle, parameter_type, new_value, park_id, approved) " +
                      "VALUES (?, ?, ?, ?, ?, ?, ?, NULL)";
         PreparedStatement ps = conn.prepareStatement(sql);
         ps.setString(1, request.getRequestId());
         ps.setInt(2, request.getEmployeeId());
-        ps.setInt(3, request.getDepManagerId());
+        ps.setInt(3, getDepartmentManagerIdForPark(conn, request.getParkId()));
         ps.setString(4, request.getRequestTitle());
         ps.setString(5, request.getParameterType().name());
         ps.setInt(6, request.getNewValue());
         ps.setInt(7, request.getParkId());
         ps.executeUpdate();
+
+        ParkChangeRequest notificationRequest = new ParkChangeRequest(
+            request.getParkId(),
+            request.getParameterType(),
+            request.getNewValue(),
+            request.getRequestedByUsername(),
+            request.getEmployeeId(),
+            depManagerId == null ? 0 : depManagerId,
+            request.getRequestId(),
+            request.getRequestTitle()
+        );
 
         boolean depManagerOnline = false;
         for (Thread t : getClientConnections()) {
@@ -1510,7 +1565,7 @@ public class ParkServer extends AbstractServer {
             Object parkId = c.getInfo("EMPLOYEE_PARK_ID");
             if ("department_manager".equals(role) &&
                 parkId != null && (int) parkId == request.getParkId()) {
-                c.sendToClient(new Message("PARK_CHANGE_REQUEST_NOTIFICATION", request));
+                c.sendToClient(new Message("PARK_CHANGE_REQUEST_NOTIFICATION", notificationRequest));
                 depManagerOnline = true;
                 break;
             }
@@ -1521,6 +1576,18 @@ public class ParkServer extends AbstractServer {
         } else {
             client.sendToClient(new Message("PARK_CHANGE_REQUEST_RESULT", false));
         }
+    }
+
+    private Integer getDepartmentManagerIdForPark(Connection conn, int parkId) throws SQLException {
+        String sql = "SELECT department_manager_id FROM park WHERE park_id = ?";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setInt(1, parkId);
+        ResultSet rs = ps.executeQuery();
+        if (!rs.next()) {
+            throw new IllegalArgumentException("Selected park does not exist in the database.");
+        }
+        int depManagerId = rs.getInt("department_manager_id");
+        return rs.wasNull() ? null : depManagerId;
     }
 
     private void handleParkChangeApproval(String requestId, boolean approved, ConnectionToClient client) throws Exception {

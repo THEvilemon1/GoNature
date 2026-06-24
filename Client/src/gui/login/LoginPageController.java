@@ -1,4 +1,4 @@
- package gui.login;
+package gui.login;
 
 import boundaries.login.EmployeeLogin;
 import boundaries.login.TravelerLoginAndRegister;
@@ -24,7 +24,6 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
 import java.net.URL;
-import java.util.ArrayList;
 import java.util.ResourceBundle;
 
 public class LoginPageController implements Initializable {

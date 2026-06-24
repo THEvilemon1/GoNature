@@ -16,7 +16,7 @@ public class Booking implements Serializable {
     public static final String STATUS_CHECKED_OUT = "CHECKED_OUT";
     public static final String STATUS_SYSTEM_CANCEL = "SYSTEM_CANCEL";
 
-    private String bookingId;
+    private int bookingId;
     private String travelerId;
     private String travelerName;
     private String travelerEmail;
@@ -28,13 +28,14 @@ public class Booking implements Serializable {
     private boolean organizedBooking;
     private double price;
     private boolean paid;
+    private int visitorsInside;
 
-    public Booking(String bookingId, String travelerId, int parkId, int numberOfVisitors,
+    public Booking(int bookingId, String travelerId, int parkId, int numberOfVisitors,
                    LocalDateTime visitorTime, String status, boolean organizedBooking, double price) {
         this(bookingId, travelerId, null, null, null, parkId, numberOfVisitors, visitorTime, status, organizedBooking, price);
     }
 
-    public Booking(String bookingId, String travelerId, String travelerName,
+    public Booking(int bookingId, String travelerId, String travelerName,
                    String travelerEmail, String travelerPhoneNumber, int parkId, int numberOfVisitors,
                    LocalDateTime visitorTime, String status, boolean organizedBooking, double price) {
         this.bookingId = bookingId;
@@ -50,7 +51,7 @@ public class Booking implements Serializable {
         this.price = price;
     }
 
-    public String getBookingId() { return bookingId; }
+    public int getBookingId() { return bookingId; }
     public String getTravelerId() { return travelerId; }
     public String getTravelerName() { return travelerName; }
     public String getTravelerEmail() { return travelerEmail; }
@@ -64,4 +65,6 @@ public class Booking implements Serializable {
     public boolean isPaid() { return paid; }
     public void setPaid(boolean paid) { this.paid = paid; }
     public void setPrice(double price) { this.price = price; }
+    public int getVisitorsInside() { return visitorsInside; }
+    public void setVisitorsInside(int visitorsInside) { this.visitorsInside = visitorsInside; }
 }

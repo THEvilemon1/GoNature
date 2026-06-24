@@ -1,5 +1,6 @@
 package gui.employee;
 
+import javafx.beans.property.SimpleStringProperty;
 import client.ParkClient;
 import client.ServerResponseListener;
 import client.WindowUtil;
@@ -7,10 +8,10 @@ import common.Employee;
 import common.Message;
 import common.ParkChangeRequest;
 import common.ParkSubmittedReport;
+import common.ParkVisitorsCount;
 import common.PromotionRequest;
 import gui.login.EmployeeAwareController;
 import javafx.application.Platform;
-import javafx.beans.property.SimpleStringProperty;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -28,6 +29,13 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
     @FXML private Label lblWelcome;
     @FXML private Label lblMessage;
 
+    @FXML private TableView<ParkVisitorsCount> tblVisitors;
+    @FXML private TableColumn<ParkVisitorsCount, String> colVisitorsParkId;
+    @FXML private TableColumn<ParkVisitorsCount, String> colVisitorsParkName;
+    @FXML private TableColumn<ParkVisitorsCount, String> colVisitorsCurrent;
+    @FXML private TableColumn<ParkVisitorsCount, String> colVisitorsCapacity;
+    @FXML private TableColumn<ParkVisitorsCount, String> colVisitorsFree;
+
     @FXML private TableView<ParkSubmittedReport> tblReports;
     @FXML private TableColumn<ParkSubmittedReport, String> colReportParkId;
     @FXML private TableColumn<ParkSubmittedReport, String> colReportTitle;
@@ -42,17 +50,52 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
 
     private Employee employee;
     private Map<Object, String> statusMap = new IdentityHashMap<>();
+    private ServerResponseListener overviewListener;
 
     @Override
     public void setEmployee(Employee employee) {
         this.employee = employee;
         lblWelcome.setText("Welcome, " + employee.getFirstName() + " " + employee.getLastName() + "!");
 
+        setupVisitorsTable();
         setupReportsTable();
         setupTable();
         listenForRequests();
         requestPendingRequests();
         requestSubmittedReports();
+        requestAllParksVisitors();
+    }
+
+    private void setupVisitorsTable() {
+        colVisitorsParkId.setCellValueFactory(data ->
+                new SimpleStringProperty(String.valueOf(data.getValue().getParkId())));
+
+        colVisitorsParkName.setCellValueFactory(data ->
+                new SimpleStringProperty(data.getValue().getParkName()));
+
+        colVisitorsCurrent.setCellValueFactory(data ->
+                new SimpleStringProperty(String.valueOf(data.getValue().getCurrentVisitors())));
+
+        colVisitorsCapacity.setCellValueFactory(data ->
+                new SimpleStringProperty(String.valueOf(data.getValue().getMaxCapacity())));
+
+        // Free spots = how many more visitors can still enter the park right now.
+        colVisitorsFree.setCellValueFactory(data -> {
+            ParkVisitorsCount park = data.getValue();
+            int free = park.getMaxCapacity() - park.getCurrentVisitors();
+            return new SimpleStringProperty(String.valueOf(free));
+        });
+    }
+
+    private void requestAllParksVisitors() {
+        ParkClient client = ParkClient.getInstance();
+        if (client == null || !client.isConnected()) return;
+
+        try {
+            client.sendToServer(new Message("GET_ALL_PARKS_VISITORS", employee.getEmployeeId()));
+        } catch (Exception e) {
+            showError("Failed to load live visitor counts.");
+        }
     }
 
     private void requestSubmittedReports() {
@@ -198,7 +241,7 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
         ParkClient client = ParkClient.getInstance();
         if (client == null || !client.isConnected()) return;
 
-        client.setListener(new ServerResponseListener() {
+        overviewListener = new ServerResponseListener() {
             @Override public void onOrderExistsResult(boolean e) {}
             @Override public void onOrderResult(common.Order o) {}
             @Override public void onUpdateOrderResult(boolean s) {}
@@ -213,6 +256,14 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
                 Platform.runLater(() -> {
                     tblReports.getItems().clear();
                     tblReports.getItems().addAll(reports);
+                });
+            }
+
+            @Override
+            public void onAllParksVisitorsResult(ArrayList<ParkVisitorsCount> parks) {
+                Platform.runLater(() -> {
+                    tblVisitors.getItems().clear();
+                    tblVisitors.getItems().addAll(parks);
                 });
             }
 
@@ -233,7 +284,14 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
                     tblRequests.refresh();
                 });
             }
-        });
+        };
+
+        // Register as both the regular listener (for this screen's own request/response
+        // traffic) and the notification listener. The notification listener keeps
+        // receiving live visitor counts and pending requests even after a report window
+        // temporarily takes over the regular listener via setListener().
+        client.setListener(overviewListener);
+        client.setNotificationListener(overviewListener);
     }
 
     private void sendDecision(Object requestObj, boolean approved) {
@@ -303,6 +361,9 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
 
             Parent root = loader.load();
 
+            CancellationsReportViewController controller = loader.getController();
+            controller.setEmployee(employee);
+
             Stage stage = new Stage();
             stage.setTitle("Cancellations Report");
             stage.setScene(new Scene(root));
@@ -316,6 +377,10 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
     @FXML
     public void handleLogout(ActionEvent event) throws Exception {
         ParkClient client = ParkClient.getInstance();
+
+        if (client != null) {
+            client.clearNotificationListener(overviewListener);
+        }
 
         if (client != null && client.isConnected()) {
             try {

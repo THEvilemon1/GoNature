@@ -140,6 +140,7 @@
 
                 <HBox spacing="10" alignment="CENTER_RIGHT">
                     <Button styleClass="card-btn-secondary" text="Cancel" onAction="#handleCancelForm" />
+                    <Button fx:id="btnResetBooking" styleClass="card-btn-secondary" text="Reset" onAction="#handleResetBooking" />
                     <Button fx:id="btnSubmitBooking" styleClass="card-btn-primary" text="Submit Booking" onAction="#handleSubmitBooking" />
                 </HBox>
             </VBox>

@@ -24,6 +24,12 @@ import ocsf.client.AbstractClient;
 public class ParkClient extends AbstractClient {
 
     private ServerResponseListener listener;
+    // Unsolicited notifications for the department manager's overview (live visitor
+    // counts, pending change/promotion requests) are delivered here instead of through
+    // the regular request/response listener. The overview is a long-lived screen, but
+    // the transient report windows it opens call setListener() and would otherwise take
+    // over the only listener, causing the manager to stop receiving live pushes.
+    private ServerResponseListener notificationListener;
     private boolean intentionalDisconnect = false;
 
     private ParkClient(String host, int port) throws IOException {
@@ -55,14 +61,54 @@ public class ParkClient extends AbstractClient {
         this.listener = listener;
     }
 
+    /**
+     * Registers a listener for unsolicited server notifications pushed to the
+     * department manager (live visitor counts and pending requests). Unlike
+     * {@link #setListener}, this is not replaced when other screens swap the
+     * regular listener, so the manager keeps receiving live updates.
+     */
+    public void setNotificationListener(ServerResponseListener notificationListener) {
+        this.notificationListener = notificationListener;
+    }
+
+    public void clearNotificationListener(ServerResponseListener notificationListener) {
+        if (this.notificationListener == notificationListener) {
+            this.notificationListener = null;
+        }
+    }
+
     public void setIntentionalDisconnect() {
         this.intentionalDisconnect = true;
     }
 
     @Override
     protected void handleMessageFromServer(Object msg) {
-        if (msg instanceof Message && listener != null) {
-            Message message = (Message) msg;
+        if (!(msg instanceof Message)) return;
+        Message message = (Message) msg;
+
+        // Server-initiated notifications for the department manager's overview are
+        // delivered to a dedicated listener that transient screens never replace,
+        // so live visitor counts keep updating even while a report window is open.
+        if (notificationListener != null) {
+            switch (message.getCommand()) {
+                case "ALL_PARKS_VISITORS_RESULT":
+                    notificationListener.onAllParksVisitorsResult(
+                        (ArrayList<common.ParkVisitorsCount>) message.getData());
+                    return;
+                case "PARK_CHANGE_REQUEST_NOTIFICATION":
+                    notificationListener.onParkChangeRequestNotification(
+                        (ParkChangeRequest) message.getData());
+                    return;
+                case "PROMOTION_REQUEST_NOTIFICATION":
+                    notificationListener.onPromotionRequestNotification(
+                        (PromotionRequest) message.getData());
+                    return;
+                default:
+                    break;
+            }
+        }
+
+        if (listener != null) {
             switch (message.getCommand()) {
             case "VISITS_REPORT_RESULT":
                 listener.onVisitsReportResult(
@@ -101,7 +147,7 @@ public class ParkClient extends AbstractClient {
                     listener.onCreateBookingRequiresWaitlistConfirmation((Booking) waitlistPayload[0], (String) waitlistPayload[1]);
                     break;
                 case "UPDATE_BOOKING_RESULT":
-                    listener.onUpdateBookingResult((boolean) message.getData());
+                    listener.onUpdateBookingResult((Booking) message.getData());
                     break;
                 case "CANCEL_BOOKING_RESULT":
                     listener.onCancelBookingResult((boolean) message.getData());
@@ -186,8 +232,15 @@ public class ParkClient extends AbstractClient {
                 case "SUBMITTED_REPORTS_RESULT":
                     listener.onSubmittedReportsResult((ArrayList<ParkSubmittedReport>) message.getData());
                     break;
-                case "REGISTER_TRAVELER_RESULT":
-                    listener.onRegisterTravelerResult((String) message.getData());
+                    
+                case "ALL_PARKS_VISITORS_RESULT":
+                    listener.onAllParksVisitorsResult(
+                        (ArrayList<common.ParkVisitorsCount>) message.getData());
+                    break;
+
+                case "CANCELLATIONS_REPORT_RESULT":
+                    listener.onCancellationsReportResult(
+                        (ArrayList<common.CancellationsReportResult>) message.getData());
                     break;
                   
             }

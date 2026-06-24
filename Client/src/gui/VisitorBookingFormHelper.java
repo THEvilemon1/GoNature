@@ -118,7 +118,7 @@ class VisitorBookingFormHelper {
         }
 
         double price = calculateTotalPrice(park, visitors);
-        String bookingId = editingBooking == null ? null : editingBooking.getBookingId();
+        int bookingId = editingBooking == null ? 0 : editingBooking.getBookingId();
         return new Booking(bookingId, currentUser.getTravelerId(), requireText(txtName, "Please enter your name."),
             requireText(txtEmail, "Please enter email address."),
             requireText(txtPhoneNumber, "Please enter phone number."), park.getId(), visitors,
@@ -156,6 +156,10 @@ class VisitorBookingFormHelper {
 
     boolean isNewBooking() {
         return editingBooking == null;
+    }
+
+    Booking getEditingBooking() {
+        return editingBooking;
     }
 
     String getParkName(int parkId) {
@@ -226,7 +230,7 @@ class VisitorBookingFormHelper {
         if (currentUser == null || currentUser.isGuide()) {
             return 1.0;
         }
-        double factor = isNewBooking() ? 0.85 : 1.0;
+        double factor = 0.85; // 15% digital booking discount always applies
         return currentUser.isClubMember() ? factor * 0.90 : factor;
     }
 
@@ -234,10 +238,10 @@ class VisitorBookingFormHelper {
         if (currentUser != null && currentUser.isGuide()) {
             return " (guide entry excluded)";
         }
-        String text = "";
-        if (isNewBooking()) text += "15% new booking";
-        if (currentUser != null && currentUser.isClubMember()) text += text.isEmpty() ? "10% club member" : ", 10% club member";
-        return text.isEmpty() ? "" : " (" + text + ")";
+        if (currentUser == null) return "";
+        String text = "15% digital booking";
+        if (currentUser.isClubMember()) text += ", 10% club member";
+        return " (" + text + ")";
     }
 
     private void refreshTimeOptions() {

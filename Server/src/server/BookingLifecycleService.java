@@ -73,7 +73,7 @@ public final class BookingLifecycleService {
         offerSpotToNextWaitingTraveler(conn, parkId, visitorTime);
     }
 
-    public static boolean confirmBooking(String bookingId, String travelerId) throws SQLException {
+    public static boolean confirmBooking(int bookingId, String travelerId) throws SQLException {
         Connection conn = DBConnection.getStaticConnection();
         boolean previousAutoCommit = conn.getAutoCommit();
         conn.setAutoCommit(false);
@@ -229,7 +229,7 @@ public final class BookingLifecycleService {
         }
     }
 
-    private static void updateBookingStatus(Connection conn, String bookingId, String status,
+    private static void updateBookingStatus(Connection conn, int bookingId, String status,
                                             LocalDateTime actionRequiredAt,
                                             LocalDateTime actionDeadline,
                                             String notificationType) throws SQLException {
@@ -242,7 +242,7 @@ public final class BookingLifecycleService {
         Utils.setTimestampOrNull(ps,3, actionDeadline);
         ps.setString(4, notificationType);
         ps.setString(5, notificationType);
-        ps.setString(6, bookingId);
+        ps.setInt(6, bookingId);
         ps.executeUpdate();
     }
 
@@ -272,27 +272,27 @@ public final class BookingLifecycleService {
         return bookings;
     }
 
-    private static void sendWaitlistExpiredNotification(Connection conn, String bookingId) throws SQLException {
+    private static void sendWaitlistExpiredNotification(Connection conn, int bookingId) throws SQLException {
         NotificationService.sendSystemCancellation(conn, bookingId,
             "Your booking stayed on the waiting list until the visit time arrived.");
     }
 
-    private static void sendWaitlistOfferExpiredNotification(Connection conn, String bookingId) throws SQLException {
+    private static void sendWaitlistOfferExpiredNotification(Connection conn, int bookingId) throws SQLException {
         NotificationService.sendSystemCancellation(conn, bookingId,
             "Your offered spot expired because it was not confirmed within one hour.");
     }
 
-    private static void sendReminderExpiredNotification(Connection conn, String bookingId) throws SQLException {
+    private static void sendReminderExpiredNotification(Connection conn, int bookingId) throws SQLException {
         NotificationService.sendSystemCancellation(conn, bookingId,
             "Your booking was not confirmed within two hours after the reminder.");
     }
 
-    private static void sendSpotConfirmedNotification(Connection conn, String bookingId) throws SQLException {
+    private static void sendSpotConfirmedNotification(Connection conn, int bookingId) throws SQLException {
         NotificationService.sendBookingConfirmed(conn, bookingId,
             "Your booking was confirmed after you accepted the available spot.");
     }
 
-    private static void sendReminderConfirmedNotification(Connection conn, String bookingId) throws SQLException {
+    private static void sendReminderConfirmedNotification(Connection conn, int bookingId) throws SQLException {
         NotificationService.sendBookingConfirmed(conn, bookingId,
             "Your visit reminder was confirmed successfully.");
     }

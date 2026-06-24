@@ -1,0 +1,14 @@
+# Compiled Java classes
+*.class
+
+# Build output directories
+bin/
+out/
+build/
+
+# IDE files
+.classpath
+.project
+.settings/
+*.iml
+.idea/

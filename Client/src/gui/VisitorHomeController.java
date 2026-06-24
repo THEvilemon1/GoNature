@@ -65,11 +65,13 @@ public class VisitorHomeController implements ServerResponseListener {
     @FXML private Button btnEditProfile;
     @FXML private Button btnCancelProfile;
     @FXML private Button btnSaveProfile;
+    @FXML private Button btnResetBooking;
 
     private VisitorLoginResult currentUser;
     private TravelerProfile currentProfile;
     private Booking pendingWaitlistBooking;
     private Booking pendingConfirmBooking;
+    private Booking pendingUpdateOriginalBooking;
     private boolean confirmingFromWaitlist;
     private VisitorBookingFormHelper formHelper;
     private VisitorBookingsViewHelper bookingsHelper;
@@ -158,6 +160,7 @@ public class VisitorHomeController implements ServerResponseListener {
         lblDetailTitle.setText("Book a Visit");
         showBookingForm(null);
         showDetail();
+        
     }
 
     @FXML
@@ -191,6 +194,17 @@ public class VisitorHomeController implements ServerResponseListener {
         resetForm();
         stopBookingsAutoRefresh();
         showMain();
+    }
+
+    @FXML
+    private void handleResetBooking() {
+        if (formHelper.isNewBooking()) {
+            formHelper.reset();
+            populateBookingContactFieldsFromProfile();
+        } else {
+            formHelper.showBooking(formHelper.getEditingBooking());
+        }
+        hideBookingMessage();
     }
 
     @FXML
@@ -237,7 +251,15 @@ public class VisitorHomeController implements ServerResponseListener {
                 showBookingMessage("You cannot book a visit with only yourself as a guide.", true);
                 return;
             }
-            String command = pendingWaitlistBooking != null ? "CREATE_WAITLIST_BOOKING" : (formHelper.isNewBooking() ? "CREATE_BOOKING" : "UPDATE_BOOKING");
+            String command;
+            if (pendingWaitlistBooking != null) {
+                command = "CREATE_WAITLIST_BOOKING";
+            } else if (formHelper.isNewBooking()) {
+                command = "CREATE_BOOKING";
+            } else {
+                command = "UPDATE_BOOKING";
+                pendingUpdateOriginalBooking = formHelper.getEditingBooking();
+            }
             client.sendToServer(new Message(command, booking));
             btnSubmitBooking.setDisable(true);
         } catch (IllegalArgumentException e) {
@@ -341,16 +363,29 @@ public class VisitorHomeController implements ServerResponseListener {
     }
 
     @Override
-    public void onUpdateBookingResult(boolean success) {
+    public void onUpdateBookingResult(Booking updatedBooking) {
         Platform.runLater(() -> {
             btnSubmitBooking.setDisable(false);
-            if (success) {
+            if (updatedBooking != null) {
+                boolean wasGuide = currentUser != null && currentUser.isGuide();
+                boolean wasPaid = pendingUpdateOriginalBooking != null && pendingUpdateOriginalBooking.isPaid();
+                boolean parkChanged = pendingUpdateOriginalBooking != null
+                    && pendingUpdateOriginalBooking.getParkId() != updatedBooking.getParkId();
+                boolean visitorsChanged = pendingUpdateOriginalBooking != null
+                    && pendingUpdateOriginalBooking.getNumberOfVisitors() != updatedBooking.getNumberOfVisitors();
+
+                pendingUpdateOriginalBooking = null;
                 resetForm();
                 lblDetailTitle.setText("My Bookings");
                 showBookingsList();
                 showBookingsMessage("Booking updated and waiting for approval.", false);
                 requestTravelerBookings();
+
+                if (wasGuide && wasPaid && (parkChanged || visitorsChanged)) {
+                    offerAdvancePay(updatedBooking);
+                }
             } else {
+                pendingUpdateOriginalBooking = null;
                 showBookingMessage("Booking could not be updated.", true);
             }
         });
@@ -505,7 +540,7 @@ public class VisitorHomeController implements ServerResponseListener {
         pendingConfirmBooking = booking;
         try {
             client.sendToServer(new Message("CONFIRM_BOOKING", new String[] {
-                booking.getBookingId(),
+                String.valueOf(booking.getBookingId()),
                 booking.getTravelerId()
             }));
         } catch (IOException e) {
@@ -594,11 +629,12 @@ public class VisitorHomeController implements ServerResponseListener {
     }
 
     private void populateBookingContactFieldsFromProfile() {
-        if (!hasCompleteProfile()) {
+        if (currentProfile == null) {
             return;
         }
         txtName.setText(currentProfile.getFullName());
-        txtEmail.setText(ContactInfoValidator.clean(currentProfile.getEmail()));
+        txtEmail.setText(ContactInfoValidator.isPlaceholderEmail(currentProfile.getEmail())
+            ? "" : ContactInfoValidator.clean(currentProfile.getEmail()));
         txtPhoneNumber.setText(ContactInfoValidator.clean(currentProfile.getPhoneNumber()));
     }
 

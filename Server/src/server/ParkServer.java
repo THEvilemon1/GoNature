@@ -825,6 +825,7 @@ public class ParkServer extends AbstractServer {
         return createBooking(booking, true).booking;
     }
 
+    // Check the capacity - how many confirmed bookings are there.
     private int getConfirmedVisitorsForSlot(Connection conn, int parkId, LocalDateTime visitorTime) throws SQLException {
         String sql = "SELECT COALESCE(SUM(numberOfVisitors), 0) AS confirmedVisitors "
             + "FROM booking WHERE park_id = ? AND visitorTime = ? AND status = ? FOR UPDATE";
@@ -918,6 +919,7 @@ public class ParkServer extends AbstractServer {
             boolean slotChanged = existing.getParkId() != booking.getParkId()
                 || !existing.getVisitorTime().equals(booking.getVisitorTime());
             int confirmedInNewSlot = getConfirmedVisitorsForSlot(conn, booking.getParkId(), booking.getVisitorTime());
+            
             // If same slot and existing was confirmed, those visitors will be freed when we reset to PENDING.
             if (!slotChanged && Booking.STATUS_CONFIRMED.equals(existing.getStatus())) {
                 confirmedInNewSlot -= existing.getNumberOfVisitors();
@@ -944,6 +946,9 @@ public class ParkServer extends AbstractServer {
 
             double price = calculatePrice(conn, booking.getParkId(), booking.getNumberOfVisitors(), booking.getTravelerId(), true);
 
+            // Slot unchanged → keep existing status; slot changed → re-confirm since capacity was already verified.
+            String newStatus = slotChanged ? Booking.STATUS_CONFIRMED : existing.getStatus();
+
             String sql = "UPDATE booking SET travelerName = ?, travelerEmail = ?, travelerPhoneNumber = ?, "
                 + "park_id = ?, numberOfVisitors = ?, visitorTime = ?, status = ?, price = ?, paid = 0 "
                 + "WHERE booking_id = ? AND traveler_id = ? "
@@ -955,7 +960,7 @@ public class ParkServer extends AbstractServer {
             ps.setInt(4, booking.getParkId());
             ps.setInt(5, booking.getNumberOfVisitors());
             ps.setTimestamp(6, Timestamp.valueOf(booking.getVisitorTime()));
-            ps.setString(7, Booking.STATUS_PENDING);
+            ps.setString(7, newStatus);
             ps.setDouble(8, price);
             ps.setInt(9, booking.getBookingId());
             ps.setString(10, booking.getTravelerId());
@@ -971,7 +976,7 @@ public class ParkServer extends AbstractServer {
             return new Booking(booking.getBookingId(), booking.getTravelerId(),
                 booking.getTravelerName(), booking.getTravelerEmail(), booking.getTravelerPhoneNumber(),
                 booking.getParkId(), booking.getNumberOfVisitors(), booking.getVisitorTime(),
-                Booking.STATUS_PENDING, false, price);
+                newStatus, false, price);
         } catch (SQLException | RuntimeException e) {
             conn.rollback();
             throw e;

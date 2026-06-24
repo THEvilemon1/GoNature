@@ -28,10 +28,10 @@ public final class Utils {
      * transaction (FOR UPDATE). Used before any status transition so that
      * two concurrent requests cannot race on the same booking row.
      */
-    public static Booking getBookingByIdForUpdate(Connection conn, String bookingId) throws SQLException {
+    public static Booking getBookingByIdForUpdate(Connection conn, int bookingId) throws SQLException {
         String sql = "SELECT * FROM booking WHERE booking_id = ? FOR UPDATE";
         PreparedStatement ps = conn.prepareStatement(sql);
-        ps.setString(1, bookingId);
+        ps.setInt(1, bookingId);
         ResultSet rs = ps.executeQuery();
         if (rs.next()) return mapBooking(rs);
         return null;
@@ -47,8 +47,8 @@ public final class Utils {
      */
     public static Booking mapBooking(ResultSet rs) throws SQLException {
         Timestamp visitorTimestamp = rs.getTimestamp("visitorTime");
-        return new Booking(
-            rs.getString("booking_id"),
+        Booking booking = new Booking(
+            rs.getInt("booking_id"),
             rs.getString("traveler_id"),
             getOptionalColumn(rs, "travelerName"),
             getOptionalColumn(rs, "travelerEmail"),
@@ -60,6 +60,25 @@ public final class Utils {
             rs.getBoolean("organizedBooking"),
             rs.getDouble("price")
         );
+        booking.setPaid(getOptionalBoolean(rs, "paid"));
+        booking.setVisitorsInside(getOptionalInt(rs, "visitorsInside"));
+        return booking;
+    }
+
+    private static int getOptionalInt(ResultSet rs, String columnName) {
+        try {
+            return rs.getInt(columnName);
+        } catch (SQLException e) {
+            return 0;
+        }
+    }
+
+    private static boolean getOptionalBoolean(ResultSet rs, String columnName) {
+        try {
+            return rs.getBoolean(columnName);
+        } catch (SQLException e) {
+            return false;
+        }
     }
 
     /**
@@ -111,12 +130,12 @@ public final class Utils {
      * double-transitions if the same entry is processed more than once.
      * Used for WAITING→EXPIRED, OFFERED→CONFIRMED, OFFERED→EXPIRED, WAITING→CANCELLED.
      */
-    public static void updateWaitingListEntryByBooking(Connection conn, String bookingId,
+    public static void updateWaitingListEntryByBooking(Connection conn, int bookingId,
             String fromStatus, String toStatus) throws SQLException {
         String sql = "UPDATE WaitingListEntry SET status = ?, updated_at = NOW() WHERE booking_id = ? AND status = ?";
         PreparedStatement ps = conn.prepareStatement(sql);
         ps.setString(1, toStatus);
-        ps.setString(2, bookingId);
+        ps.setInt(2, bookingId);
         ps.setString(3, fromStatus);
         ps.executeUpdate();
     }

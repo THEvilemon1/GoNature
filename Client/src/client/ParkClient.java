@@ -147,7 +147,7 @@ public class ParkClient extends AbstractClient {
                     listener.onCreateBookingRequiresWaitlistConfirmation((Booking) waitlistPayload[0], (String) waitlistPayload[1]);
                     break;
                 case "UPDATE_BOOKING_RESULT":
-                    listener.onUpdateBookingResult((boolean) message.getData());
+                    listener.onUpdateBookingResult((Booking) message.getData());
                     break;
                 case "CANCEL_BOOKING_RESULT":
                     listener.onCancelBookingResult((boolean) message.getData());

@@ -12,7 +12,7 @@ public class NotificationService {
 
     private static final DateTimeFormatter DISPLAY_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
-    public static void sendWaitlistPromotionOffer(Connection conn, String bookingId, LocalDateTime deadline) throws SQLException {
+    public static void sendWaitlistPromotionOffer(Connection conn, int bookingId, LocalDateTime deadline) throws SQLException {
         BookingNotificationContext context = getContext(conn, bookingId);
         String message = String.format(
             "Hello %s, a spot is now available for your visit to Park %d at %s. Please confirm before %s or the booking will be cancelled.",
@@ -24,7 +24,7 @@ public class NotificationService {
         notifyTraveler(context, "WAITLIST_PROMOTION", message);
     }
 
-    public static void sendReminderConfirmationRequired(Connection conn, String bookingId, LocalDateTime deadline) throws SQLException {
+    public static void sendReminderConfirmationRequired(Connection conn, int bookingId, LocalDateTime deadline) throws SQLException {
         BookingNotificationContext context = getContext(conn, bookingId);
         String message = String.format(
             "Hello %s, your visit to Park %d is scheduled for %s. Please confirm before %s or the booking will be cancelled automatically.",
@@ -36,7 +36,7 @@ public class NotificationService {
         notifyTraveler(context, "REMINDER_CONFIRMATION", message);
     }
 
-    public static void sendSystemCancellation(Connection conn, String bookingId, String reason) throws SQLException {
+    public static void sendSystemCancellation(Connection conn, int bookingId, String reason) throws SQLException {
         BookingNotificationContext context = getContext(conn, bookingId);
         String message = String.format(
             "Hello %s, your booking %s for Park %d at %s was cancelled by the system. Reason: %s",
@@ -49,7 +49,7 @@ public class NotificationService {
         notifyTraveler(context, "SYSTEM_CANCEL", message);
     }
 
-    public static void sendBookingConfirmed(Connection conn, String bookingId, String reason) throws SQLException {
+    public static void sendBookingConfirmed(Connection conn, int bookingId, String reason) throws SQLException {
         BookingNotificationContext context = getContext(conn, bookingId);
         String message = String.format(
             "Hello %s, your booking %s for Park %d at %s is confirmed. %s",
@@ -62,16 +62,25 @@ public class NotificationService {
         notifyTraveler(context, "BOOKING_CONFIRMED", message);
     }
 
-    private static BookingNotificationContext getContext(Connection conn, String bookingId) throws SQLException {
+    private static BookingNotificationContext getContext(Connection conn, int bookingId) throws SQLException {
+        // booking.traveler_id references traveler.traveler_id, and the contact
+        // details live on user (reached via traveler.user_id) — the same path used
+        // by the traveler-profile query. We must NOT join booking straight to user
+        // on traveler_id, because a traveler_id is never equal to a user_id, so that
+        // join matches nothing and makes this method throw "Booking not found".
+        // LEFT JOINs keep the booking row even when the traveler/user link is
+        // missing (e.g. a guest booking); the COALESCE then falls back to the
+        // contact fields stored directly on the booking.
         String sql = "SELECT b.booking_id, b.traveler_id, b.park_id, b.visitorTime, "
             + "COALESCE(NULLIF(b.travelerName, ''), TRIM(CONCAT(u.firstName, ' ', u.lastName))) AS contactName, "
             + "COALESCE(NULLIF(b.travelerEmail, ''), u.email) AS contactEmail, "
             + "COALESCE(NULLIF(b.travelerPhoneNumber, ''), u.phoneNumber) AS contactPhoneNumber "
             + "FROM booking b "
-            + "JOIN `user` u ON u.user_id = b.traveler_id "
+            + "LEFT JOIN traveler t ON t.traveler_id = b.traveler_id "
+            + "LEFT JOIN `user` u ON u.user_id = t.user_id "
             + "WHERE b.booking_id = ?";
         PreparedStatement ps = conn.prepareStatement(sql);
-        ps.setString(1, bookingId);
+        ps.setInt(1, bookingId);
         ResultSet rs = ps.executeQuery();
         if (!rs.next()) {
             throw new IllegalArgumentException("Booking not found for notification: " + bookingId);
@@ -79,7 +88,7 @@ public class NotificationService {
 
         Timestamp visitorTimestamp = rs.getTimestamp("visitorTime");
         return new BookingNotificationContext(
-            rs.getString("booking_id"),
+            rs.getInt("booking_id"),
             rs.getString("traveler_id"),
             rs.getInt("park_id"),
             visitorTimestamp.toLocalDateTime(),
@@ -130,7 +139,7 @@ public class NotificationService {
     }
 
     private static final class BookingNotificationContext {
-        private final String bookingId;
+        private final int bookingId;
         private final String travelerId;
         private final int parkId;
         private final LocalDateTime visitorTime;
@@ -138,7 +147,7 @@ public class NotificationService {
         private final String email;
         private final String phoneNumber;
 
-        private BookingNotificationContext(String bookingId, String travelerId, int parkId,
+        private BookingNotificationContext(int bookingId, String travelerId, int parkId,
                                            LocalDateTime visitorTime, String name, String email, String phoneNumber) {
             this.bookingId = bookingId;
             this.travelerId = travelerId;

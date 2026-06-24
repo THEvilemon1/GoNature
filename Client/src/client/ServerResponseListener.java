@@ -29,7 +29,7 @@ public interface ServerResponseListener {
     default void onParksResult(ArrayList<ParkOption> parks) {}
     default void onCreateBookingResult(Booking booking) {}
     default void onCreateBookingRequiresWaitlistConfirmation(Booking booking, String message) {}
-    default void onUpdateBookingResult(boolean success) {}
+    default void onUpdateBookingResult(Booking booking) {}
     default void onCancelBookingResult(boolean success) {}
     default void onParkVisitorsReportResult(ParkVisitorsReportResult result) {}
     default void onParkUsageReportResult(java.util.ArrayList<common.ParkUsageReportResult> results) {}

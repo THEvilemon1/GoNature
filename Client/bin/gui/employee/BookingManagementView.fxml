@@ -50,6 +50,18 @@
                 </VBox>
             </HBox>
 
+            <!-- Selected booking details + action -->
+            <VBox fx:id="detailBox" styleClass="details-box" spacing="8" visible="false" managed="false">
+                <Label fx:id="lblDetailTitle" styleClass="field-label" text="Booking Details" />
+                <Label fx:id="lblBookingInfo" styleClass="details-label" text="" wrapText="true" />
+                <Label fx:id="lblActionStatus" styleClass="lbl-message" text="" wrapText="true"
+                       visible="false" managed="false" />
+                <HBox alignment="CENTER_RIGHT">
+                    <Button fx:id="btnBookingAction" text="" onAction="#handleBookingAction"
+                            visible="false" managed="false" prefWidth="160" />
+                </HBox>
+            </VBox>
+
             <Separator styleClass="card-sep" />
 
             <!-- Logout -->

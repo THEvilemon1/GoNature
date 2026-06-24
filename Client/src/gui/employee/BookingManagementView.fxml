@@ -51,12 +51,43 @@
             </HBox>
 
             <!-- Selected booking details + action -->
-            <VBox fx:id="detailBox" styleClass="details-box" spacing="8" visible="false" managed="false">
-                <Label fx:id="lblDetailTitle" styleClass="field-label" text="Booking Details" />
-                <Label fx:id="lblBookingInfo" styleClass="details-label" text="" wrapText="true" />
+            <VBox fx:id="detailBox" styleClass="booking-details-box" spacing="12" visible="false" managed="false">
+                <HBox alignment="CENTER_LEFT" spacing="10">
+                    <Label fx:id="lblDetailTitle" styleClass="booking-details-title" text="Booking Details" />
+                    <Region HBox.hgrow="ALWAYS" />
+                    <Label fx:id="lblDetailStatus" styleClass="booking-status-badge" text="" />
+                </HBox>
+
+                <GridPane styleClass="booking-details-grid" hgap="18" vgap="10">
+                    <Label styleClass="booking-detail-key" text="Booking ID"
+                           GridPane.columnIndex="0" GridPane.rowIndex="0" />
+                    <Label fx:id="lblDetailBookingId" styleClass="booking-detail-value"
+                           GridPane.columnIndex="1" GridPane.rowIndex="0" />
+
+                    <Label styleClass="booking-detail-key" text="Name"
+                           GridPane.columnIndex="0" GridPane.rowIndex="1" />
+                    <Label fx:id="lblDetailName" styleClass="booking-detail-value"
+                           GridPane.columnIndex="1" GridPane.rowIndex="1" />
+
+                    <Label styleClass="booking-detail-key" text="Visitors"
+                           GridPane.columnIndex="0" GridPane.rowIndex="2" />
+                    <Label fx:id="lblDetailVisitors" styleClass="booking-detail-value"
+                           GridPane.columnIndex="1" GridPane.rowIndex="2" />
+
+                    <Label styleClass="booking-detail-key" text="Visit Time"
+                           GridPane.columnIndex="2" GridPane.rowIndex="0" />
+                    <Label fx:id="lblDetailTime" styleClass="booking-detail-value"
+                           GridPane.columnIndex="3" GridPane.rowIndex="0" />
+
+                    <Label styleClass="booking-detail-key" text="Price"
+                           GridPane.columnIndex="2" GridPane.rowIndex="1" />
+                    <Label fx:id="lblDetailPrice" styleClass="booking-detail-value"
+                           GridPane.columnIndex="3" GridPane.rowIndex="1" />
+                </GridPane>
+
                 <Label fx:id="lblActionStatus" styleClass="lbl-message" text="" wrapText="true"
                        visible="false" managed="false" />
-                <HBox alignment="CENTER_RIGHT">
+                <HBox styleClass="booking-action-row" alignment="CENTER_RIGHT">
                     <Button fx:id="btnBookingAction" text="" onAction="#handleBookingAction"
                             visible="false" managed="false" prefWidth="160" />
                 </HBox>

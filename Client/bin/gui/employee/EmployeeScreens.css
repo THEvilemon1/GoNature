@@ -188,6 +188,84 @@
     -fx-text-fill: #374151;
 }
 
+.booking-details-box {
+    -fx-background-color: white;
+    -fx-background-radius: 12;
+    -fx-border-color: #c8ddc8;
+    -fx-border-radius: 12;
+    -fx-border-width: 1.5;
+    -fx-padding: 16;
+    -fx-effect: dropshadow(gaussian, rgba(31,41,55,0.10), 10, 0, 0, 3);
+}
+
+.booking-details-title {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1f2937;
+}
+
+.booking-status-badge {
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-border-width: 1;
+    -fx-padding: 4 10 4 10;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+}
+
+.booking-status-pending {
+    -fx-background-color: #fff7ed;
+    -fx-border-color: #fdba74;
+    -fx-text-fill: #c2410c;
+}
+
+.booking-status-confirmed {
+    -fx-background-color: #eff6ff;
+    -fx-border-color: #93c5fd;
+    -fx-text-fill: #1d4ed8;
+}
+
+.booking-status-checked-in {
+    -fx-background-color: #e8f5e9;
+    -fx-border-color: #a5d6a7;
+    -fx-text-fill: #1b5e20;
+}
+
+.booking-details-grid {
+    -fx-background-color: #f8faf8;
+    -fx-background-radius: 10;
+    -fx-border-color: #e1eadf;
+    -fx-border-radius: 10;
+    -fx-border-width: 1;
+    -fx-padding: 12 14 12 14;
+}
+
+.booking-detail-key {
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #6b7280;
+}
+
+.booking-detail-value {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1f2937;
+}
+
+.booking-action-row {
+    -fx-padding: 2 0 0 0;
+}
+
+.booking-action-button {
+    -fx-pref-height: 38;
+    -fx-min-width: 150;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 8;
+    -fx-cursor: hand;
+    -fx-alignment: CENTER;
+}
+
 /* ── Separator ──────────────────────────────────────────────────── */
 .card-sep .line {
     -fx-border-color: #d1d5db;

@@ -42,7 +42,12 @@ public class BookingManagementViewController implements EmployeeAwareController,
     @FXML private ListView<Booking> lstPending;
     @FXML private ListView<Booking> lstCheckedIn;
     @FXML private VBox detailBox;
-    @FXML private Label lblBookingInfo;
+    @FXML private Label lblDetailStatus;
+    @FXML private Label lblDetailBookingId;
+    @FXML private Label lblDetailName;
+    @FXML private Label lblDetailVisitors;
+    @FXML private Label lblDetailTime;
+    @FXML private Label lblDetailPrice;
     @FXML private Label lblActionStatus;
     @FXML private Button btnBookingAction;
 
@@ -190,16 +195,13 @@ public class BookingManagementViewController implements EmployeeAwareController,
     private void showBookingDetails(Booking booking) {
         selectedBooking = booking;
 
-        StringBuilder info = new StringBuilder();
-        info.append("Booking ID: ").append(booking.getBookingId()).append("\n");
-        if (booking.getTravelerName() != null && !booking.getTravelerName().isEmpty()) {
-            info.append("Name: ").append(booking.getTravelerName()).append("\n");
-        }
-        info.append("Visitors: ").append(booking.getNumberOfVisitors()).append("\n");
-        info.append("Time: ").append(booking.getVisitorTime().format(DATE_TIME_FMT)).append("\n");
-        info.append("Status: ").append(booking.getStatus()).append("\n");
-        info.append("Price: ").append(String.format("%.2f", booking.getPrice())).append(" ILS");
-        lblBookingInfo.setText(info.toString());
+        lblDetailStatus.setText(formatStatus(booking.getStatus()));
+        styleStatusBadge(booking.getStatus());
+        lblDetailBookingId.setText(String.valueOf(booking.getBookingId()));
+        lblDetailName.setText(hasText(booking.getTravelerName()) ? booking.getTravelerName() : "Not provided");
+        lblDetailVisitors.setText(booking.getNumberOfVisitors() + " visitor(s)");
+        lblDetailTime.setText(booking.getVisitorTime().format(DATE_TIME_FMT));
+        lblDetailPrice.setText(String.format("%.2f ILS", booking.getPrice()));
 
         hideActionStatus();
 
@@ -220,11 +222,36 @@ public class BookingManagementViewController implements EmployeeAwareController,
     private void configureActionButton(String text, String styleClass, boolean visible) {
         if (visible) {
             btnBookingAction.setText(text);
-            btnBookingAction.getStyleClass().setAll(styleClass);
+            btnBookingAction.getStyleClass().setAll("booking-action-button", styleClass);
         }
         btnBookingAction.setVisible(visible);
         btnBookingAction.setManaged(visible);
         btnBookingAction.setDisable(false);
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+
+    private String formatStatus(String status) {
+        if (Booking.STATUS_CHECKED_IN.equals(status)) return "Checked in";
+        if (Booking.STATUS_CONFIRMED.equals(status)) return "Confirmed";
+        if (Booking.STATUS_PENDING.equals(status)) return "Pending";
+        if (Booking.STATUS_PENDING_WAITLIST_CONFIRMATION.equals(status)) return "Pending confirmation";
+        if (Booking.STATUS_PENDING_REMINDER_CONFIRMATION.equals(status)) return "Pending confirmation";
+        return status == null ? "Unknown" : status.replace('_', ' ');
+    }
+
+    private void styleStatusBadge(String status) {
+        lblDetailStatus.getStyleClass().removeAll(
+            "booking-status-pending", "booking-status-confirmed", "booking-status-checked-in");
+        if (Booking.STATUS_CHECKED_IN.equals(status)) {
+            lblDetailStatus.getStyleClass().add("booking-status-checked-in");
+        } else if (Booking.STATUS_CONFIRMED.equals(status)) {
+            lblDetailStatus.getStyleClass().add("booking-status-confirmed");
+        } else {
+            lblDetailStatus.getStyleClass().add("booking-status-pending");
+        }
     }
 
     private void clearDetails() {

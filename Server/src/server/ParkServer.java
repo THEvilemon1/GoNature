@@ -238,6 +238,14 @@ public class ParkServer extends AbstractServer {
         }
     }
 
+    /**
+     * Pushes real-time park state updates to all connected clients monitoring the specified park.
+     * Retrieves current visitor count, available spots, and today's bookings, then broadcasts
+     * this information to all ConnectionToClient instances associated with the given park ID (Park Employees).
+     * Also notifies department managers of visitor count changes.
+     *
+     * @param parkId the ID of the park for which to push live state updates
+     */
     private void pushLiveParkState(int parkId) {
         try {
             Connection conn = DBConnection.getStaticConnection();
@@ -380,6 +388,8 @@ public class ParkServer extends AbstractServer {
                                 "The selected park is full for this date and time. You can join the waiting list or choose another time." }));
                     } else {
                         client.sendToClient(new Message("CREATE_BOOKING_RESULT", bookingAvailabilityResult.booking));
+                        // Live-update park employees so a newly confirmed booking shows up immediately.
+                        pushLiveParkState(bookingAvailabilityResult.booking.getParkId());
                     }
                     break;
 
@@ -414,7 +424,18 @@ public class ParkServer extends AbstractServer {
 
                 case "UPDATE_BOOKING":
                     Booking bookingToUpdate = (Booking) message.getData();
-                    client.sendToClient(new Message("UPDATE_BOOKING_RESULT", updateBooking(bookingToUpdate)));
+                    // Capture the original park before the edit in case the booking moves to another park.
+                    Booking originalBooking = getBookingById(bookingToUpdate.getBookingId());
+                    Booking updatedBookingResult = updateBooking(bookingToUpdate);
+                    client.sendToClient(new Message("UPDATE_BOOKING_RESULT", updatedBookingResult));
+                    if (updatedBookingResult != null) {
+                        // Live-update park employees: the name, visitors, time or even the park may have changed.
+                        pushLiveParkState(updatedBookingResult.getParkId());
+                        if (originalBooking != null
+                                && originalBooking.getParkId() != updatedBookingResult.getParkId()) {
+                            pushLiveParkState(originalBooking.getParkId());
+                        }
+                    }
                     break;
 
                 case "CANCEL_BOOKING":
@@ -525,6 +546,17 @@ public class ParkServer extends AbstractServer {
                      boolean checkOutSuccess = checkOutVisitor(exitRequest);
                      client.sendToClient(new Message("CHECK_OUT_RESULT", checkOutSuccess));
                      if (checkOutSuccess) pushLiveParkState(exitRequest.getParkId());
+                     break;
+
+                 case "SET_VISITORS_INSIDE":
+                     Booking visitorsUpdateBooking = (Booking) message.getData();
+                     Integer parkIdForUpdate = (Integer) client.getInfo("EMPLOYEE_PARK_ID");
+                     if (parkIdForUpdate == null) {
+                         throw new IllegalArgumentException("Employee park is missing. Please log in again.");
+                     }
+                     boolean updateInsideSuccess = setVisitorsInside(visitorsUpdateBooking, parkIdForUpdate);
+                     client.sendToClient(new Message("SET_VISITORS_INSIDE_RESULT", updateInsideSuccess));
+                     if (updateInsideSuccess) pushLiveParkState(parkIdForUpdate);
                      break;
 
                  case "WALK_IN_VISITOR":
@@ -1261,13 +1293,20 @@ public class ParkServer extends AbstractServer {
 
         Connection conn = DBConnection.getStaticConnection();
 
-        String updateBooking = "UPDATE booking SET status = ?, visitorsInside = numberOfVisitors, entryTime = NOW() " +
+        // The worker may enter fewer visitors than booked (e.g. someone did not show up).
+        // When no explicit count is supplied (visitorsInside <= 0) we fall back to the booked amount,
+        // which keeps the older Enter Visitor screen working unchanged.
+        int visitorsEntering = booking.getVisitorsInside() > 0
+            ? booking.getVisitorsInside() : booking.getNumberOfVisitors();
+
+        String updateBooking = "UPDATE booking SET status = ?, visitorsInside = ?, entryTime = NOW() " +
                                "WHERE booking_id = ? AND status = ? AND park_id = ?";
         PreparedStatement ps = conn.prepareStatement(updateBooking);
         ps.setString(1, Booking.STATUS_CHECKED_IN);
-        ps.setInt(2, booking.getBookingId());
-        ps.setString(3, Booking.STATUS_CONFIRMED);
-        ps.setInt(4, employeeParkId);
+        ps.setInt(2, visitorsEntering);
+        ps.setInt(3, booking.getBookingId());
+        ps.setString(4, Booking.STATUS_CONFIRMED);
+        ps.setInt(5, employeeParkId);
         int rows = ps.executeUpdate();
 
         if (rows == 0) return false;
@@ -1321,6 +1360,62 @@ public class ParkServer extends AbstractServer {
         Booking updatedBooking = getBookingById(Integer.parseInt(request.getBookingId()));
         if (updatedBooking != null && Booking.STATUS_CHECKED_OUT.equals(updatedBooking.getStatus())) {
             BookingLifecycleService.handleSpotFreed(conn, updatedBooking.getParkId(), updatedBooking.getVisitorTime());
+        }
+
+        return true;
+    }
+
+
+    // Set the absolute number of visitors currently inside for a checked-in booking.
+    // Lets a worker correct the count after check-in (e.g. a visitor arrived late, or some left).
+    // Setting it to 0 walks everyone out and checks the booking out.
+    private boolean setVisitorsInside(Booking booking, int employeeParkId) throws SQLException {
+        Connection conn = DBConnection.getStaticConnection();
+
+        String getSql = "SELECT status, park_id, numberOfVisitors FROM booking WHERE booking_id = ?";
+        PreparedStatement getPs = conn.prepareStatement(getSql);
+        getPs.setInt(1, booking.getBookingId());
+        ResultSet rs = getPs.executeQuery();
+
+        if (!rs.next()) {
+            throw new IllegalArgumentException("Booking not found.");
+        }
+
+        String status = rs.getString("status");
+        int parkId = rs.getInt("park_id");
+        int booked = rs.getInt("numberOfVisitors");
+
+        if (parkId != employeeParkId) {
+            throw new IllegalArgumentException("This booking belongs to another park.");
+        }
+        if (!Booking.STATUS_CHECKED_IN.equals(status)) {
+            throw new IllegalArgumentException("This booking is not checked in. Status: " + status);
+        }
+
+        int newCount = booking.getVisitorsInside();
+        if (newCount < 0) newCount = 0;
+        if (newCount > booked) {
+            throw new IllegalArgumentException(
+                "Cannot have more than " + booked + " visitor(s) inside for this booking.");
+        }
+
+        String newStatus = (newCount == 0) ? Booking.STATUS_CHECKED_OUT : Booking.STATUS_CHECKED_IN;
+        String updateBooking = "UPDATE booking SET visitorsInside = ?, status = ?, " +
+                               "exitTime = CASE WHEN ? = 0 THEN NOW() ELSE exitTime END WHERE booking_id = ?";
+        PreparedStatement updatePs = conn.prepareStatement(updateBooking);
+        updatePs.setInt(1, newCount);
+        updatePs.setString(2, newStatus);
+        updatePs.setInt(3, newCount);
+        updatePs.setInt(4, booking.getBookingId());
+        updatePs.executeUpdate();
+
+        Utils.syncParkCurrentVisitors(conn, employeeParkId);
+
+        if (newCount == 0) {
+            Booking updatedBooking = getBookingById(booking.getBookingId());
+            if (updatedBooking != null) {
+                BookingLifecycleService.handleSpotFreed(conn, updatedBooking.getParkId(), updatedBooking.getVisitorTime());
+            }
         }
 
         return true;

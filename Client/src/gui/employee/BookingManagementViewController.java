@@ -4,7 +4,6 @@ import client.ParkClient;
 import client.ServerResponseListener;
 import common.Booking;
 import common.Employee;
-import common.ExitRequest;
 import common.Message;
 import common.Order;
 import gui.login.EmployeeAwareController;
@@ -15,14 +14,18 @@ import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
+import javafx.geometry.Insets;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.control.Spinner;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
@@ -31,6 +34,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Optional;
 import java.util.ResourceBundle;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -99,8 +103,14 @@ public class BookingManagementViewController implements EmployeeAwareController,
                 super.updateItem(b, empty);
                 if (empty || b == null) {
                     setText(null);
+                } else if (Booking.STATUS_CHECKED_IN.equals(b.getStatus())) {
+                    setText("#" + b.getBookingId()
+                        + "   |   " + b.getVisitorTime().toLocalTime().format(TIME_FMT)
+                        + "   |   Booked: " + b.getNumberOfVisitors()
+                        + " | Inside: " + b.getVisitorsInside());
                 } else {
-                    setText(b.getVisitorTime().toLocalTime().format(TIME_FMT)
+                    setText("#" + b.getBookingId()
+                        + "   |   " + b.getVisitorTime().toLocalTime().format(TIME_FMT)
                         + "   |   " + b.getNumberOfVisitors() + " visitor(s)");
                 }
             }
@@ -179,8 +189,8 @@ public class BookingManagementViewController implements EmployeeAwareController,
         for (Booking b : bookings) {
             if (Booking.STATUS_CHECKED_IN.equals(b.getStatus())) {
                 checkedInItems.add(b);
-            } else {
-                // PENDING and CONFIRMED bookings are waiting to enter
+            } else if (Booking.STATUS_CONFIRMED.equals(b.getStatus())) {
+                // Only confirmed bookings are ready to be checked in.
                 pendingItems.add(b);
             }
         }
@@ -214,16 +224,21 @@ public class BookingManagementViewController implements EmployeeAwareController,
         styleStatusBadge(booking.getStatus());
         lblDetailBookingId.setText(String.valueOf(booking.getBookingId()));
         lblDetailName.setText(hasText(booking.getTravelerName()) ? booking.getTravelerName() : "Not provided");
-        lblDetailVisitors.setText(booking.getNumberOfVisitors() + " visitor(s)");
+        if (Booking.STATUS_CHECKED_IN.equals(booking.getStatus())) {
+            lblDetailVisitors.setText("Booked: " + booking.getNumberOfVisitors()
+                + "   |   Inside: " + booking.getVisitorsInside());
+        } else {
+            lblDetailVisitors.setText(booking.getNumberOfVisitors() + " visitor(s)");
+        }
         lblDetailTime.setText(booking.getVisitorTime().format(DATE_TIME_FMT));
         lblDetailPrice.setText(String.format("%.2f ILS", booking.getPrice()));
 
         hideActionStatus();
 
         if (Booking.STATUS_CHECKED_IN.equals(booking.getStatus())) {
-            configureActionButton("Walk Out", "btn-danger", true);
+            configureActionButton("Update Visitors Inside", "btn-primary", true);
         } else if (Booking.STATUS_CONFIRMED.equals(booking.getStatus())) {
-            configureActionButton("Enter", "btn-primary", true);
+            configureActionButton("Check In", "btn-primary", true);
         } else {
             // PENDING — the visitor has not confirmed yet, so it cannot be entered.
             configureActionButton(null, null, false);
@@ -281,7 +296,7 @@ public class BookingManagementViewController implements EmployeeAwareController,
     public void handleBookingAction(ActionEvent event) {
         if (selectedBooking == null) return;
         if (Booking.STATUS_CHECKED_IN.equals(selectedBooking.getStatus())) {
-            walkOut(selectedBooking);
+            editVisitorsInside(selectedBooking);
         } else if (Booking.STATUS_CONFIRMED.equals(selectedBooking.getStatus())) {
             enter(selectedBooking);
         }
@@ -311,11 +326,28 @@ public class BookingManagementViewController implements EmployeeAwareController,
             return;
         }
 
+        int booked = booking.getNumberOfVisitors();
+        Optional<Integer> entered = promptForCount(
+            "Check In",
+            "Check in booking #" + booking.getBookingId(),
+            bookingSummary(booking)
+                + "\nBooked visitors: " + booked
+                + "\n\nEnter how many visitors actually came in.",
+            "Visitors entering:",
+            booked, 1, booked);
+        if (!entered.isPresent()) return;
+
+        sendCheckIn(booking, entered.get());
+    }
+
+    private void sendCheckIn(Booking booking, int visitorsEntering) {
         ParkClient client = ParkClient.getInstance();
         if (client == null || !client.isConnected()) {
             showActionStatus("Not connected to server.", true);
             return;
         }
+
+        booking.setVisitorsInside(visitorsEntering);
 
         btnBookingAction.setDisable(true);
         client.setListener(new ServerResponseListener() {
@@ -323,7 +355,7 @@ public class BookingManagementViewController implements EmployeeAwareController,
             public void onCheckInResult(boolean success) {
                 Platform.runLater(() -> {
                     if (success) {
-                        showActionAlert("Visitor checked in.");
+                        showActionAlert(visitorsEntering + " visitor(s) checked in.");
                         refreshData();
                     } else {
                         showActionStatus("Check-in failed. Please try again.", true);
@@ -350,39 +382,49 @@ public class BookingManagementViewController implements EmployeeAwareController,
         }
     }
 
-    private void walkOut(Booking booking) {
-        int visitorsInside = booking.getVisitorsInside() > 0
-            ? booking.getVisitorsInside() : booking.getNumberOfVisitors();
+    // Lets the worker correct how many visitors are currently inside for a checked-in booking.
+    // Increasing it covers a late arrival; setting it to 0 walks everyone out (checks the booking out).
+    private void editVisitorsInside(Booking booking) {
+        int booked = booking.getNumberOfVisitors();
+        int currentInside = booking.getVisitorsInside() > 0
+            ? booking.getVisitorsInside() : booked;
 
-        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
-        confirm.setTitle("Walk Out");
-        confirm.setHeaderText("Walk out this booking?");
-        confirm.setContentText("Booking ID: " + booking.getBookingId()
-            + "\nVisitors leaving: " + visitorsInside);
-        confirm.showAndWait().ifPresent(result -> {
-            if (result == ButtonType.OK) {
-                sendCheckOut(booking, visitorsInside);
-            }
-        });
+        Optional<Integer> updated = promptForCount(
+            "Update Visitors Inside",
+            "Booking #" + booking.getBookingId(),
+            bookingSummary(booking)
+                + "\nBooked visitors: " + booked
+                + "\nCurrently inside: " + currentInside
+                + "\n\nSet the number of visitors currently inside."
+                + "\nEnter 0 to check everyone out.",
+            "Visitors inside now:",
+            currentInside, 0, booked);
+        if (!updated.isPresent()) return;
+
+        sendSetVisitorsInside(booking, updated.get());
     }
 
-    private void sendCheckOut(Booking booking, int visitorsLeaving) {
+    private void sendSetVisitorsInside(Booking booking, int visitorsInside) {
         ParkClient client = ParkClient.getInstance();
         if (client == null || !client.isConnected()) {
             showActionStatus("Not connected to server.", true);
             return;
         }
 
+        booking.setVisitorsInside(visitorsInside);
+
         btnBookingAction.setDisable(true);
         client.setListener(new ServerResponseListener() {
             @Override
-            public void onCheckOutResult(boolean success) {
+            public void onSetVisitorsInsideResult(boolean success) {
                 Platform.runLater(() -> {
                     if (success) {
-                        showActionAlert("Visitor walked out.");
+                        showActionAlert(visitorsInside == 0
+                            ? "All visitors checked out."
+                            : "Visitors inside updated to " + visitorsInside + ".");
                         refreshData();
                     } else {
-                        showActionStatus("Walk out failed. Please try again.", true);
+                        showActionStatus("Update failed. Please try again.", true);
                         btnBookingAction.setDisable(false);
                     }
                 });
@@ -399,13 +441,59 @@ public class BookingManagementViewController implements EmployeeAwareController,
         });
 
         try {
-            ExitRequest request = new ExitRequest(
-                String.valueOf(booking.getBookingId()), visitorsLeaving, employee.getParkId());
-            client.sendToServer(new Message("CHECK_OUT_VISITOR", request));
+            client.sendToServer(new Message("SET_VISITORS_INSIDE", booking));
         } catch (Exception e) {
             showActionStatus("Error: " + e.getMessage(), true);
             btnBookingAction.setDisable(false);
         }
+    }
+
+    private String bookingSummary(Booking booking) {
+        String name = hasText(booking.getTravelerName()) ? booking.getTravelerName() : "Not provided";
+        return "Name: " + name
+            + "\nTime: " + booking.getVisitorTime().format(DATE_TIME_FMT);
+    }
+
+    // Simple modal asking the worker for a visitor count, bounded to [min, max] and seeded with initial.
+    // Returns the chosen value, or empty if the worker cancels.
+    private Optional<Integer> promptForCount(String title, String header, String details,
+                                             String fieldLabel, int initial, int min, int max) {
+        Dialog<Integer> dialog = new Dialog<>();
+        dialog.setTitle(title);
+        dialog.setHeaderText(header);
+
+        ButtonType confirmType = new ButtonType("Confirm", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(confirmType, ButtonType.CANCEL);
+
+        Label info = new Label(details);
+        info.setWrapText(true);
+
+        Spinner<Integer> spinner = new Spinner<>(min, max, clamp(initial, min, max));
+        spinner.setEditable(true);
+        spinner.setPrefWidth(120);
+
+        VBox box = new VBox(10, info, new Label(fieldLabel), spinner);
+        box.setPadding(new Insets(12));
+        dialog.getDialogPane().setContent(box);
+
+        dialog.setResultConverter(button -> {
+            if (button != confirmType) return null;
+            int value;
+            try {
+                value = Integer.parseInt(spinner.getEditor().getText().trim());
+            } catch (NumberFormatException e) {
+                value = spinner.getValue();
+            }
+            return clamp(value, min, max);
+        });
+
+        return dialog.showAndWait();
+    }
+
+    private int clamp(int value, int min, int max) {
+        if (value < min) return min;
+        if (value > max) return max;
+        return value;
     }
 
     private void showActionStatus(String message, boolean isError) {

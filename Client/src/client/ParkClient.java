@@ -192,6 +192,9 @@ public class ParkClient extends AbstractClient {
                 case "CHECK_OUT_RESULT":
                     listener.onCheckOutResult((boolean) message.getData());
                     break;
+                case "SET_VISITORS_INSIDE_RESULT":
+                    listener.onSetVisitorsInsideResult((boolean) message.getData());
+                    break;
                 case "WALK_IN_RESULT":
                     listener.onWalkInResult((common.Booking) message.getData());
                     break;

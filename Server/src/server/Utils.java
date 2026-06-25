@@ -149,6 +149,12 @@ public final class Utils {
         return currentVisitors;
     }
 
+    /**
+     * Returns the number of available spots in a park, taking into account
+     * the current visitors and the number of visitors booked for the next
+     * four hours. This is used to determine whether a new booking can be
+     * accepted or if the traveler should be placed on the waiting list.
+     */
     public static int getEffectiveAvailableSpots(Connection conn, int parkId) throws SQLException {
         String parkSql = "SELECT maxCapacity FROM park WHERE park_id = ?";
         PreparedStatement parkPs = conn.prepareStatement(parkSql);

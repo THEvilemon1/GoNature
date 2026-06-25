@@ -168,9 +168,9 @@ public class WalkInViewController implements Initializable {
         Stage currentStage = (Stage) txtNationalId.getScene().getWindow();
         currentStage.hide();
 
-        FXMLLoader loader = new FXMLLoader(getClass().getResource("/gui/employee/EnterVisitorView.fxml"));
+        FXMLLoader loader = new FXMLLoader(getClass().getResource("/gui/employee/BookingManagementView.fxml"));
         Parent root = loader.load();
-        EnterVisitorViewController controller = loader.getController();
+        BookingManagementViewController controller = loader.getController();
         controller.setEmployee(employee);
 
         Stage stage = new Stage();

@@ -9,51 +9,54 @@
            styleClass="root-pane"
            stylesheets="@EmployeeScreens.css">
 
-    <VBox styleClass="screen-card" maxWidth="560" alignment="TOP_CENTER">
+    <VBox styleClass="screen-card" maxWidth="620" alignment="TOP_CENTER">
 
-        <!-- Top bar -->
+        <!-- ── Top bar ─────────────────────────────────────────── -->
         <HBox styleClass="top-bar" alignment="CENTER_LEFT" spacing="0">
-            <Label styleClass="screen-title" text="Booking Management" />
-            <Region HBox.hgrow="ALWAYS" minWidth="20" />
-            <Label fx:id="lblCurrentVisitors" styleClass="top-bar-info" text="Current Visitors: --" />
+            <VBox spacing="2">
+                <Label styleClass="screen-title" text="Booking Management" />
+                <Label fx:id="lblWelcome" styleClass="welcome-label-top" text="Welcome!" />
+            </VBox>
+            <Region HBox.hgrow="ALWAYS" minWidth="16" />
+            <VBox alignment="CENTER_RIGHT" spacing="1" styleClass="visitors-badge">
+                <Label styleClass="visitors-caption" text="INSIDE PARK" />
+                <Label fx:id="lblCurrentVisitors" styleClass="visitors-count" text="--" />
+            </VBox>
         </HBox>
 
-        <!-- Content -->
-        <VBox styleClass="content-area" spacing="16">
+        <!-- ── Main content ────────────────────────────────────── -->
+        <VBox styleClass="content-area" spacing="18">
 
-            <Label fx:id="lblWelcome" styleClass="welcome-label" text="Welcome!" />
-
-            <!-- Main action buttons -->
-            <HBox spacing="16" alignment="CENTER">
-                <Button styleClass="btn-big, btn-primary" text="Enter Visitor"
-                        onAction="#handleEnterVisitor" prefWidth="240" />
-                <Button styleClass="btn-big, btn-danger" text="Exit Visitor"
-                        onAction="#handleExitVisitor" prefWidth="240" />
-            </HBox>
-
-            <Separator styleClass="card-sep" />
-
-            <!-- Today's bookings -->
-            <Label styleClass="field-label" text="Today's Bookings" />
+            <!-- TODAY'S BOOKINGS — primary work surface -->
+            <Label styleClass="section-title" text="Today's Bookings" />
 
             <HBox spacing="14">
-                <!-- Pending list -->
+                <!-- Confirmed → waiting to enter -->
                 <VBox spacing="6" HBox.hgrow="ALWAYS">
-                    <Label styleClass="list-header-pending" text="Pending" />
+                    <HBox alignment="CENTER_LEFT" spacing="6">
+                        <Label styleClass="list-header-pending" text="Confirmed" />
+                        <Label styleClass="list-header-sub" text="· waiting to enter" />
+                    </HBox>
+                    <TextField fx:id="txtSearchBookingId" styleClass="field-input-search"
+                               promptText="Search by booking ID..." />
                     <ListView fx:id="lstPending" prefHeight="160" />
                 </VBox>
 
-                <!-- Checked-in list -->
+                <!-- Checked in → currently inside -->
                 <VBox spacing="6" HBox.hgrow="ALWAYS">
-                    <Label styleClass="list-header-checkedin" text="Checked In" />
-                    <ListView fx:id="lstCheckedIn" prefHeight="160" />
+                    <HBox alignment="CENTER_LEFT" spacing="6">
+                        <Label styleClass="list-header-checkedin" text="Checked In" />
+                        <Label styleClass="list-header-sub" text="· inside the park" />
+                    </HBox>
+                    <ListView fx:id="lstCheckedIn" prefHeight="190" />
                 </VBox>
             </HBox>
 
-            <!-- Selected booking details + action -->
-            <VBox fx:id="detailBox" styleClass="booking-details-box" spacing="12" visible="false" managed="false">
+            <!-- Selected booking detail + action -->
+            <VBox fx:id="detailBox" styleClass="booking-details-box" spacing="12"
+                  visible="false" managed="false">
                 <HBox alignment="CENTER_LEFT" spacing="10">
-                    <Label fx:id="lblDetailTitle" styleClass="booking-details-title" text="Booking Details" />
+                    <Label styleClass="booking-details-title" text="Booking Details" />
                     <Region HBox.hgrow="ALWAYS" />
                     <Label fx:id="lblDetailStatus" styleClass="booking-status-badge" text="" />
                 </HBox>
@@ -89,7 +92,26 @@
                        visible="false" managed="false" />
                 <HBox styleClass="booking-action-row" alignment="CENTER_RIGHT">
                     <Button fx:id="btnBookingAction" text="" onAction="#handleBookingAction"
-                            visible="false" managed="false" prefWidth="160" />
+                            visible="false" managed="false" prefWidth="220" />
+                </HBox>
+            </VBox>
+
+            <Separator styleClass="card-sep" />
+
+            <!-- ── MANUAL ENTRY — secondary, edge-case actions ── -->
+            <VBox spacing="10">
+                <VBox spacing="3">
+                    <Label styleClass="section-title-manual" text="Manual Entry" />
+                    <Label styleClass="section-subtitle-manual"
+                           text="For walk-ins without a booking, or to exit a visitor by ID" />
+                </VBox>
+                <HBox spacing="12">
+                    <Button styleClass="btn-manual-enter" text="Walk In Visitor"
+                            onAction="#handleEnterVisitor"
+                            HBox.hgrow="ALWAYS" maxWidth="Infinity" />
+                    <Button styleClass="btn-manual-exit" text="Exit Visitor"
+                            onAction="#handleExitVisitor"
+                            HBox.hgrow="ALWAYS" maxWidth="Infinity" />
                 </HBox>
             </VBox>
 

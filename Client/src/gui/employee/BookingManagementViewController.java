@@ -26,6 +26,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.Spinner;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
@@ -43,6 +44,7 @@ public class BookingManagementViewController implements EmployeeAwareController,
 
     @FXML private Label lblWelcome;
     @FXML private Label lblCurrentVisitors;
+    @FXML private TextField txtSearchBookingId;
     @FXML private ListView<Booking> lstPending;
     @FXML private ListView<Booking> lstCheckedIn;
     @FXML private VBox detailBox;
@@ -63,6 +65,7 @@ public class BookingManagementViewController implements EmployeeAwareController,
 
     private final ObservableList<Booking> pendingItems = FXCollections.observableArrayList();
     private final ObservableList<Booking> checkedInItems = FXCollections.observableArrayList();
+    private final ArrayList<Booking> allPendingBookings = new ArrayList<>();
 
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
     private static final DateTimeFormatter DATE_TIME_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
@@ -71,8 +74,8 @@ public class BookingManagementViewController implements EmployeeAwareController,
     public void initialize(URL location, ResourceBundle resources) {
         lstPending.setItems(pendingItems);
         lstCheckedIn.setItems(checkedInItems);
-        lstPending.setPlaceholder(new Label("No pending bookings"));
-        lstCheckedIn.setPlaceholder(new Label("No checked-in bookings"));
+        lstPending.setPlaceholder(new Label("No confirmed bookings for today"));
+        lstCheckedIn.setPlaceholder(new Label("No visitors checked in yet"));
         lstPending.setCellFactory(list -> bookingCell());
         lstCheckedIn.setCellFactory(list -> bookingCell());
 
@@ -94,6 +97,25 @@ public class BookingManagementViewController implements EmployeeAwareController,
                 showBookingDetails(newB);
             }
         });
+
+        txtSearchBookingId.textProperty().addListener((obs, oldVal, newVal) -> {
+            filterPendingBookings(newVal);
+        });
+    }
+
+    private void filterPendingBookings(String searchText) {
+        if (searchText == null || searchText.trim().isEmpty()) {
+            pendingItems.setAll(allPendingBookings);
+        } else {
+            String query = searchText.trim().toLowerCase();
+            ArrayList<Booking> filtered = new ArrayList<>();
+            for (Booking b : allPendingBookings) {
+                if (String.valueOf(b.getBookingId()).contains(query)) {
+                    filtered.add(b);
+                }
+            }
+            pendingItems.setAll(filtered);
+        }
     }
 
     private ListCell<Booking> bookingCell() {
@@ -177,13 +199,13 @@ public class BookingManagementViewController implements EmployeeAwareController,
     }
 
     private void updateCurrentVisitors(int currentVisitors) {
-        lblCurrentVisitors.setText("Current Visitors: " + currentVisitors);
+        lblCurrentVisitors.setText(String.valueOf(currentVisitors));
     }
 
     private void populateLists(ArrayList<Booking> bookings) {
         int selectedId = selectedBooking != null ? selectedBooking.getBookingId() : -1;
 
-        pendingItems.clear();
+        allPendingBookings.clear();
         checkedInItems.clear();
 
         for (Booking b : bookings) {
@@ -191,9 +213,13 @@ public class BookingManagementViewController implements EmployeeAwareController,
                 checkedInItems.add(b);
             } else if (Booking.STATUS_CONFIRMED.equals(b.getStatus())) {
                 // Only confirmed bookings are ready to be checked in.
-                pendingItems.add(b);
+                allPendingBookings.add(b);
             }
         }
+
+        // Reapply the search filter
+        String currentSearch = txtSearchBookingId.getText();
+        filterPendingBookings(currentSearch);
 
         // Re-select the previously selected booking if it is still listed,
         // so an in-progress action keeps its details visible across refreshes.
@@ -524,9 +550,9 @@ public class BookingManagementViewController implements EmployeeAwareController,
         Stage currentStage = (Stage) lblWelcome.getScene().getWindow();
         currentStage.hide();
 
-        FXMLLoader loader = new FXMLLoader(getClass().getResource("/gui/employee/EnterVisitorView.fxml"));
+        FXMLLoader loader = new FXMLLoader(getClass().getResource("/gui/employee/WalkInView.fxml"));
         Parent root = loader.load();
-        EnterVisitorViewController controller = loader.getController();
+        WalkInViewController controller = loader.getController();
         controller.setEmployee(employee);
 
         Stage stage = new Stage();

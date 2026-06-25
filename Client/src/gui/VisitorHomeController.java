@@ -28,6 +28,7 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.Spinner;
+import javafx.scene.control.SpinnerValueFactory;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
@@ -59,6 +60,7 @@ public class VisitorHomeController implements ServerResponseListener {
     @FXML private TextField txtProfilePhoneNumber;
     @FXML private TextField txtProfileClubMember;
     @FXML private Spinner<Integer> spnVisitors;
+    @FXML private Spinner<Integer> spnProfileFamilyMembers;
     @FXML private ComboBox<ParkOption> cmbPark;
     @FXML private DatePicker dateVisit;
     @FXML private ComboBox<String> cmbTime;
@@ -67,6 +69,7 @@ public class VisitorHomeController implements ServerResponseListener {
     @FXML private Button btnCancelProfile;
     @FXML private Button btnSaveProfile;
     @FXML private Button btnResetBooking;
+    @FXML private VBox profileFamilyMembersSection;
 
     private VisitorLoginResult currentUser;
     private TravelerProfile currentProfile;
@@ -84,6 +87,8 @@ public class VisitorHomeController implements ServerResponseListener {
         formHelper = new VisitorBookingFormHelper(txtName, txtEmail, txtPhoneNumber, spnVisitors, cmbPark,
             dateVisit, cmbTime, lblSelectedParkPrice, lblPricePerPerson, lblTotalPrice, lblVisitorHint);
         formHelper.initialize();
+        spnProfileFamilyMembers.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(0, 50, 0));
+        spnProfileFamilyMembers.getEditor().textProperty().addListener((obs, oldValue, newValue) -> clampFamilyMembersEditor());
 
         bookingsHelper = new VisitorBookingsViewHelper(bookingsList, lblBookingsMessage, formHelper,
             new VisitorBookingsViewHelper.BookingActionHandler() {
@@ -459,7 +464,8 @@ public class VisitorHomeController implements ServerResponseListener {
         String email = ContactInfoValidator.requireEmail(getFieldText(txtProfileEmail));
         String phoneNumber = ContactInfoValidator.requirePhoneNumber(getFieldText(txtProfilePhoneNumber));
         boolean clubMember = currentProfile != null ? currentProfile.isClubMember() : currentUser.isClubMember();
-        return new TravelerProfile(currentUser.getTravelerId(), firstName, lastName, email, phoneNumber, clubMember);
+        int familyMembers = clubMember ? getProfileFamilyMembers() : 0;
+        return new TravelerProfile(currentUser.getTravelerId(), firstName, lastName, email, phoneNumber, clubMember, familyMembers);
     }
 
     private String getFieldText(TextField field) {
@@ -671,6 +677,8 @@ public class VisitorHomeController implements ServerResponseListener {
             txtProfileEmail.clear();
             txtProfilePhoneNumber.clear();
             txtProfileClubMember.setText(currentUser != null && currentUser.isClubMember() ? "True" : "False");
+            setFamilyMembersVisible(currentUser != null && currentUser.isClubMember());
+            setProfileFamilyMembersValue(0);
             return;
         }
 
@@ -679,6 +687,8 @@ public class VisitorHomeController implements ServerResponseListener {
         txtProfileEmail.setText(ContactInfoValidator.isPlaceholderEmail(currentProfile.getEmail()) ? "" : ContactInfoValidator.clean(currentProfile.getEmail()));
         txtProfilePhoneNumber.setText(ContactInfoValidator.clean(currentProfile.getPhoneNumber()));
         txtProfileClubMember.setText(currentProfile.isClubMember() ? "True" : "False");
+        setFamilyMembersVisible(currentProfile.isClubMember());
+        setProfileFamilyMembersValue(currentProfile.getFamilyMembers());
     }
 
     private void populateBookingContactFieldsFromProfile() {
@@ -715,9 +725,41 @@ public class VisitorHomeController implements ServerResponseListener {
         txtProfileEmail.setEditable(editable);
         txtProfilePhoneNumber.setEditable(editable);
         txtProfileClubMember.setEditable(false);
+        spnProfileFamilyMembers.setDisable(!editable);
         btnEditProfile.setDisable(editable);
         btnCancelProfile.setDisable(!editable);
         btnSaveProfile.setDisable(!editable);
+    }
+
+    private void setFamilyMembersVisible(boolean visible) {
+        profileFamilyMembersSection.setVisible(visible);
+        profileFamilyMembersSection.setManaged(visible);
+    }
+
+    private void setProfileFamilyMembersValue(int value) {
+        if (spnProfileFamilyMembers.getValueFactory() != null) {
+            spnProfileFamilyMembers.getValueFactory().setValue(Math.max(0, value));
+        }
+    }
+
+    private int getProfileFamilyMembers() {
+        clampFamilyMembersEditor();
+        return spnProfileFamilyMembers.getValue() == null ? 0 : spnProfileFamilyMembers.getValue();
+    }
+
+    private void clampFamilyMembersEditor() {
+        if (spnProfileFamilyMembers == null || spnProfileFamilyMembers.getValueFactory() == null) {
+            return;
+        }
+        int value;
+        try {
+            value = Integer.parseInt(spnProfileFamilyMembers.getEditor().getText());
+        } catch (NumberFormatException e) {
+            value = 0;
+        }
+        value = Math.max(0, value);
+        spnProfileFamilyMembers.getValueFactory().setValue(value);
+        spnProfileFamilyMembers.getEditor().setText(String.valueOf(value));
     }
 
     private void showBookingMessage(String message, boolean error) {

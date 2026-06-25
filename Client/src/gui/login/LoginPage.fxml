@@ -113,7 +113,7 @@
 
         <!-- ── Footer ───────────────────────────────────────────── -->
         <Label styleClass="footer-text"
-               text="GoNature © 2024 — All rights reserved" />
+               text="GoNature © 2026 — All rights reserved" />
 
     </VBox>
 </StackPane>

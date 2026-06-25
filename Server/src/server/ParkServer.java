@@ -1492,7 +1492,7 @@ public class ParkServer extends AbstractServer {
         }
 
         Connection conn = DBConnection.getStaticConnection();
-        String sql = "SELECT u.firstName, u.lastName, u.email, u.phoneNumber, t.clubMember "
+        String sql = "SELECT u.firstName, u.lastName, u.email, u.phoneNumber, t.clubMember, t.familyMembers "
             + "FROM traveler t JOIN `user` u ON u.user_id = t.user_id "
             + "WHERE t.traveler_id = ?";
         PreparedStatement ps = conn.prepareStatement(sql);
@@ -1508,7 +1508,8 @@ public class ParkServer extends AbstractServer {
             rs.getString("lastName"),
             rs.getString("email"),
             rs.getString("phoneNumber"),
-            rs.getBoolean("clubMember")
+            rs.getBoolean("clubMember"),
+            Math.max(0, rs.getInt("familyMembers"))
         );
     }
 
@@ -1521,19 +1522,53 @@ public class ParkServer extends AbstractServer {
         String lastName = ContactInfoValidator.requireName(profile.getLastName(), "Last name");
         String email = ContactInfoValidator.requireEmail(profile.getEmail());
         String phoneNumber = ContactInfoValidator.requirePhoneNumber(profile.getPhoneNumber());
+        if (profile.getFamilyMembers() < 0) {
+            throw new IllegalArgumentException("Family members cannot be negative.");
+        }
 
         Connection conn = DBConnection.getStaticConnection();
-        String sql = "UPDATE `user` SET firstName = ?, lastName = ?, email = ?, phoneNumber = ? WHERE user_id = (SELECT user_id FROM traveler WHERE traveler_id = ?)";
-        PreparedStatement ps = conn.prepareStatement(sql);
-        ps.setString(1, firstName);
-        ps.setString(2, lastName);
-        ps.setString(3, email);
-        ps.setString(4, phoneNumber);
-        ps.setString(5, profile.getTravelerId());
+        boolean previousAutoCommit = conn.getAutoCommit();
+        conn.setAutoCommit(false);
         try {
-            return ps.executeUpdate() > 0;
+            String travelerSql = "SELECT user_id, clubMember FROM traveler WHERE traveler_id = ? FOR UPDATE";
+            PreparedStatement travelerPs = conn.prepareStatement(travelerSql);
+            travelerPs.setString(1, profile.getTravelerId());
+            ResultSet travelerRs = travelerPs.executeQuery();
+            if (!travelerRs.next()) {
+                conn.rollback();
+                throw new IllegalArgumentException("Traveler profile was not found.");
+            }
+
+            String userId = travelerRs.getString("user_id");
+            boolean clubMember = travelerRs.getBoolean("clubMember");
+
+            String sql = "UPDATE `user` SET firstName = ?, lastName = ?, email = ?, phoneNumber = ? WHERE user_id = ?";
+            PreparedStatement ps = conn.prepareStatement(sql);
+            ps.setString(1, firstName);
+            ps.setString(2, lastName);
+            ps.setString(3, email);
+            ps.setString(4, phoneNumber);
+            ps.setString(5, userId);
+            boolean updated = ps.executeUpdate() > 0;
+
+            if (clubMember) {
+                String familySql = "UPDATE traveler SET familyMembers = ? WHERE traveler_id = ?";
+                PreparedStatement familyPs = conn.prepareStatement(familySql);
+                familyPs.setInt(1, profile.getFamilyMembers());
+                familyPs.setString(2, profile.getTravelerId());
+                familyPs.executeUpdate();
+            }
+
+            conn.commit();
+            return updated;
         } catch (SQLIntegrityConstraintViolationException e) {
+            conn.rollback();
             throw new IllegalArgumentException("Email already exists in the system.");
+        } catch (SQLException | RuntimeException e) {
+            conn.rollback();
+            throw e;
+        } finally {
+            conn.setAutoCommit(previousAutoCommit);
         }
     }
 

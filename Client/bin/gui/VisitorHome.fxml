@@ -183,6 +183,14 @@
                            wrapText="true" />
                 </VBox>
 
+                <VBox fx:id="profileFamilyMembersSection" spacing="5" visible="false" managed="false">
+                    <Label styleClass="field-label" text="Family Members" />
+                    <Spinner fx:id="spnProfileFamilyMembers" editable="true" maxWidth="120" />
+                    <Label styleClass="field-help"
+                           text="Number of family members saved for this club membership."
+                           wrapText="true" />
+                </VBox>
+
                 <Label fx:id="lblProfileMessage" styleClass="booking-message" text="" wrapText="true" visible="false" />
 
                 <HBox spacing="10" alignment="CENTER_RIGHT">

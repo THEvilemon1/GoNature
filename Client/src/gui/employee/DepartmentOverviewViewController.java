@@ -8,6 +8,7 @@ import common.Employee;
 import common.Message;
 import common.ParkChangeRequest;
 import common.ParkSubmittedReport;
+import common.ParkSubmittedReportDetails;
 import common.ParkVisitorsCount;
 import common.PromotionRequest;
 import gui.login.EmployeeAwareController;
@@ -20,11 +21,16 @@ import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.stage.Stage;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.Map;
 
 public class DepartmentOverviewViewController implements EmployeeAwareController {
+
+    private static final DateTimeFormatter REQUEST_TIME_FORMAT =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     @FXML private Label lblWelcome;
     @FXML private Label lblMessage;
@@ -122,7 +128,7 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
 
     private void setupReportsTable() {
         colReportParkId.setCellValueFactory(data ->
-                new SimpleStringProperty(String.valueOf(data.getValue().getParkId())));
+                new SimpleStringProperty(data.getValue().getParkName()));
 
         colReportTitle.setCellValueFactory(data ->
                 new SimpleStringProperty(data.getValue().getReportTitle()));
@@ -132,6 +138,36 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
 
         colReportContent.setCellValueFactory(data ->
                 new SimpleStringProperty(data.getValue().getContent()));
+
+        tblReports.setRowFactory(table -> {
+            TableRow<ParkSubmittedReport> row = new TableRow<>();
+            row.setOnMouseClicked(event -> {
+                if (!row.isEmpty()) {
+                    requestSubmittedReportDetails(row.getItem());
+                }
+            });
+            return row;
+        });
+    }
+
+    private void requestSubmittedReportDetails(ParkSubmittedReport report) {
+        if (report.getReportId() <= 0) {
+            showError("This report was saved before report details were supported.");
+            return;
+        }
+
+        ParkClient client = ParkClient.getInstance();
+        if (client == null || !client.isConnected()) {
+            showError("Not connected to server.");
+            return;
+        }
+
+        try {
+            client.setListener(overviewListener);
+            client.sendToServer(new Message("GET_SUBMITTED_REPORT_DETAILS", report.getReportId()));
+        } catch (Exception e) {
+            showError("Failed to load report details.");
+        }
     }
 
     private void setupTable() {
@@ -141,7 +177,9 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
 
             if (item instanceof ParkChangeRequest) {
                 ParkChangeRequest r = (ParkChangeRequest) item;
-                text = r.getRequestTitle() + "  |  Park: " + r.getParkId() + "  |  From: " + r.getRequestedByUsername();
+                text = r.getRequestTitle() + "  |  Park: " + r.getParkId() +
+                        "  |  From: " + r.getRequestedByUsername() +
+                        "  |  Date: " + formatRequestTime(r.getRequestDate());
 
             } else if (item instanceof PromotionRequest) {
                 PromotionRequest r = (PromotionRequest) item;
@@ -165,12 +203,12 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
         });
 
         colStatus.setCellValueFactory(data -> {
-            String status = statusMap.getOrDefault(data.getValue(), "⏳ Waiting");
+            String status = statusMap.getOrDefault(data.getValue(), waitingStatus());
             return new SimpleStringProperty(status);
         });
 
         colApprove.setCellFactory(col -> new TableCell<>() {
-            private final Button btn = new Button("✔ Approve");
+            private final Button btn = new Button("✓ Approve");
 
             {
                 btn.setStyle("-fx-background-color: #2e7d32; -fx-text-fill: white; -fx-background-radius: 6; -fx-cursor: hand;");
@@ -201,7 +239,7 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
         });
 
         colReject.setCellFactory(col -> new TableCell<>() {
-            private final Button btn = new Button("✘ Reject");
+            private final Button btn = new Button("✕ Reject");
 
             {
                 btn.setStyle("-fx-background-color: #c62828; -fx-text-fill: white; -fx-background-radius: 6; -fx-cursor: hand;");
@@ -234,7 +272,7 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
 
     private boolean isItemAlreadyDecided(Object item) {
         String status = statusMap.get(item);
-        return status != null && !status.equals("⏳ Waiting");
+        return status != null && !status.equals(waitingStatus());
     }
 
     private void listenForRequests() {
@@ -260,6 +298,11 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
             }
 
             @Override
+            public void onSubmittedReportDetailsResult(ParkSubmittedReportDetails details) {
+                Platform.runLater(() -> openSubmittedReport(details));
+            }
+
+            @Override
             public void onAllParksVisitorsResult(ArrayList<ParkVisitorsCount> parks) {
                 Platform.runLater(() -> {
                     tblVisitors.getItems().clear();
@@ -270,7 +313,7 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
             @Override
             public void onParkChangeRequestNotification(ParkChangeRequest request) {
                 Platform.runLater(() -> {
-                    statusMap.put(request, "⏳ Waiting");
+                    statusMap.put(request, waitingStatus());
                     tblRequests.getItems().add(request);
                     tblRequests.refresh();
                 });
@@ -279,7 +322,7 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
             @Override
             public void onPromotionRequestNotification(PromotionRequest request) {
                 Platform.runLater(() -> {
-                    statusMap.put(request, "⏳ Waiting");
+                    statusMap.put(request, waitingStatus());
                     tblRequests.getItems().add(request);
                     tblRequests.refresh();
                 });
@@ -320,7 +363,7 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
                         new Object[]{request.getRequestId(), approved}));
             }
 
-            statusMap.put(requestObj, approved ? "✔ Approved" : "✘ Rejected");
+            statusMap.put(requestObj, approved ? "✓ Approved" : "✕ Rejected");
             tblRequests.refresh();
 
             showSuccess((approved ? "Request approved!" : "Request rejected.") +
@@ -420,5 +463,33 @@ public class DepartmentOverviewViewController implements EmployeeAwareController
         lblMessage.getStyleClass().removeAll("msg-error");
         lblMessage.getStyleClass().add("msg-success");
         lblMessage.setVisible(true);
+    }
+
+    private void openSubmittedReport(ParkSubmittedReportDetails details) {
+        try {
+            FXMLLoader loader = new FXMLLoader(
+                    getClass().getResource("/gui/employee/SubmittedReportView.fxml"));
+
+            Parent root = loader.load();
+
+            SubmittedReportViewController controller = loader.getController();
+            controller.setReportDetails(details);
+
+            Stage stage = new Stage();
+            stage.setTitle(details.getReport().getReportTitle());
+            stage.setScene(new Scene(root));
+            WindowUtil.showMaximized(stage);
+        } catch (Exception e) {
+            showError("Failed to open report details.");
+            e.printStackTrace();
+        }
+    }
+
+    private String waitingStatus() {
+        return "⌛ Waiting";
+    }
+
+    private String formatRequestTime(LocalDateTime requestDate) {
+        return requestDate == null ? "N/A" : requestDate.format(REQUEST_TIME_FORMAT);
     }
 }

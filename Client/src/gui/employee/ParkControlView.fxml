@@ -16,8 +16,12 @@
             <HBox HBox.hgrow="ALWAYS" />
             <Label fx:id="lblWelcome" styleClass="top-bar-info" text="" />
             <Button styleClass="btn-secondary" text="Promotions" onAction="#handleOpenPromotions" />
-            <Button styleClass="btn-secondary" text="Visitors Report" onAction="#handleVisitorsReport" />
-            <Button styleClass="btn-secondary" text="Usage Report" onAction="#handleUsageReport" />
+            <MenuButton styleClass="btn-secondary" text="Reports">
+                <items>
+                    <MenuItem text="Visitors Report" onAction="#handleVisitorsReport" />
+                    <MenuItem text="Usage Report" onAction="#handleUsageReport" />
+                </items>
+            </MenuButton>
             <Button styleClass="btn-secondary" text="Logout" onAction="#handleLogout" />
         </HBox>
 

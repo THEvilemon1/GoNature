@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 
 import common.ParkSubmittedReport;
+import common.ParkSubmittedReportDetails;
 import common.ParkChangeRequest;
 import common.Booking;
 import common.Employee;
@@ -231,11 +232,20 @@ public class ParkClient extends AbstractClient {
                 case "PARK_VISITORS_REPORT_RESULT":
                     listener.onParkVisitorsReportResult((ParkVisitorsReportResult) message.getData());
                     break;
+                case "PARK_VISITORS_REPORT_SUBMIT_RESULT":
+                    listener.onParkVisitorsReportSubmitResult((boolean) message.getData());
+                    break;
                 case "PARK_USAGE_REPORT_RESULT":
                     listener.onParkUsageReportResult((ArrayList<common.ParkUsageReportResult>) message.getData());
                     break;
+                case "PARK_USAGE_REPORT_SUBMIT_RESULT":
+                    listener.onParkUsageReportSubmitResult((boolean) message.getData());
+                    break;
                 case "SUBMITTED_REPORTS_RESULT":
                     listener.onSubmittedReportsResult((ArrayList<ParkSubmittedReport>) message.getData());
+                    break;
+                case "SUBMITTED_REPORT_DETAILS_RESULT":
+                    listener.onSubmittedReportDetailsResult((ParkSubmittedReportDetails) message.getData());
                     break;
                     
                 case "ALL_PARKS_VISITORS_RESULT":

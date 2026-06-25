@@ -236,3 +236,84 @@
     -fx-background-color: #e8ede8;
     -fx-text-fill: #1c1c1e;
 }
+
+.menu-button.btn-secondary > .label {
+    -fx-text-fill: #374151;
+}
+
+.menu-button.btn-secondary:hover > .label {
+    -fx-text-fill: #2e7d32;
+}
+
+.menu-button.btn-secondary .arrow {
+    -fx-background-color: #374151;
+}
+
+.menu-button.btn-secondary:hover .arrow {
+    -fx-background-color: #2e7d32;
+}
+
+.context-menu {
+    -fx-background-color: white;
+    -fx-background-radius: 8;
+    -fx-border-color: #d1d5db;
+    -fx-border-radius: 8;
+    -fx-padding: 6;
+}
+
+.menu-item {
+    -fx-padding: 8 16 8 16;
+}
+
+.menu-item:focused {
+    -fx-background-color: #e8ede8;
+}
+
+.menu-item:focused .label {
+    -fx-text-fill: #1b5e20;
+}
+
+.department-overview-card {
+    -fx-padding: 0 0 24 0;
+}
+
+.department-overview-content {
+    -fx-padding: 24 28 28 28;
+}
+
+.overview-section {
+    -fx-spacing: 8;
+}
+
+.overview-section-title {
+    -fx-padding: 0 0 2 2;
+    -fx-text-fill: #1f2937;
+}
+
+.overview-table {
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-border-color: #d8ded8;
+    -fx-border-width: 1;
+}
+
+.overview-table .column-header-background {
+    -fx-background-color: #eef4ee;
+    -fx-background-radius: 10 10 0 0;
+}
+
+.overview-table .column-header,
+.overview-table .filler {
+    -fx-background-color: transparent;
+    -fx-size: 34;
+}
+
+.overview-table .column-header .label {
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #374151;
+}
+
+.overview-table .table-row-cell {
+    -fx-cell-size: 32;
+}

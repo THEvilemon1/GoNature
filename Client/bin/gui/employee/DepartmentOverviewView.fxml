@@ -9,61 +9,67 @@
            styleClass="root-pane"
            stylesheets="@EmployeeScreens.css">
 
-    <VBox styleClass="screen-card" prefWidth="960" maxWidth="1040" alignment="TOP_CENTER">
+    <VBox styleClass="screen-card, department-overview-card" prefWidth="980" maxWidth="1080" alignment="TOP_CENTER">
 
         <HBox styleClass="top-bar" alignment="CENTER_LEFT" spacing="12">
             <Label styleClass="screen-title" text="Department Overview" />
             <HBox HBox.hgrow="ALWAYS" />
             <Label fx:id="lblWelcome" styleClass="top-bar-info" text="" />
+            <MenuButton styleClass="btn-secondary" text="Reports">
+                <items>
+                    <MenuItem text="Visits Report" onAction="#handleVisitsReport" />
+                    <MenuItem text="Cancellations Report" onAction="#handleCancellationsReport" />
+                </items>
+            </MenuButton>
             <Button styleClass="btn-secondary" text="Logout" onAction="#handleLogout" />
         </HBox>
 
-        <VBox styleClass="content-area" spacing="18" VBox.vgrow="ALWAYS">
+        <VBox styleClass="content-area, department-overview-content" spacing="18" alignment="TOP_CENTER" VBox.vgrow="ALWAYS">
 
-            <Label styleClass="field-label" text="LIVE VISITORS IN ALL PARKS" />
+            <HBox spacing="18" alignment="TOP_CENTER">
+                <VBox styleClass="overview-section" spacing="8" prefWidth="410" maxWidth="430">
+                    <Label styleClass="field-label, overview-section-title" text="LIVE VISITORS IN ALL PARKS" />
 
-            <TableView fx:id="tblVisitors" styleClass="list-view" prefHeight="180">
-                <columns>
-                    <TableColumn fx:id="colVisitorsParkId" text="Park ID" prefWidth="90" />
-                    <TableColumn fx:id="colVisitorsParkName" text="Park" prefWidth="260" />
-                    <TableColumn fx:id="colVisitorsCurrent" text="Visitors Inside" prefWidth="160" />
-                    <TableColumn fx:id="colVisitorsCapacity" text="Max Capacity" prefWidth="160" />
-                    <TableColumn fx:id="colVisitorsFree" text="Free Spots" prefWidth="160" />
-                </columns>
-            </TableView>
+                    <TableView fx:id="tblVisitors" styleClass="list-view, overview-table" prefWidth="410" prefHeight="190">
+                        <columns>
+                            <TableColumn fx:id="colVisitorsParkId" text="ID" prefWidth="55" />
+                            <TableColumn fx:id="colVisitorsParkName" text="Park" prefWidth="145" />
+                            <TableColumn fx:id="colVisitorsCurrent" text="Inside" prefWidth="70" />
+                            <TableColumn fx:id="colVisitorsCapacity" text="Capacity" prefWidth="70" />
+                            <TableColumn fx:id="colVisitorsFree" text="Free" prefWidth="70" />
+                        </columns>
+                    </TableView>
+                </VBox>
 
-            <Separator styleClass="card-sep" />
+                <VBox styleClass="overview-section" spacing="8" prefWidth="510" maxWidth="540">
+                    <Label styleClass="field-label, overview-section-title" text="SUBMITTED PARK REPORTS" />
 
-            <Label styleClass="field-label" text="SUBMITTED PARK REPORTS" />
+                    <TableView fx:id="tblReports" styleClass="list-view, overview-table" prefWidth="510" prefHeight="190">
+                        <columns>
+                            <TableColumn fx:id="colReportParkId" text="Park" prefWidth="130" />
+                            <TableColumn fx:id="colReportTitle" text="Report Title" prefWidth="150" />
+                            <TableColumn fx:id="colReportEmployeeId" text="Employee" prefWidth="80" />
+                            <TableColumn fx:id="colReportContent" text="Content" prefWidth="190" />
+                        </columns>
+                    </TableView>
+                </VBox>
+            </HBox>
 
-            <TableView fx:id="tblReports" styleClass="list-view" prefHeight="220">
-                <columns>
-                    <TableColumn fx:id="colReportParkId" text="Park ID" prefWidth="90" />
-                    <TableColumn fx:id="colReportTitle" text="Report Title" prefWidth="320" />
-                    <TableColumn fx:id="colReportEmployeeId" text="Employee ID" prefWidth="120" />
-                    <TableColumn fx:id="colReportContent" text="Content" prefWidth="430" />
-                </columns>
-            </TableView>
+            <VBox styleClass="overview-section" spacing="8" prefWidth="940" maxWidth="940">
+                <Label styleClass="field-label, overview-section-title" text="PARK MANAGER REQUESTS" />
 
-            <Separator styleClass="card-sep" />
-
-            <Label styleClass="field-label" text="PARK MANAGER REQUESTS" />
-
-            <TableView fx:id="tblRequests" styleClass="list-view" prefHeight="250">
-                <columns>
-                    <TableColumn fx:id="colRequest" text="Request" prefWidth="500" />
-                    <TableColumn fx:id="colStatus" text="Status" prefWidth="120" />
-                    <TableColumn fx:id="colApprove" text="" prefWidth="110" />
-                    <TableColumn fx:id="colReject" text="" prefWidth="110" />
-                </columns>
-            </TableView>
+                <TableView fx:id="tblRequests" styleClass="list-view, overview-table" prefWidth="940" prefHeight="260">
+                    <columns>
+                        <TableColumn fx:id="colRequest" text="Request" prefWidth="610" />
+                        <TableColumn fx:id="colStatus" text="Status" prefWidth="130" />
+                        <TableColumn fx:id="colApprove" text="" prefWidth="100" />
+                        <TableColumn fx:id="colReject" text="" prefWidth="100" />
+                    </columns>
+                </TableView>
+            </VBox>
 
             <Label fx:id="lblMessage" styleClass="lbl-message" text=""
                    wrapText="true" maxWidth="700" visible="false" />
-
-            <Button text="Visits Report" onAction="#handleVisitsReport" prefWidth="220" />
-            <Button text="Cancellations Report" onAction="#handleCancellationsReport" prefWidth="220" />
-            <Button styleClass="btn-secondary" text="Logout" onAction="#handleLogout" prefWidth="120" />
         </VBox>
     </VBox>
 </StackPane>

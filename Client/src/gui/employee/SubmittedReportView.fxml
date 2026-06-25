@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.chart.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<StackPane xmlns="http://javafx.com/javafx/17"
+           xmlns:fx="http://javafx.com/fxml/1"
+           fx:controller="gui.employee.SubmittedReportViewController"
+           styleClass="root-pane"
+           stylesheets="@EmployeeScreens.css">
+
+    <VBox styleClass="screen-card" prefWidth="900" maxWidth="980" alignment="TOP_CENTER">
+
+        <HBox styleClass="top-bar" alignment="CENTER_LEFT" spacing="0">
+            <Label fx:id="lblTitle" styleClass="screen-title" text="Submitted Report" />
+            <Region HBox.hgrow="ALWAYS" minWidth="20" />
+            <Button styleClass="btn-secondary" text="Close" onAction="#handleClose" />
+        </HBox>
+
+        <VBox styleClass="content-area" spacing="18">
+            <Label fx:id="lblMeta" styleClass="field-help" text="" />
+
+            <TextArea fx:id="reportArea" prefHeight="180" editable="false" wrapText="true" />
+
+            <HBox alignment="CENTER_RIGHT">
+                <Button fx:id="btnShowGraph" styleClass="btn-primary" text="Show Graph"
+                        onAction="#handleShowGraph" prefWidth="140" />
+            </HBox>
+
+            <PieChart fx:id="visitorsPieChart" prefHeight="320" title="Visitors by Type" />
+
+            <BarChart fx:id="usageChart" prefHeight="320" title="Park Usage By Day">
+                <xAxis>
+                    <CategoryAxis label="Date" />
+                </xAxis>
+                <yAxis>
+                    <NumberAxis label="Usage %" />
+                </yAxis>
+            </BarChart>
+        </VBox>
+    </VBox>
+</StackPane>

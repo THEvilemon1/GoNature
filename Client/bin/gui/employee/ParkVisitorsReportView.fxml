@@ -31,6 +31,8 @@
                 <Region HBox.hgrow="ALWAYS" />
                 <Button styleClass="btn-primary" text="Generate Report"
                         onAction="#handleGenerateReport" prefWidth="170" />
+                <Button fx:id="btnSendReport" styleClass="btn-secondary" text="Send to Department Manager"
+                        onAction="#handleSendReport" prefWidth="220" />
             </HBox>
 
             <Separator styleClass="card-sep" />

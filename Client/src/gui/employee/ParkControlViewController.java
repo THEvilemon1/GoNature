@@ -112,7 +112,7 @@ public class ParkControlViewController implements EmployeeAwareController {
                             pendingRequest.getRequestId(),
                             pendingRequestSentAt,
                             pendingRequest.getRequestTitle(),
-                            "Waiting",
+                            formatStatus(null),
                             null,
                             pendingRequest.getParameterType(),
                             pendingRequest.getNewValue()
@@ -162,7 +162,7 @@ public class ParkControlViewController implements EmployeeAwareController {
             ActivityLogEntry entry = new ActivityLogEntry(
                     nextRequestNumber++,
                     savedEntry.getRequestId(),
-                    null,
+                    savedEntry.getRequestDate(),
                     savedEntry.getRequestTitle(),
                     formatStatus(savedEntry.getApproved()),
                     null,
@@ -176,8 +176,8 @@ public class ParkControlViewController implements EmployeeAwareController {
     }
 
     private String formatStatus(Boolean approved) {
-        if (approved == null) return "Waiting";
-        return approved ? "Confirmed" : "Rejected";
+        if (approved == null) return "⌛ Waiting";
+        return approved ? "✓ Confirmed" : "✕ Rejected";
     }
 
     @FXML
@@ -293,6 +293,7 @@ public class ParkControlViewController implements EmployeeAwareController {
         }
 
         String requestTitle = buildRequestTitle(type, titlePrefix, value);
+        pendingRequestSentAt = LocalDateTime.now();
         ParkChangeRequest request = new ParkChangeRequest(
                 employee.getParkId(),
                 type,
@@ -301,12 +302,12 @@ public class ParkControlViewController implements EmployeeAwareController {
                 employee.getEmployeeId(),
                 0,
                 UUID.randomUUID().toString(),
-                requestTitle
+                requestTitle,
+                pendingRequestSentAt
         );
 
         pendingRequest = request;
         pendingField = field;
-        pendingRequestSentAt = LocalDateTime.now();
 
         try {
             client.sendToServer(new Message("PARK_CHANGE_REQUEST", request));
@@ -332,7 +333,7 @@ public class ParkControlViewController implements EmployeeAwareController {
         ActivityLogEntry entry = requestIdToLogEntry.get(requestId);
         if (entry == null || entry.isFinalStatus()) return;
 
-        entry.setRequestStatus(approved ? "Confirmed" : "Rejected");
+        entry.setRequestStatus(formatStatus(approved));
         entry.setResponseDateTime(LocalDateTime.now());
         entry.setFinalStatus(true);
         tblActivityLog.refresh();

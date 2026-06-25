@@ -7,42 +7,7 @@
 	</classpathentry>
 	<classpathentry kind="src" path="src"/>
 	<classpathentry exported="true" kind="lib" path="lib/mysql-connector-j-9.5.0.jar"/>
-	<classpathentry kind="lib" path="/Users/fauziazzam/javafx-sdk-21.0.11/lib/javafx-swt.jar">
-		<attributes>
-			<attribute name="module" value="true"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry kind="lib" path="/Users/fauziazzam/javafx-sdk-21.0.11/lib/javafx.base.jar">
-		<attributes>
-			<attribute name="module" value="true"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry kind="lib" path="/Users/fauziazzam/javafx-sdk-21.0.11/lib/javafx.controls.jar">
-		<attributes>
-			<attribute name="module" value="true"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry kind="lib" path="/Users/fauziazzam/javafx-sdk-21.0.11/lib/javafx.fxml.jar">
-		<attributes>
-			<attribute name="module" value="true"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry kind="lib" path="/Users/fauziazzam/javafx-sdk-21.0.11/lib/javafx.graphics.jar">
-		<attributes>
-			<attribute name="module" value="true"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry kind="lib" path="/Users/fauziazzam/javafx-sdk-21.0.11/lib/javafx.media.jar">
-		<attributes>
-			<attribute name="module" value="true"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry kind="lib" path="/Users/fauziazzam/javafx-sdk-21.0.11/lib/javafx.swing.jar">
-		<attributes>
-			<attribute name="module" value="true"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry kind="lib" path="/Users/fauziazzam/javafx-sdk-21.0.11/lib/javafx.web.jar">
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/javafx">
 		<attributes>
 			<attribute name="module" value="true"/>
 		</attributes>

@@ -98,8 +98,6 @@
     -fx-font-family: "Arial";
 }
 
-<<<<<<< HEAD
-=======
 .section-title-manual {
     -fx-font-size: 11px;
     -fx-font-weight: bold;
@@ -107,7 +105,6 @@
     -fx-font-family: "Arial";
 }
 
->>>>>>> cad06096ede3afa65a6bec37e3d0ccb3c32df7bf
 .section-subtitle-manual {
     -fx-font-size: 11px;
     -fx-text-fill: #9ca3af;
@@ -120,11 +117,8 @@
     -fx-font-family: "Arial";
 }
 
-<<<<<<< HEAD
 /* Section labels */
-=======
 /* ── Section labels ─────────────────────────────────────────────── */
->>>>>>> cad06096ede3afa65a6bec37e3d0ccb3c32df7bf
 .field-label {
     -fx-font-size: 12px;
     -fx-font-weight: bold;
@@ -132,10 +126,7 @@
     -fx-font-family: "Arial";
 }
 
-<<<<<<< HEAD
 /* Ã¢â€â‚¬Ã¢â€â‚¬ Input fields Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
-=======
->>>>>>> cad06096ede3afa65a6bec37e3d0ccb3c32df7bf
 .field-input {
     -fx-pref-height: 40;
     -fx-font-size: 14px;

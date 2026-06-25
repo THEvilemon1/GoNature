@@ -2,32 +2,19 @@ package server;
 
 import common.Employee;
 import java.sql.*;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
 
 /**
  * EmployeeLoginRepository
  * Handles all DB operations related to employee login/logout.
- * Tracks logged-in employees to prevent double login.
  */
 public class EmployeeLoginRepository {
-
-    // Thread-safe set of currently logged-in usernames
-    private static final Set<String> loggedInEmployees =
-        Collections.synchronizedSet(new HashSet<>());
 
     /**
      * Attempts to log in an employee.
      * Returns Employee object if successful.
-     * Returns "ALREADY_LOGGED_IN" if user is already logged in.
      * Returns null if credentials are wrong.
      */
     public static Object loginEmployee(String username, String password) throws SQLException {
-        if (loggedInEmployees.contains(username)) {
-            return "ALREADY_LOGGED_IN";
-        }
-
         Connection conn = DBConnection.getStaticConnection();
         String sql = "SELECT e.employee_id, e.salary, e.park_id, u.username, e.role, e.user_id, " +
              "u.firstName, u.lastName, u.email, u.phoneNumber, " +
@@ -57,7 +44,6 @@ public class EmployeeLoginRepository {
                 getNullableInt(rs, "gap"),
                 getNullableInt(rs, "defaultStayTime")
             );
-            loggedInEmployees.add(username);
             System.out.println("[EmployeeLoginRepository] Employee logged in: " + username);
             return employee;
         }
@@ -68,15 +54,7 @@ public class EmployeeLoginRepository {
      * Logs out an employee.
      */
     public static void logoutEmployee(String username) {
-        loggedInEmployees.remove(username);
         System.out.println("[EmployeeLoginRepository] Employee logged out: " + username);
-    }
-
-    /**
-     * Check if an employee is currently logged in.
-     */
-    public static boolean isLoggedIn(String username) {
-        return loggedInEmployees.contains(username);
     }
 
     private static Integer getNullableInt(ResultSet rs, String columnName) throws SQLException {

@@ -96,6 +96,10 @@ public class ParkServer extends AbstractServer {
         }
     }
 
+    private String getEmployeeSessionKey(String username) {
+        return "EMPLOYEE:" + username;
+    }
+
     private ParkVisitorsReportResult getParkVisitorsReport(int parkId, java.time.LocalDate fromDate, java.time.LocalDate toDate) throws SQLException {
         int individualVisitors = 0;
         int organizedVisitors = 0;
@@ -504,10 +508,21 @@ public class ParkServer extends AbstractServer {
                     Object loginResult1 = EmployeeLoginRepository.loginEmployee(credentials[0], credentials[1]);
                     if (loginResult1 == null) {
                         client.sendToClient(new Message("EMPLOYEE_LOGIN_FAILED", "Invalid username or password."));
-                    } else if (loginResult1.equals("ALREADY_LOGGED_IN")) {
-                        client.sendToClient(new Message("EMPLOYEE_LOGIN_FAILED", "This user is already logged in."));
                     } else {
                         Employee employee = (Employee) loginResult1;
+                        ConnectionToClient oldEmployeeConnection = UserSessionManager.getInstance()
+                            .loginUser(getEmployeeSessionKey(employee.getUsername()), client);
+
+                        if (oldEmployeeConnection != null) {
+                            try {
+                                oldEmployeeConnection.sendToClient(new Message("FORCE_LOGOUT",
+                                    "You have logged in from another computer."));
+                                oldEmployeeConnection.close();
+                            } catch (IOException e) {
+                                System.out.println("Error disconnecting old employee session: " + e.getMessage());
+                            }
+                        }
+
                         client.setInfo("EMPLOYEE_USERNAME", employee.getUsername());
                         client.setInfo("EMPLOYEE_PARK_ID", employee.getParkId());
                         client.setInfo("EMPLOYEE_ROLE", employee.getRole());
@@ -519,6 +534,7 @@ public class ParkServer extends AbstractServer {
                 case "EMPLOYEE_LOGOUT":
                     String logoutUsername = (String) message.getData();
                     EmployeeLoginRepository.logoutEmployee(logoutUsername);
+                    UserSessionManager.getInstance().logoutUser(getEmployeeSessionKey(logoutUsername));
                     break;
 
 

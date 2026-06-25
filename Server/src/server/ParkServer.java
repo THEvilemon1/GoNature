@@ -1283,9 +1283,14 @@ public class ParkServer extends AbstractServer {
             ps.setString(13, Booking.STATUS_CHECKED_OUT);
 
             boolean updated = ps.executeUpdate() > 0;
-            conn.commit();
 
             if (!updated) return null;
+
+            if (slotChanged && Booking.STATUS_CONFIRMED.equals(existing.getStatus())) {
+                BookingLifecycleService.handleSpotFreed(conn, existing.getParkId(), existing.getVisitorTime());
+            }
+
+            conn.commit();
 
             return new Booking(booking.getBookingId(), booking.getTravelerId(),
                 booking.getTravelerName(), booking.getTravelerEmail(), booking.getTravelerPhoneNumber(),
@@ -1484,11 +1489,13 @@ public class ParkServer extends AbstractServer {
 
     private VisitorLoginResult loginOrRegisterVisitor(String nationalId) throws SQLException {
         Connection conn = DBConnection.getStaticConnection();
-        int nationalIdNumber = Integer.parseInt(nationalId);
 
-        String selectSql = "SELECT traveler_id, guide, clubMember FROM traveler WHERE nationalId = ?";
+        String selectSql = "SELECT t.traveler_id, t.guide, t.clubMember "
+            + "FROM traveler t "
+            + "INNER JOIN `user` u ON t.user_id = u.user_id "
+            + "WHERE u.nationalId = ?";
         PreparedStatement selectPs = conn.prepareStatement(selectSql);
-        selectPs.setInt(1, nationalIdNumber);
+        selectPs.setString(1, nationalId);
         ResultSet rs = selectPs.executeQuery();
         if (rs.next()) {
             boolean isGuide = rs.getBoolean("guide");
@@ -1500,7 +1507,7 @@ public class ParkServer extends AbstractServer {
         conn.setAutoCommit(false);
 
         try {
-        	String insertUserSql = "INSERT INTO `user` (user_id, firstName, lastName, email, phoneNumber) VALUES (?, ?, ?, ?, ?)";
+            String insertUserSql = "INSERT INTO `user` (user_id, firstName, lastName, email, phoneNumber, nationalId) VALUES (?, ?, ?, ?, ?, ?)";
             String userId = generateUniqueId(conn, "`user`", "user_id");
         	PreparedStatement insertUserPs = conn.prepareStatement(insertUserSql);
             insertUserPs.setString(1, userId);
@@ -1508,17 +1515,17 @@ public class ParkServer extends AbstractServer {
         	insertUserPs.setString(3, "Guest");
         	insertUserPs.setNull(4, Types.VARCHAR);
         	insertUserPs.setNull(5, Types.VARCHAR);
+            insertUserPs.setString(6, nationalId);
         	insertUserPs.executeUpdate();
 
-            String insertTravelerSql = "INSERT INTO traveler (traveler_id, nationalId, guide, clubMember, user_id) VALUES (?, ?, ?, ?, ?)";
+            String insertTravelerSql = "INSERT INTO traveler (traveler_id, guide, clubMember, user_id) VALUES (?, ?, ?, ?)";
             PreparedStatement insertTravelerPs = conn.prepareStatement(insertTravelerSql);
 
             String travelerId = generateUniqueId(conn, "traveler", "traveler_id");
             insertTravelerPs.setString(1, travelerId);
-            insertTravelerPs.setInt(2, nationalIdNumber);
+            insertTravelerPs.setBoolean(2, false);
             insertTravelerPs.setBoolean(3, false);
-            insertTravelerPs.setBoolean(4, false);
-            insertTravelerPs.setString(5, userId);
+            insertTravelerPs.setString(4, userId);
             insertTravelerPs.executeUpdate();
             System.out.println("Inserted traveler row for visitor: " + travelerId);
 
@@ -1600,19 +1607,20 @@ public class ParkServer extends AbstractServer {
 
     private Object[] registerSubscriber(SubscriberRequest req) throws SQLException {
         Connection conn = DBConnection.getStaticConnection();
-        int nationalIdNumber;
-        try {
-            nationalIdNumber = Integer.parseInt(req.getNationalId());
-        } catch (NumberFormatException e) {
+        String nationalId = req.getNationalId();
+        if (nationalId == null || !nationalId.matches("\\d+")) {
             return new Object[]{false, "National ID must be a number."};
         }
 
         boolean previousAutoCommit = conn.getAutoCommit();
         conn.setAutoCommit(false);
         try {
-            String selectSql = "SELECT t.traveler_id, t.guide, t.clubMember, t.user_id FROM traveler t WHERE t.nationalId = ?";
+            String selectSql = "SELECT t.traveler_id, t.guide, t.clubMember, t.user_id "
+                + "FROM traveler t "
+                + "INNER JOIN `user` u ON t.user_id = u.user_id "
+                + "WHERE u.nationalId = ?";
             PreparedStatement selectPs = conn.prepareStatement(selectSql);
-            selectPs.setInt(1, nationalIdNumber);
+            selectPs.setString(1, nationalId);
             ResultSet rs = selectPs.executeQuery();
 
             String userId;
@@ -1650,21 +1658,21 @@ public class ParkServer extends AbstractServer {
                 userId     = generateUniqueId(conn, "`user`", "user_id");
                 travelerId = generateUniqueId(conn, "traveler", "traveler_id");
 
-                String insertUserSql = "INSERT INTO `user` (user_id, firstName, lastName, email, phoneNumber) VALUES (?, ?, ?, ?, ?)";
+                String insertUserSql = "INSERT INTO `user` (user_id, firstName, lastName, email, phoneNumber, nationalId) VALUES (?, ?, ?, ?, ?, ?)";
                 PreparedStatement insertUserPs = conn.prepareStatement(insertUserSql);
                 insertUserPs.setString(1, userId);
                 insertUserPs.setString(2, req.getFirstName());
                 insertUserPs.setString(3, req.getLastName());
                 insertUserPs.setString(4, req.getEmail());
                 insertUserPs.setString(5, req.getPhoneNumber());
+                insertUserPs.setString(6, nationalId);
                 insertUserPs.executeUpdate();
 
-                String insertTravelerSql = "INSERT INTO traveler (traveler_id, nationalId, guide, clubMember, familyMembers, user_id) VALUES (?, ?, false, false, ?, ?)";
+                String insertTravelerSql = "INSERT INTO traveler (traveler_id, guide, clubMember, familyMembers, user_id) VALUES (?, false, false, ?, ?)";
                 PreparedStatement insertTravelerPs = conn.prepareStatement(insertTravelerSql);
                 insertTravelerPs.setString(1, travelerId);
-                insertTravelerPs.setInt(2, nationalIdNumber);
-                insertTravelerPs.setInt(3, req.getFamilyMembers());
-                insertTravelerPs.setString(4, userId);
+                insertTravelerPs.setInt(2, req.getFamilyMembers());
+                insertTravelerPs.setString(3, userId);
                 insertTravelerPs.executeUpdate();
             }
 

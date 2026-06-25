@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<StackPane xmlns="http://javafx.com/javafx/17"
+           xmlns:fx="http://javafx.com/fxml/1"
+           fx:controller="gui.employee.TravelerRegistrationViewController"
+           styleClass="root-pane"
+           stylesheets="@EmployeeScreens.css">
+
+    <VBox styleClass="screen-card" maxWidth="560" alignment="TOP_CENTER">
+
+        <!-- Top bar -->
+        <HBox styleClass="top-bar" alignment="CENTER_LEFT" spacing="0">
+            <VBox spacing="2">
+                <Label styleClass="screen-title" text="Traveler Registration" />
+                <Label fx:id="lblWelcome" styleClass="welcome-label-top" text="Welcome!" />
+            </VBox>
+        </HBox>
+
+        <!-- Content -->
+        <VBox styleClass="content-area" spacing="16">
+
+            <Label styleClass="section-title" text="Register as Club Member or Tour Guide" />
+
+            <!-- National ID row -->
+            <VBox spacing="4">
+                <Label styleClass="field-label" text="National ID" />
+                <HBox spacing="10" alignment="CENTER_LEFT">
+                    <TextField fx:id="txtNationalId" styleClass="field-input"
+                               promptText="Enter national ID number" HBox.hgrow="ALWAYS" />
+                    <Button styleClass="btn-refresh" text="Look Up"
+                            onAction="#handleLookUp" prefWidth="90" prefHeight="40" />
+                </HBox>
+                <Label fx:id="lblCurrentRole" styleClass="lbl-message" text=""
+                       wrapText="true" visible="false" managed="false" />
+            </VBox>
+
+            <!-- Personal details -->
+            <HBox spacing="12">
+                <VBox spacing="4" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="First Name" />
+                    <TextField fx:id="txtFirstName" styleClass="field-input" promptText="First name" />
+                </VBox>
+                <VBox spacing="4" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Last Name" />
+                    <TextField fx:id="txtLastName" styleClass="field-input" promptText="Last name" />
+                </VBox>
+            </HBox>
+
+            <HBox spacing="12">
+                <VBox spacing="4" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Email" />
+                    <TextField fx:id="txtEmail" styleClass="field-input" promptText="Email address" />
+                </VBox>
+                <VBox spacing="4" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Phone Number" />
+                    <TextField fx:id="txtPhone" styleClass="field-input" promptText="Phone number" />
+                </VBox>
+            </HBox>
+
+            <Separator styleClass="card-sep" />
+
+            <!-- Registration type -->
+            <Label styleClass="section-title" text="Registration Type" />
+            <HBox spacing="16" alignment="CENTER_LEFT">
+                <RadioButton fx:id="rbClubMember" text="Club Member" />
+                <RadioButton fx:id="rbGuide" text="Tour Guide" />
+            </HBox>
+
+            <!-- Club member extra fields -->
+            <VBox fx:id="clubMemberSection" spacing="10">
+                <HBox spacing="12" alignment="CENTER_LEFT">
+                    <VBox spacing="4">
+                        <Label styleClass="field-label" text="Family Members (including subscriber)" />
+                        <Spinner fx:id="spnFamilyMembers" min="1" max="6" initialValue="1"
+                                 prefWidth="100" editable="true" />
+                    </VBox>
+                </HBox>
+                <VBox spacing="4">
+                    <Label styleClass="field-label" text="Credit Card (optional)" />
+                    <TextField fx:id="txtCreditCard" styleClass="field-input" promptText="Credit card number" />
+                </VBox>
+            </VBox>
+
+            <!-- Status message -->
+            <Label fx:id="lblMessage" styleClass="lbl-message" text=""
+                   wrapText="true" visible="false" managed="false" />
+
+            <!-- Buttons -->
+            <HBox spacing="12" alignment="CENTER_RIGHT">
+                <Button styleClass="btn-secondary" text="Logout"
+                        onAction="#handleLogout" prefWidth="90" />
+                <Button fx:id="btnRegister" styleClass="btn-primary" text="Register"
+                        onAction="#handleRegister" prefWidth="160" />
+            </HBox>
+
+        </VBox>
+    </VBox>
+</StackPane>

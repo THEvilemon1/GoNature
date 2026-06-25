@@ -64,4 +64,8 @@ public interface ServerResponseListener {
     // Department manager reports
     default void onAllParksVisitorsResult(ArrayList<common.ParkVisitorsCount> parks) {}
     default void onCancellationsReportResult(ArrayList<common.CancellationsReportResult> results) {}
+
+    // Service representative operations
+    default void onRegisterSubscriberResult(boolean success, String message) {}
+    default void onTravelerStatusResult(Object[] status) {}
 }

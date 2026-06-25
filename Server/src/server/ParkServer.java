@@ -667,6 +667,18 @@ public class ParkServer extends AbstractServer {
                 	    client.sendToClient(new Message("ALL_CHECKED_IN_BOOKINGS_RESULT", checkedInNow));
                 	    break;
 
+                 case "REGISTER_SUBSCRIBER":
+                	    SubscriberRequest subReq = (SubscriberRequest) message.getData();
+                	    Object[] subResult = registerSubscriber(subReq);
+                	    client.sendToClient(new Message("REGISTER_SUBSCRIBER_RESULT", subResult));
+                	    break;
+
+                 case "GET_TRAVELER_STATUS":
+                     String statusNationalId = (String) message.getData();
+                     Object[] travelerStatus = getTravelerStatus(statusNationalId);
+                     client.sendToClient(new Message("TRAVELER_STATUS_RESULT", travelerStatus));
+                     break;
+
                 default:
                     client.sendToClient(new Message("ERROR", "Unknown command"));
             }
@@ -1271,6 +1283,133 @@ public class ParkServer extends AbstractServer {
 
             conn.commit();
             return new VisitorLoginResult(travelerId, nationalId, true);
+        } catch (SQLException e) {
+            conn.rollback();
+            throw e;
+        } finally {
+            conn.setAutoCommit(previousAutoCommit);
+        }
+    }
+
+    // Returns Object[]{ Boolean isGuide, Boolean isClubMember, String firstName,
+    //   String lastName, String email, String phoneNumber } or null if not found.
+    private Object[] getTravelerStatus(String nationalId) throws SQLException {
+        Connection conn = DBConnection.getStaticConnection();
+        int nationalIdNumber;
+        try {
+            nationalIdNumber = Integer.parseInt(nationalId);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+        String sql = "SELECT t.guide, t.clubMember, u.firstName, u.lastName, u.email, u.phoneNumber "
+                   + "FROM traveler t INNER JOIN `user` u ON t.user_id = u.user_id "
+                   + "WHERE t.nationalId = ?";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setInt(1, nationalIdNumber);
+        ResultSet rs = ps.executeQuery();
+        if (!rs.next()) return null;
+        return new Object[]{
+            rs.getBoolean("guide"),
+            rs.getBoolean("clubMember"),
+            rs.getString("firstName"),
+            rs.getString("lastName"),
+            rs.getString("email"),
+            rs.getString("phoneNumber")
+        };
+    }
+
+    private Object[] registerSubscriber(SubscriberRequest req) throws SQLException {
+        Connection conn = DBConnection.getStaticConnection();
+        int nationalIdNumber;
+        try {
+            nationalIdNumber = Integer.parseInt(req.getNationalId());
+        } catch (NumberFormatException e) {
+            return new Object[]{false, "National ID must be a number."};
+        }
+
+        boolean previousAutoCommit = conn.getAutoCommit();
+        conn.setAutoCommit(false);
+        try {
+            String selectSql = "SELECT t.traveler_id, t.guide, t.clubMember, t.user_id FROM traveler t WHERE t.nationalId = ?";
+            PreparedStatement selectPs = conn.prepareStatement(selectSql);
+            selectPs.setInt(1, nationalIdNumber);
+            ResultSet rs = selectPs.executeQuery();
+
+            String userId;
+            String travelerId;
+            boolean alreadyClubMember;
+            boolean alreadyGuide;
+
+            if (rs.next()) {
+                travelerId     = rs.getString("traveler_id");
+                userId         = rs.getString("user_id");
+                alreadyClubMember = rs.getBoolean("clubMember");
+                alreadyGuide   = rs.getBoolean("guide");
+
+                if (req.getType().equals(SubscriberRequest.TYPE_CLUB_MEMBER) && alreadyClubMember) {
+                    conn.rollback();
+                    return new Object[]{false, "This traveler is already a club member."};
+                }
+                if (req.getType().equals(SubscriberRequest.TYPE_GUIDE) && alreadyGuide) {
+                    conn.rollback();
+                    return new Object[]{false, "This traveler is already registered as a tour guide."};
+                }
+
+                // Clear the opposite role so guide and club member are mutually exclusive
+                if (req.getType().equals(SubscriberRequest.TYPE_CLUB_MEMBER) && alreadyGuide) {
+                    PreparedStatement clearGuide = conn.prepareStatement("UPDATE traveler SET guide = false WHERE traveler_id = ?");
+                    clearGuide.setString(1, travelerId);
+                    clearGuide.executeUpdate();
+                } else if (req.getType().equals(SubscriberRequest.TYPE_GUIDE) && alreadyClubMember) {
+                    PreparedStatement clearClub = conn.prepareStatement("UPDATE traveler SET clubMember = false WHERE traveler_id = ?");
+                    clearClub.setString(1, travelerId);
+                    clearClub.executeUpdate();
+                }
+
+                String updateUserSql = "UPDATE `user` SET firstName=?, lastName=?, email=?, phoneNumber=? WHERE user_id=?";
+                PreparedStatement updateUserPs = conn.prepareStatement(updateUserSql);
+                updateUserPs.setString(1, req.getFirstName());
+                updateUserPs.setString(2, req.getLastName());
+                updateUserPs.setString(3, req.getEmail());
+                updateUserPs.setString(4, req.getPhoneNumber());
+                updateUserPs.setString(5, userId);
+                updateUserPs.executeUpdate();
+            } else {
+                userId     = generateUniqueId(conn, "`user`", "user_id");
+                travelerId = generateUniqueId(conn, "traveler", "traveler_id");
+
+                String insertUserSql = "INSERT INTO `user` (user_id, firstName, lastName, email, phoneNumber) VALUES (?, ?, ?, ?, ?)";
+                PreparedStatement insertUserPs = conn.prepareStatement(insertUserSql);
+                insertUserPs.setString(1, userId);
+                insertUserPs.setString(2, req.getFirstName());
+                insertUserPs.setString(3, req.getLastName());
+                insertUserPs.setString(4, req.getEmail());
+                insertUserPs.setString(5, req.getPhoneNumber());
+                insertUserPs.executeUpdate();
+
+                String insertTravelerSql = "INSERT INTO traveler (traveler_id, nationalId, guide, clubMember, user_id) VALUES (?, ?, false, false, ?)";
+                PreparedStatement insertTravelerPs = conn.prepareStatement(insertTravelerSql);
+                insertTravelerPs.setString(1, travelerId);
+                insertTravelerPs.setInt(2, nationalIdNumber);
+                insertTravelerPs.setString(3, userId);
+                insertTravelerPs.executeUpdate();
+            }
+
+            if (req.getType().equals(SubscriberRequest.TYPE_CLUB_MEMBER)) {
+                String updateSql = "UPDATE traveler SET clubMember = true WHERE traveler_id = ?";
+                PreparedStatement updatePs = conn.prepareStatement(updateSql);
+                updatePs.setString(1, travelerId);
+                updatePs.executeUpdate();
+            } else {
+                String updateSql = "UPDATE traveler SET guide = true WHERE traveler_id = ?";
+                PreparedStatement updatePs = conn.prepareStatement(updateSql);
+                updatePs.setString(1, travelerId);
+                updatePs.executeUpdate();
+            }
+
+            conn.commit();
+            String label = req.getType().equals(SubscriberRequest.TYPE_CLUB_MEMBER) ? "club member" : "tour guide";
+            return new Object[]{true, req.getFirstName() + " " + req.getLastName() + " registered successfully as " + label + "."};
         } catch (SQLException e) {
             conn.rollback();
             throw e;

@@ -257,7 +257,16 @@ public class ParkClient extends AbstractClient {
                     listener.onCancellationsReportResult(
                         (ArrayList<common.CancellationsReportResult>) message.getData());
                     break;
-                  
+
+                case "REGISTER_SUBSCRIBER_RESULT":
+                    Object[] regResult = (Object[]) message.getData();
+                    listener.onRegisterSubscriberResult((boolean) regResult[0], (String) regResult[1]);
+                    break;
+
+                case "TRAVELER_STATUS_RESULT":
+                    listener.onTravelerStatusResult((Object[]) message.getData());
+                    break;
+
             }
         }
     }

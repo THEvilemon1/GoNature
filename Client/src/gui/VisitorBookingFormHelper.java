@@ -125,10 +125,11 @@ class VisitorBookingFormHelper {
 
         double price = calculateTotalPrice(park, visitors);
         int bookingId = editingBooking == null ? 0 : editingBooking.getBookingId();
+        boolean organizedBooking = currentUser.isGuide();
         return new Booking(bookingId, currentUser.getTravelerId(), requireText(txtName, "Please enter your name."),
             requireText(txtEmail, "Please enter email address."),
             requireText(txtPhoneNumber, "Please enter phone number."), park.getId(), visitors,
-            visitorTime, Booking.STATUS_PENDING, false, price);
+            visitorTime, Booking.STATUS_PENDING, organizedBooking, price);
     }
 
     void showBooking(Booking booking) {
@@ -233,8 +234,11 @@ class VisitorBookingFormHelper {
     }
 
     private double discountFactor() {
-        if (currentUser == null || currentUser.isGuide()) {
+        if (currentUser == null) {
             return 1.0;
+        }
+        if (currentUser.isGuide()) {
+            return 0.75;
         }
         double factor = 0.85; // 15% digital booking discount always applies
         return currentUser.isClubMember() ? factor * 0.90 : factor;
@@ -242,7 +246,7 @@ class VisitorBookingFormHelper {
 
     private String discountText() {
         if (currentUser != null && currentUser.isGuide()) {
-            return " (guide entry excluded)";
+            return " (25% group discount, guide entry excluded)";
         }
         if (currentUser == null) return "";
         String text = "15% digital booking";

@@ -48,7 +48,6 @@ public class ParkControlViewController implements EmployeeAwareController {
     @FXML private TextField txtNewStayTime;
 
     private Employee employee;
-    private Map<String, String> requestIdToLogText = new HashMap<>();
     private ServerResponseListener liveVisitorsListener;
     private final Map<String, ActivityLogEntry> requestIdToLogEntry = new HashMap<>();
     private int nextRequestNumber = 1;
@@ -85,35 +84,6 @@ public class ParkControlViewController implements EmployeeAwareController {
                 new SimpleStringProperty(data.getValue().getRequestStatus()));
         colResponseDateTime.setCellValueFactory(data ->
                 new SimpleStringProperty(formatTime(data.getValue().getResponseDateTime())));
-    }
-
-    private void registerLiveVisitorsListener() {
-        ParkClient client = ParkClient.getInstance();
-        if (client == null || !client.isConnected()) return;
-
-        liveVisitorsListener = new ServerResponseListener() {
-            @Override
-            public void onParkVisitorsResult(int currentVisitors) {
-                Platform.runLater(() -> updateCurrentVisitors(currentVisitors));
-            }
-
-            @Override public void onOrderExistsResult(boolean e) {}
-            @Override public void onOrderResult(common.Order o) {}
-            @Override public void onUpdateOrderResult(boolean s) {}
-            @Override public void onError(String msg) {}
-        };
-        client.setNotificationListener(liveVisitorsListener);
-    }
-
-    private void requestCurrentVisitors() {
-        ParkClient client = ParkClient.getInstance();
-        if (client == null || !client.isConnected()) return;
-
-        try {
-            client.sendToServer(new Message("GET_PARK_CURRENT_VISITORS", employee.getParkId()));
-        } catch (Exception e) {
-            showError("Failed to load live visitor count.");
-        }
     }
 
     private void updateCurrentVisitors(int currentVisitors) {

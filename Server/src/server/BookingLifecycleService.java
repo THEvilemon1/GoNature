@@ -149,7 +149,7 @@ public final class BookingLifecycleService {
         while (rs.next()) {
             Booking booking = Utils.mapBooking(rs);
             // LocalDateTime deadline = now.plusHours(REMINDER_CONFIRMATION_WINDOW_HOURS);
-            LocalDateTime deadline = now.plusSeconds(30); // For testing purposes, set to 30 seconds instead of 1 hour
+            LocalDateTime deadline = now.plusHours(REMINDER_CONFIRMATION_WINDOW_HOURS); // For testing purposes, set to 30 seconds instead of 1 hour
             updateBookingStatus(conn,
                 booking.getBookingId(),
                 Booking.STATUS_PENDING_REMINDER_CONFIRMATION,

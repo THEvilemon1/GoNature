@@ -1085,8 +1085,8 @@ public class ParkServer extends AbstractServer {
 
             int bookingId = 1000000 + new java.util.Random().nextInt(9000000);
             int capacity = Utils.getParkEffectiveCapacity(conn, booking.getParkId());
-            int confirmedVisitors = getConfirmedVisitorsForSlot(conn, booking.getParkId(), booking.getVisitorTime());
-            boolean isFull = confirmedVisitors + booking.getNumberOfVisitors() > capacity;
+            int occupiedVisitors = getOccupiedVisitorsForSlot(conn, booking.getParkId(), booking.getVisitorTime());
+            boolean isFull = occupiedVisitors + booking.getNumberOfVisitors() > capacity;
             String status = isFull
                 ? Booking.STATUS_WAITING_LIST
                 : Booking.STATUS_CONFIRMED;
@@ -1139,16 +1139,24 @@ public class ParkServer extends AbstractServer {
         return createBooking(booking, true).booking;
     }
 
-    // Check the capacity - how many confirmed bookings are there.
-    private int getConfirmedVisitorsForSlot(Connection conn, int parkId, LocalDateTime visitorTime) throws SQLException {
-        String sql = "SELECT COALESCE(SUM(numberOfVisitors), 0) AS confirmedVisitors "
-            + "FROM booking WHERE park_id = ? AND visitorTime = ? AND status = ? FOR UPDATE";
+    // Check the capacity reserved by confirmed bookings and open confirmation offers.
+    private int getOccupiedVisitorsForSlot(Connection conn, int parkId, LocalDateTime visitorTime) throws SQLException {
+        String sql = "SELECT COALESCE(SUM(numberOfVisitors), 0) AS occupiedVisitors "
+            + "FROM booking WHERE park_id = ? AND visitorTime = ? AND status IN (?, ?, ?) FOR UPDATE";
         PreparedStatement ps = conn.prepareStatement(sql);
         ps.setInt(1, parkId);
         ps.setTimestamp(2, Timestamp.valueOf(visitorTime));
         ps.setString(3, Booking.STATUS_CONFIRMED);
+        ps.setString(4, Booking.STATUS_PENDING_WAITLIST_CONFIRMATION);
+        ps.setString(5, Booking.STATUS_PENDING_REMINDER_CONFIRMATION);
         ResultSet rs = ps.executeQuery();
-        return rs.next() ? rs.getInt("confirmedVisitors") : 0;
+        return rs.next() ? rs.getInt("occupiedVisitors") : 0;
+    }
+
+    private boolean isCapacityReservingStatus(String status) {
+        return Booking.STATUS_CONFIRMED.equals(status)
+            || Booking.STATUS_PENDING_WAITLIST_CONFIRMATION.equals(status)
+            || Booking.STATUS_PENDING_REMINDER_CONFIRMATION.equals(status);
     }
 
     private String getOrCreateWaitingList(Connection conn, int parkId, LocalDateTime slotTime) throws SQLException {
@@ -1232,15 +1240,15 @@ public class ParkServer extends AbstractServer {
             // Capacity check: confirm the new slot can accommodate the requested visitors.
             boolean slotChanged = existing.getParkId() != booking.getParkId()
                 || !existing.getVisitorTime().equals(booking.getVisitorTime());
-            int confirmedInNewSlot = getConfirmedVisitorsForSlot(conn, booking.getParkId(), booking.getVisitorTime());
+            int occupiedInNewSlot = getOccupiedVisitorsForSlot(conn, booking.getParkId(), booking.getVisitorTime());
             
-            // If same slot and existing was confirmed, those visitors will be freed when we reset to PENDING.
-            if (!slotChanged && Booking.STATUS_CONFIRMED.equals(existing.getStatus())) {
-                confirmedInNewSlot -= existing.getNumberOfVisitors();
+            // If the same booking already reserves this slot, don't count it twice.
+            if (!slotChanged && isCapacityReservingStatus(existing.getStatus())) {
+                occupiedInNewSlot -= existing.getNumberOfVisitors();
             }
             int capacity = Utils.getParkEffectiveCapacity(conn, booking.getParkId());
 
-            if (booking.getNumberOfVisitors() > capacity - confirmedInNewSlot) {
+            if (booking.getNumberOfVisitors() > capacity - occupiedInNewSlot) {
                 conn.rollback();
                 if (!slotChanged) {
                     throw new IllegalArgumentException(
@@ -1284,7 +1292,10 @@ public class ParkServer extends AbstractServer {
 
             boolean updated = ps.executeUpdate() > 0;
 
-            if (!updated) return null;
+            if (!updated) {
+                conn.rollback();
+                return null;
+            }
 
             if (slotChanged && Booking.STATUS_CONFIRMED.equals(existing.getStatus())) {
                 BookingLifecycleService.handleSpotFreed(conn, existing.getParkId(), existing.getVisitorTime());
@@ -1333,6 +1344,7 @@ public class ParkServer extends AbstractServer {
 
             if (cancelled) {
                 Utils.updateWaitingListEntryByBooking(conn, booking.getBookingId(), "WAITING", "CANCELLED");
+                Utils.updateWaitingListEntryByBooking(conn, booking.getBookingId(), "OFFERED", "CANCELLED");
                 if (Booking.STATUS_CONFIRMED.equals(existingBooking.getStatus())
                     || Booking.STATUS_PENDING_REMINDER_CONFIRMATION.equals(existingBooking.getStatus())
                     || Booking.STATUS_PENDING_WAITLIST_CONFIRMATION.equals(existingBooking.getStatus())) {

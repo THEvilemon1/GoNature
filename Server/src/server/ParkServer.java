@@ -1291,8 +1291,8 @@ public class ParkServer extends AbstractServer {
         }
     }
 
-    // Returns Object[]{ Boolean isGuide, Boolean isClubMember, String firstName,
-    //   String lastName, String email, String phoneNumber } or null if not found.
+    // Returns Object[]{ Boolean isGuide, Boolean isClubMember, Integer familyMembers,
+    //   String firstName, String lastName, String email, String phoneNumber } or null if not found.
     private Object[] getTravelerStatus(String nationalId) throws SQLException {
         Connection conn = DBConnection.getStaticConnection();
         int nationalIdNumber;
@@ -1301,7 +1301,7 @@ public class ParkServer extends AbstractServer {
         } catch (NumberFormatException e) {
             return null;
         }
-        String sql = "SELECT t.guide, t.clubMember, u.firstName, u.lastName, u.email, u.phoneNumber "
+        String sql = "SELECT t.guide, t.familyMembers, t.clubMember, u.firstName, u.lastName, u.email, u.phoneNumber "
                    + "FROM traveler t INNER JOIN `user` u ON t.user_id = u.user_id "
                    + "WHERE t.nationalId = ?";
         PreparedStatement ps = conn.prepareStatement(sql);
@@ -1311,6 +1311,7 @@ public class ParkServer extends AbstractServer {
         return new Object[]{
             rs.getBoolean("guide"),
             rs.getBoolean("clubMember"),
+            rs.getInt("familyMembers"),
             rs.getString("firstName"),
             rs.getString("lastName"),
             rs.getString("email"),
@@ -1346,16 +1347,8 @@ public class ParkServer extends AbstractServer {
                 alreadyClubMember = rs.getBoolean("clubMember");
                 alreadyGuide   = rs.getBoolean("guide");
 
-                if (req.getType().equals(SubscriberRequest.TYPE_CLUB_MEMBER) && alreadyClubMember) {
-                    conn.rollback();
-                    return new Object[]{false, "This traveler is already a club member."};
-                }
-                if (req.getType().equals(SubscriberRequest.TYPE_GUIDE) && alreadyGuide) {
-                    conn.rollback();
-                    return new Object[]{false, "This traveler is already registered as a tour guide."};
-                }
-
                 // Clear the opposite role so guide and club member are mutually exclusive
+                // (same-role re-submission just updates the person's info — no error)
                 if (req.getType().equals(SubscriberRequest.TYPE_CLUB_MEMBER) && alreadyGuide) {
                     PreparedStatement clearGuide = conn.prepareStatement("UPDATE traveler SET guide = false WHERE traveler_id = ?");
                     clearGuide.setString(1, travelerId);
@@ -1387,18 +1380,20 @@ public class ParkServer extends AbstractServer {
                 insertUserPs.setString(5, req.getPhoneNumber());
                 insertUserPs.executeUpdate();
 
-                String insertTravelerSql = "INSERT INTO traveler (traveler_id, nationalId, guide, clubMember, user_id) VALUES (?, ?, false, false, ?)";
+                String insertTravelerSql = "INSERT INTO traveler (traveler_id, nationalId, guide, clubMember, familyMembers, user_id) VALUES (?, ?, false, false, ?, ?)";
                 PreparedStatement insertTravelerPs = conn.prepareStatement(insertTravelerSql);
                 insertTravelerPs.setString(1, travelerId);
                 insertTravelerPs.setInt(2, nationalIdNumber);
-                insertTravelerPs.setString(3, userId);
+                insertTravelerPs.setInt(3, req.getFamilyMembers());
+                insertTravelerPs.setString(4, userId);
                 insertTravelerPs.executeUpdate();
             }
 
             if (req.getType().equals(SubscriberRequest.TYPE_CLUB_MEMBER)) {
-                String updateSql = "UPDATE traveler SET clubMember = true WHERE traveler_id = ?";
+                String updateSql = "UPDATE traveler SET clubMember = true, familyMembers = ? WHERE traveler_id = ?";
                 PreparedStatement updatePs = conn.prepareStatement(updateSql);
-                updatePs.setString(1, travelerId);
+                updatePs.setInt(1, req.getFamilyMembers());
+                updatePs.setString(2, travelerId);
                 updatePs.executeUpdate();
             } else {
                 String updateSql = "UPDATE traveler SET guide = true WHERE traveler_id = ?";

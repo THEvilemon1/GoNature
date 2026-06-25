@@ -104,17 +104,20 @@ public class TravelerRegistrationViewController implements EmployeeAwareControll
                         clearPersonFields();
                         clearRoleSelection();
                     } else {
+
                         boolean isGuide      = (Boolean) status[0];
                         boolean isClubMember = (Boolean) status[1];
-                        String firstName     = (String)  status[2];
-                        String lastName      = (String)  status[3];
-                        String email         = (String)  status[4];
-                        String phone         = (String)  status[5];
+                        int familyMembers    = (Integer) status[2];
+                        String firstName     = (String)  status[3];
+                        String lastName      = (String)  status[4];
+                        String email         = (String)  status[5];
+                        String phone         = (String)  status[6];
 
                         // Pre-fill personal details
                         txtFirstName.setText(firstName != null ? firstName : "");
                         txtLastName.setText(lastName   != null ? lastName  : "");
                         txtEmail.setText(email         != null ? email     : "");
+                        spnFamilyMembers.getValueFactory().setValue(familyMembers);
                         txtPhone.setText(phone         != null ? phone     : "");
 
                         // Auto-select current role

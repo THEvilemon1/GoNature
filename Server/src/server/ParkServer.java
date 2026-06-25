@@ -661,6 +661,12 @@ public class ParkServer extends AbstractServer {
                 	    client.sendToClient(new Message("TODAY_BOOKINGS_RESULT", todayBookings));
                 	    break;
 
+                 case "GET_ALL_CHECKED_IN_BOOKINGS":
+                	    int parkIdForCheckedIn = (int) message.getData();
+                	    ArrayList<Booking> checkedInNow = getAllCheckedInBookings(parkIdForCheckedIn);
+                	    client.sendToClient(new Message("ALL_CHECKED_IN_BOOKINGS_RESULT", checkedInNow));
+                	    break;
+
                 default:
                     client.sendToClient(new Message("ERROR", "Unknown command"));
             }
@@ -726,15 +732,36 @@ public class ParkServer extends AbstractServer {
             ps.executeUpdate();
     }
 
+    private ArrayList<Booking> getAllCheckedInBookings(int parkId) throws SQLException {
+        ArrayList<Booking> list = new ArrayList<>();
+        Connection conn = DBConnection.getStaticConnection();
+        String sql = "SELECT * FROM booking WHERE park_id = ? AND status = 'CHECKED_IN' ORDER BY entryTime ASC";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setInt(1, parkId);
+        ResultSet rs = ps.executeQuery();
+        while (rs.next()) {
+            list.add(Utils.mapBooking(rs));
+        }
+        return list;
+    }
+
     private ArrayList<Booking> getTodayBookings(int parkId) throws SQLException {
         ArrayList<Booking> list = new ArrayList<>();
         Connection conn = DBConnection.getStaticConnection();
 
+        // Returns two sets in one query:
+        // - Today's CONFIRMED bookings (shown in the Pending list, awaiting check-in)
+        // - ALL CHECKED_IN bookings for this park regardless of date
+        //   (people physically inside, including anyone who checked in on a previous day)
         String sql = "SELECT * FROM booking " +
-                     "WHERE park_id = ? " +
-                     "AND DATE(visitorTime) = CURDATE() " +
-                     "AND status IN ('PENDING', 'CONFIRMED', 'CHECKED_IN') " +
-                     "ORDER BY visitorTime ASC";
+                 "WHERE park_id = ? " +
+                 "AND (" +
+                 "  (DATE(visitorTime) = CURDATE() " +
+                 "   AND status = 'CONFIRMED' " +
+                 "   AND visitorTime BETWEEN DATE_SUB(NOW(), INTERVAL 30 MINUTE) AND DATE_ADD(NOW(), INTERVAL 30 MINUTE)) " +
+                 "  OR status = 'CHECKED_IN'" +
+                 ") " +
+                 "ORDER BY status DESC, visitorTime ASC";
         PreparedStatement ps = conn.prepareStatement(sql);
         ps.setInt(1, parkId);
         ResultSet rs = ps.executeQuery();

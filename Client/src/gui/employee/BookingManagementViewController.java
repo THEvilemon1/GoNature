@@ -209,11 +209,10 @@ public class BookingManagementViewController implements EmployeeAwareController,
         checkedInItems.clear();
 
         for (Booking b : bookings) {
-            if (Booking.STATUS_CHECKED_IN.equals(b.getStatus())) {
-                checkedInItems.add(b);
-            } else if (Booking.STATUS_CONFIRMED.equals(b.getStatus())) {
-                // Only confirmed bookings are ready to be checked in.
+            if (Booking.STATUS_CONFIRMED.equals(b.getStatus())) {
                 allPendingBookings.add(b);
+            } else if (Booking.STATUS_CHECKED_IN.equals(b.getStatus())) {
+                checkedInItems.add(b);
             }
         }
 
@@ -409,25 +408,47 @@ public class BookingManagementViewController implements EmployeeAwareController,
     }
 
     // Lets the worker correct how many visitors are currently inside for a checked-in booking.
-    // Increasing it covers a late arrival; setting it to 0 walks everyone out (checks the booking out).
+    // Increasing it covers a late arrival; "Exit All" or setting 0 checks the booking out.
     private void editVisitorsInside(Booking booking) {
         int booked = booking.getNumberOfVisitors();
         int currentInside = booking.getVisitorsInside() > 0
             ? booking.getVisitorsInside() : booked;
 
-        Optional<Integer> updated = promptForCount(
-            "Update Visitors Inside",
-            "Booking #" + booking.getBookingId(),
-            bookingSummary(booking)
-                + "\nBooked visitors: " + booked
-                + "\nCurrently inside: " + currentInside
-                + "\n\nSet the number of visitors currently inside."
-                + "\nEnter 0 to check everyone out.",
-            "Visitors inside now:",
-            currentInside, 0, booked);
-        if (!updated.isPresent()) return;
+        Dialog<Integer> dialog = new Dialog<>();
+        dialog.setTitle("Update Visitors Inside");
+        dialog.setHeaderText("Booking #" + booking.getBookingId());
 
-        sendSetVisitorsInside(booking, updated.get());
+        ButtonType confirmType = new ButtonType("Confirm", ButtonBar.ButtonData.OK_DONE);
+        ButtonType exitAllType = new ButtonType("Exit All", ButtonBar.ButtonData.LEFT);
+        dialog.getDialogPane().getButtonTypes().addAll(confirmType, exitAllType, ButtonType.CANCEL);
+
+        Label info = new Label(bookingSummary(booking)
+            + "\nBooked visitors: " + booked
+            + "\nCurrently inside: " + currentInside
+            + "\n\nSet the number of visitors currently inside.");
+        info.setWrapText(true);
+
+        Spinner<Integer> spinner = new Spinner<>(0, booked, clamp(currentInside, 0, booked));
+        spinner.setEditable(true);
+        spinner.setPrefWidth(120);
+
+        VBox box = new VBox(10, info, new Label("Visitors inside now:"), spinner);
+        box.setPadding(new Insets(12));
+        dialog.getDialogPane().setContent(box);
+
+        dialog.setResultConverter(button -> {
+            if (button == exitAllType) return 0;
+            if (button != confirmType) return null;
+            int value;
+            try {
+                value = Integer.parseInt(spinner.getEditor().getText().trim());
+            } catch (NumberFormatException e) {
+                value = spinner.getValue();
+            }
+            return clamp(value, 0, booked);
+        });
+
+        dialog.showAndWait().ifPresent(count -> sendSetVisitorsInside(booking, count));
     }
 
     private void sendSetVisitorsInside(Booking booking, int visitorsInside) {
@@ -542,6 +563,11 @@ public class BookingManagementViewController implements EmployeeAwareController,
         alert.setHeaderText(null);
         alert.setContentText(message);
         alert.show();
+    }
+
+    @FXML
+    public void handleRefresh(ActionEvent event) {
+        refreshData();
     }
 
     @FXML

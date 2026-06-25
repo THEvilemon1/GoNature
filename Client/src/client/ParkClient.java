@@ -104,6 +104,10 @@ public class ParkClient extends AbstractClient {
                     notificationListener.onTodayBookingsResult(
                         (java.util.ArrayList<common.Booking>) message.getData());
                     break;
+                case "ALL_CHECKED_IN_BOOKINGS_RESULT":
+                    notificationListener.onAllCheckedInBookingsResult(
+                        (java.util.ArrayList<common.Booking>) message.getData());
+                    break;
                 case "PARK_CHANGE_REQUEST_NOTIFICATION":
                     notificationListener.onParkChangeRequestNotification(
                         (ParkChangeRequest) message.getData());
@@ -200,7 +204,10 @@ public class ParkClient extends AbstractClient {
                     break;
                 case "TODAY_BOOKINGS_RESULT":
                     listener.onTodayBookingsResult((java.util.ArrayList<common.Booking>) message.getData());
-                    break;  
+                    break;
+                case "ALL_CHECKED_IN_BOOKINGS_RESULT":
+                    listener.onAllCheckedInBookingsResult((java.util.ArrayList<common.Booking>) message.getData());
+                    break;
                 case "PARK_CHANGE_REQUEST_RESULT":
                     listener.onParkChangeRequestResult((boolean) message.getData());
                     break;

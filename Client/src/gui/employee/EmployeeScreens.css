@@ -198,6 +198,21 @@
     -fx-background-color: #8e0000;
 }
 
+/* ── Refresh button ─────────────────────────────────────────────── */
+.btn-refresh {
+    -fx-pref-height: 30;
+    -fx-font-size: 12px;
+    -fx-background-color: #e8ede8;
+    -fx-text-fill: #2e7d32;
+    -fx-background-radius: 8;
+    -fx-cursor: hand;
+    -fx-font-weight: bold;
+}
+
+.btn-refresh:hover {
+    -fx-background-color: #d4e6d4;
+}
+
 /* ── Secondary button (grey - back/logout) ──────────────────────── */
 .btn-secondary {
     -fx-pref-height: 38;

@@ -49,6 +49,7 @@ public interface ServerResponseListener {
     default void onWalkInResult(Booking booking) {}
     default void onVisitsReportResult(java.util.ArrayList<common.VisitsReportResult> result) {}
     default void onTodayBookingsResult(java.util.ArrayList<common.Booking> bookings) {}
+    default void onAllCheckedInBookingsResult(java.util.ArrayList<common.Booking> bookings) {}
     
     default void onParkChangeRequestResult(boolean success) {}
     default void onParkChangeApprovalResult(String requestId, boolean approved) {}

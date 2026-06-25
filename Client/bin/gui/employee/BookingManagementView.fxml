@@ -28,7 +28,11 @@
         <VBox styleClass="content-area" spacing="18">
 
             <!-- TODAY'S BOOKINGS — primary work surface -->
-            <Label styleClass="section-title" text="Today's Bookings" />
+            <HBox alignment="CENTER_LEFT" spacing="10">
+                <Label styleClass="section-title" text="Today's Bookings" />
+                <Region HBox.hgrow="ALWAYS" />
+                <Button styleClass="btn-refresh" text="⟳  Refresh" onAction="#handleRefresh" />
+            </HBox>
 
             <HBox spacing="14">
                 <!-- Confirmed → waiting to enter -->

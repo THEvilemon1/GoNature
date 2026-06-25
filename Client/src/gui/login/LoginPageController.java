@@ -42,7 +42,7 @@ public class LoginPageController implements Initializable {
 
     @Override
     public void initialize(URL url, ResourceBundle rb) {
-        showEmployeeSection();
+        showTravelerSection();
         btnEmployee.setOnAction(e -> showEmployeeSection());
         btnTraveler.setOnAction(e -> showTravelerSection());
     }

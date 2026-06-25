@@ -1304,8 +1304,15 @@ public class ParkServer extends AbstractServer {
         }
     }
 
-    // Returns Object[]{ Boolean isGuide, Boolean isClubMember, Integer familyMembers,
-    //   String firstName, String lastName, String email, String phoneNumber } or null if not found.
+    // Looks a person up by their national ID (which lives on the `user` table).
+    // Employees take priority over travelers, so the same national ID is never
+    // offered for club-member / guide registration when it belongs to staff.
+    // Returns one of:
+    //   Employee  -> Object[]{ "EMPLOYEE", String role, Integer salary, Integer parkId, String parkName,
+    //                          String firstName, String lastName, String email, String phoneNumber }
+    //   Traveler  -> Object[]{ "TRAVELER", Boolean isGuide, Boolean isClubMember, Integer familyMembers,
+    //                          String firstName, String lastName, String email, String phoneNumber }
+    //   not found -> null
     private Object[] getTravelerStatus(String nationalId) throws SQLException {
         Connection conn = DBConnection.getStaticConnection();
         int nationalIdNumber;
@@ -1314,22 +1321,53 @@ public class ParkServer extends AbstractServer {
         } catch (NumberFormatException e) {
             return null;
         }
-        String sql = "SELECT t.guide, t.familyMembers, t.clubMember, u.firstName, u.lastName, u.email, u.phoneNumber "
-                   + "FROM traveler t INNER JOIN `user` u ON t.user_id = u.user_id "
-                   + "WHERE t.nationalId = ?";
-        PreparedStatement ps = conn.prepareStatement(sql);
-        ps.setInt(1, nationalIdNumber);
-        ResultSet rs = ps.executeQuery();
-        if (!rs.next()) return null;
-        return new Object[]{
-            rs.getBoolean("guide"),
-            rs.getBoolean("clubMember"),
-            rs.getInt("familyMembers"),
-            rs.getString("firstName"),
-            rs.getString("lastName"),
-            rs.getString("email"),
-            rs.getString("phoneNumber")
-        };
+
+        // 1) Employees first — if this national ID belongs to staff, return employee info.
+        String empSql = "SELECT e.role, e.salary, e.park_id, p.name AS parkName, "
+                      + "u.firstName, u.lastName, u.email, u.phoneNumber "
+                      + "FROM employee e "
+                      + "INNER JOIN `user` u ON e.user_id = u.user_id "
+                      + "LEFT JOIN park p ON e.park_id = p.park_id "
+                      + "WHERE u.nationalId = ?";
+        try (PreparedStatement ps = conn.prepareStatement(empSql)) {
+            ps.setInt(1, nationalIdNumber);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                int parkId = rs.getInt("park_id");
+                Integer parkIdOrNull = rs.wasNull() ? null : parkId;
+                return new Object[]{
+                    "EMPLOYEE",
+                    rs.getString("role"),
+                    rs.getInt("salary"),
+                    parkIdOrNull,
+                    rs.getString("parkName"),
+                    rs.getString("firstName"),
+                    rs.getString("lastName"),
+                    rs.getString("email"),
+                    rs.getString("phoneNumber")
+                };
+            }
+        }
+
+        // 2) Otherwise fall back to the traveler record.
+        String travSql = "SELECT t.guide, t.familyMembers, t.clubMember, u.firstName, u.lastName, u.email, u.phoneNumber "
+                       + "FROM traveler t INNER JOIN `user` u ON t.user_id = u.user_id "
+                       + "WHERE u.nationalId = ?";
+        try (PreparedStatement ps = conn.prepareStatement(travSql)) {
+            ps.setInt(1, nationalIdNumber);
+            ResultSet rs = ps.executeQuery();
+            if (!rs.next()) return null;
+            return new Object[]{
+                "TRAVELER",
+                rs.getBoolean("guide"),
+                rs.getBoolean("clubMember"),
+                rs.getInt("familyMembers"),
+                rs.getString("firstName"),
+                rs.getString("lastName"),
+                rs.getString("email"),
+                rs.getString("phoneNumber")
+            };
+        }
     }
 
     private Object[] registerSubscriber(SubscriberRequest req) throws SQLException {
@@ -1447,6 +1485,29 @@ public class ParkServer extends AbstractServer {
     private int getEffectiveAvailableSpots(int parkId) throws SQLException {
         Connection conn = DBConnection.getStaticConnection();
         return Utils.getEffectiveAvailableSpots(conn, parkId);
+    }
+
+    private int getParkGap(int parkId) throws SQLException {
+        Connection conn = DBConnection.getStaticConnection();
+        String sql = "SELECT gap FROM park WHERE park_id = ?";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setInt(1, parkId);
+        ResultSet rs = ps.executeQuery();
+        if (!rs.next()) {
+            throw new IllegalArgumentException("Selected park does not exist in the database.");
+        }
+        return rs.getInt("gap");
+    }
+
+    private int getCheckedInWalkInVisitors(int parkId) throws SQLException {
+        Connection conn = DBConnection.getStaticConnection();
+        String sql = "SELECT COALESCE(SUM(visitorsInside), 0) AS walkedInVisitors " +
+            "FROM booking WHERE park_id = ? AND status = ? AND walk_in = 1";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setInt(1, parkId);
+        ps.setString(2, Booking.STATUS_CHECKED_IN);
+        ResultSet rs = ps.executeQuery();
+        return rs.next() ? rs.getInt("walkedInVisitors") : 0;
     }
 
     private Booking getBookingById(int bookingId) throws SQLException {
@@ -1632,6 +1693,20 @@ public class ParkServer extends AbstractServer {
 
 
     private Booking processWalkIn(WalkInRequest request) throws SQLException {
+        int walkInLimit = getParkGap(request.getParkId());
+        int checkedInWalkInVisitors = getCheckedInWalkInVisitors(request.getParkId());
+        if (checkedInWalkInVisitors >= walkInLimit) {
+            throw new IllegalArgumentException(
+                "This park has already reached its walk-in limit of " + walkInLimit + " visitor(s)."
+            );
+        }
+        if (checkedInWalkInVisitors + request.getNumberOfVisitors() > walkInLimit) {
+            int remainingWalkInSpots = walkInLimit - checkedInWalkInVisitors;
+            throw new IllegalArgumentException(
+                "Not enough walk-in spots available. Remaining walk-in spots: " + remainingWalkInSpots + "."
+            );
+        }
+
         int available = getEffectiveAvailableSpots(request.getParkId());
         if (available < request.getNumberOfVisitors()) {
             throw new IllegalArgumentException("Not enough spots available. Available: " + available);
@@ -1646,8 +1721,8 @@ public class ParkServer extends AbstractServer {
         double price = calculatePrice(conn, request.getParkId(), request.getNumberOfVisitors(), travelerId, false);
 
         int bookingId = (int)(Math.random() * 9000000) + 1000000;
-        String sql = "INSERT INTO booking (booking_id, traveler_id, park_id, numberOfVisitors, visitorTime, status, organizedBooking, price, visitorsInside, entryTime) " +
-            "VALUES (?, ?, ?, ?, NOW(), ?, false, ?, ?, NOW())";
+        String sql = "INSERT INTO booking (booking_id, traveler_id, park_id, numberOfVisitors, visitorTime, status, organizedBooking, price, visitorsInside, entryTime, paid, walk_in) " +
+            "VALUES (?, ?, ?, ?, NOW(), ?, false, ?, ?, NOW(), 1, 1)";
         PreparedStatement ps = conn.prepareStatement(sql);
         ps.setInt(1, bookingId);
         ps.setString(2, travelerId);

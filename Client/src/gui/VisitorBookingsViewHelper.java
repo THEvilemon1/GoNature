@@ -18,6 +18,7 @@ class VisitorBookingsViewHelper {
         void editBooking(Booking booking);
         void cancelBooking(Booking booking);
         void confirmBooking(Booking booking);
+        void exitBooking(Booking booking);
     }
 
     private final VBox bookingsList;
@@ -43,10 +44,12 @@ class VisitorBookingsViewHelper {
         hideMessage();
         VBox waiting = createSection("Waiting and action needed", "Bookings here are waiting for availability or your confirmation.");
         VBox confirmed = createSection("Confirmed visits", "Approved reservations that can still be edited or cancelled before check-in.");
-        VBox unavailable = createSection("Completed / unavailable", "Final, cancelled, or already active bookings.");
+        VBox active = createSection("Active visits", "You are currently inside the park. Use Exit when you leave.");
+        VBox unavailable = createSection("Completed / unavailable", "Final or cancelled bookings.");
 
         int waitingCount = 0;
         int confirmedCount = 0;
+        int activeCount = 0;
         int unavailableCount = 0;
 
         for (Booking booking : bookings) {
@@ -56,6 +59,9 @@ class VisitorBookingsViewHelper {
             } else if (Booking.STATUS_CONFIRMED.equals(booking.getStatus())) {
                 confirmed.getChildren().add(createRow(booking));
                 confirmedCount++;
+            } else if (Booking.STATUS_CHECKED_IN.equals(booking.getStatus())) {
+                active.getChildren().add(createRow(booking));
+                activeCount++;
             } else {
                 unavailable.getChildren().add(createRow(booking));
                 unavailableCount++;
@@ -64,6 +70,7 @@ class VisitorBookingsViewHelper {
 
         if (waitingCount > 0) bookingsList.getChildren().add(waiting);
         if (confirmedCount > 0) bookingsList.getChildren().add(confirmed);
+        if (activeCount > 0) bookingsList.getChildren().add(active);
         if (unavailableCount > 0) bookingsList.getChildren().add(unavailable);
     }
 
@@ -97,8 +104,9 @@ class VisitorBookingsViewHelper {
     private Node createRow(Booking booking) {
         VBox row = new VBox(8);
         row.getStyleClass().add("booking-row");
+        boolean checkedIn = Booking.STATUS_CHECKED_IN.equals(booking.getStatus());
         boolean locked = !isEditable(booking);
-        if (locked) {
+        if (locked && !checkedIn) {
             row.getStyleClass().add("booking-row-locked");
         }
 
@@ -124,24 +132,31 @@ class VisitorBookingsViewHelper {
         description.setWrapText(true);
 
         HBox actions = new HBox(8);
-        if (requiresConfirmation(booking)) {
-            Button confirm = new Button("Confirm Arrival");
-            confirm.getStyleClass().add("small-action-btn");
-            confirm.setOnAction(e -> actionHandler.confirmBooking(booking));
-            actions.getChildren().add(confirm);
+        if (checkedIn) {
+            Button exit = new Button("Exit");
+            exit.getStyleClass().add("small-action-btn");
+            exit.setOnAction(e -> actionHandler.exitBooking(booking));
+            actions.getChildren().add(exit);
+        } else {
+            if (requiresConfirmation(booking)) {
+                Button confirm = new Button("Confirm Arrival");
+                confirm.getStyleClass().add("small-action-btn");
+                confirm.setOnAction(e -> actionHandler.confirmBooking(booking));
+                actions.getChildren().add(confirm);
+            }
+
+            Button edit = new Button("Edit");
+            edit.getStyleClass().add("small-action-btn");
+            edit.setDisable(locked || requiresConfirmation(booking));
+            edit.setOnAction(e -> actionHandler.editBooking(booking));
+
+            Button cancel = new Button("Cancel Booking");
+            cancel.getStyleClass().add("small-danger-btn");
+            cancel.setDisable(locked);
+            cancel.setOnAction(e -> actionHandler.cancelBooking(booking));
+
+            actions.getChildren().addAll(edit, cancel);
         }
-
-        Button edit = new Button("Edit");
-        edit.getStyleClass().add("small-action-btn");
-        edit.setDisable(locked || requiresConfirmation(booking));
-        edit.setOnAction(e -> actionHandler.editBooking(booking));
-
-        Button cancel = new Button("Cancel Booking");
-        cancel.getStyleClass().add("small-danger-btn");
-        cancel.setDisable(locked);
-        cancel.setOnAction(e -> actionHandler.cancelBooking(booking));
-
-        actions.getChildren().addAll(edit, cancel);
         row.getChildren().addAll(header, details, description, actions);
         return row;
     }
@@ -187,7 +202,7 @@ class VisitorBookingsViewHelper {
         if (Booking.STATUS_PENDING_WAITLIST_CONFIRMATION.equals(status)) return "A spot opened for you. Confirm within one hour or it will be cancelled.";
         if (Booking.STATUS_PENDING_REMINDER_CONFIRMATION.equals(status)) return "Please confirm that you are coming, or the booking may be cancelled.";
         if (Booking.STATUS_CANCELLED.equals(status)) return "This booking was cancelled and can no longer be changed.";
-        if (Booking.STATUS_CHECKED_IN.equals(status)) return "This visit is already active and cannot be changed.";
+        if (Booking.STATUS_CHECKED_IN.equals(status)) return "Your visit is active. Use Exit when you leave the park.";
         if (Booking.STATUS_CHECKED_OUT.equals(status)) return "This visit has ended and is kept for your records.";
         if (Booking.STATUS_SYSTEM_CANCEL.equals(status)) return "This booking was cancelled automatically by the system.";
         return "This booking status is not available for changes.";

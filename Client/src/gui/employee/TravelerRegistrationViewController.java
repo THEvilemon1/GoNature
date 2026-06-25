@@ -2,6 +2,7 @@ package gui.employee;
 
 import client.ParkClient;
 import client.ServerResponseListener;
+import client.WindowUtil;
 import common.Employee;
 import common.Message;
 import common.Order;
@@ -9,9 +10,13 @@ import common.SubscriberRequest;
 import gui.login.EmployeeAwareController;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
 
 import java.io.IOException;
 import java.net.URL;
@@ -62,6 +67,7 @@ public class TravelerRegistrationViewController implements EmployeeAwareControll
         txtNationalId.textProperty().addListener((obs, oldVal, newVal) -> {
             lookedUpStatus = null;
             hideCurrentRole();
+            setRegistrationEnabled(true);
         });
     }
 
@@ -103,34 +109,65 @@ public class TravelerRegistrationViewController implements EmployeeAwareControll
                         showCurrentRole("Traveler not found — will be created on registration.", true);
                         clearPersonFields();
                         clearRoleSelection();
-                    } else {
+                        setRegistrationEnabled(true);
+                        return;
+                    }
 
-                        boolean isGuide      = (Boolean) status[0];
-                        boolean isClubMember = (Boolean) status[1];
-                        int familyMembers    = (Integer) status[2];
-                        String firstName     = (String)  status[3];
-                        String lastName      = (String)  status[4];
-                        String email         = (String)  status[5];
-                        String phone         = (String)  status[6];
+                    String type = (String) status[0];
 
-                        // Pre-fill personal details
+                    if ("EMPLOYEE".equals(type)) {
+                        // This national ID belongs to staff — show their details, no role registration.
+                        String role      = (String)  status[1];
+                        Integer salary   = (Integer) status[2];
+                        Integer parkId   = (Integer) status[3];
+                        String parkName  = (String)  status[4];
+                        String firstName = (String)  status[5];
+                        String lastName  = (String)  status[6];
+                        String email     = (String)  status[7];
+                        String phone     = (String)  status[8];
+
                         txtFirstName.setText(firstName != null ? firstName : "");
                         txtLastName.setText(lastName   != null ? lastName  : "");
                         txtEmail.setText(email         != null ? email     : "");
-                        spnFamilyMembers.getValueFactory().setValue(familyMembers);
                         txtPhone.setText(phone         != null ? phone     : "");
+                        clearRoleSelection();
+                        setRegistrationEnabled(false);
 
-                        // Auto-select current role
-                        if (isGuide) {
-                            rbGuide.setSelected(true);
-                            showCurrentRole("Current role: Tour Guide", true);
-                        } else if (isClubMember) {
-                            rbClubMember.setSelected(true);
-                            showCurrentRole("Current role: Club Member", true);
-                        } else {
-                            clearRoleSelection();
-                            showCurrentRole("Traveler found — no special role assigned yet.", true);
-                        }
+                        String park = (parkName != null) ? parkName
+                                    : (parkId != null ? "park #" + parkId : "no assigned park");
+                        showCurrentRole("Employee: " + prettyRole(role) + " at " + park
+                                + (salary != null ? ", salary " + salary : "")
+                                + ". Employees cannot be registered as Club Members or Tour Guides.", false);
+                        return;
+                    }
+
+                    // TRAVELER
+                    setRegistrationEnabled(true);
+                    boolean isGuide      = (Boolean) status[1];
+                    boolean isClubMember = (Boolean) status[2];
+                    int familyMembers    = (Integer) status[3];
+                    String firstName     = (String)  status[4];
+                    String lastName      = (String)  status[5];
+                    String email         = (String)  status[6];
+                    String phone         = (String)  status[7];
+
+                    // Pre-fill personal details
+                    txtFirstName.setText(firstName != null ? firstName : "");
+                    txtLastName.setText(lastName   != null ? lastName  : "");
+                    txtEmail.setText(email         != null ? email     : "");
+                    spnFamilyMembers.getValueFactory().setValue(familyMembers);
+                    txtPhone.setText(phone         != null ? phone     : "");
+
+                    // Auto-select current role
+                    if (isGuide) {
+                        rbGuide.setSelected(true);
+                        showCurrentRole("Current role: Tour Guide", true);
+                    } else if (isClubMember) {
+                        rbClubMember.setSelected(true);
+                        showCurrentRole("Current role: Club Member", true);
+                    } else {
+                        clearRoleSelection();
+                        showCurrentRole("Traveler found — no special role assigned yet.", true);
                     }
                 });
             }
@@ -177,10 +214,17 @@ public class TravelerRegistrationViewController implements EmployeeAwareControll
             type = SubscriberRequest.TYPE_GUIDE;
         }
 
+        // Employees can never be registered as club members or guides
+        if (lookedUpStatus != null && "EMPLOYEE".equals(lookedUpStatus[0])) {
+            showError("This national ID belongs to an employee and cannot be registered "
+                    + "as a Club Member or Tour Guide.");
+            return;
+        }
+
         // Warn if a role switch is about to happen
         if (lookedUpStatus != null) {
-            boolean currentlyGuide      = (Boolean) lookedUpStatus[0];
-            boolean currentlyClubMember = (Boolean) lookedUpStatus[1];
+            boolean currentlyGuide      = (Boolean) lookedUpStatus[1];
+            boolean currentlyClubMember = (Boolean) lookedUpStatus[2];
 
             if (type.equals(SubscriberRequest.TYPE_GUIDE) && currentlyClubMember) {
                 if (!confirmSwitch("This person is currently a Club Member.\n"
@@ -254,7 +298,7 @@ public class TravelerRegistrationViewController implements EmployeeAwareControll
     // ── Logout ───────────────────────────────────────────────────────────────
 
     @FXML
-    private void handleLogout() {
+    private void handleLogout() throws Exception {
         ParkClient client = ParkClient.getInstance();
         if (client != null && client.isConnected() && employee != null) {
             try {
@@ -263,7 +307,21 @@ public class TravelerRegistrationViewController implements EmployeeAwareControll
                 e.printStackTrace();
             }
         }
-        System.exit(0);
+
+        Stage currentStage = (Stage) lblWelcome.getScene().getWindow();
+        currentStage.hide();
+
+        FXMLLoader loader = new FXMLLoader(getClass().getResource("/gui/login/LoginPage.fxml"));
+        Parent root = loader.load();
+
+        Stage stage = new Stage();
+        Scene scene = new Scene(root);
+        java.net.URL css = getClass().getResource("/gui/login/LoginPage.css");
+        if (css != null) scene.getStylesheets().add(css.toExternalForm());
+        stage.setTitle("GoNature - Login");
+        stage.setScene(scene);
+        stage.setOnCloseRequest(e -> System.exit(0));
+        WindowUtil.showMaximized(stage);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -287,6 +345,27 @@ public class TravelerRegistrationViewController implements EmployeeAwareControll
 
     private void clearRoleSelection() {
         rbClubMember.getToggleGroup().selectToggle(null);
+    }
+
+    // Enable/disable the role-registration controls (used to lock them when the
+    // looked-up national ID belongs to an employee).
+    private void setRegistrationEnabled(boolean enabled) {
+        rbClubMember.setDisable(!enabled);
+        rbGuide.setDisable(!enabled);
+        btnRegister.setDisable(!enabled);
+    }
+
+    // Turns a role enum value (e.g. "service_rep") into a readable label.
+    private String prettyRole(String role) {
+        if (role == null || role.isEmpty()) return "Employee";
+        String[] words = role.split("_");
+        StringBuilder sb = new StringBuilder();
+        for (String w : words) {
+            if (w.isEmpty()) continue;
+            if (sb.length() > 0) sb.append(' ');
+            sb.append(Character.toUpperCase(w.charAt(0))).append(w.substring(1));
+        }
+        return sb.toString();
     }
 
     private void showCurrentRole(String msg, boolean isInfo) {

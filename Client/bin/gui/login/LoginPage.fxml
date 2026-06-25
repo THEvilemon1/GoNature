@@ -52,19 +52,20 @@
             <ToggleButton fx:id="btnEmployee"
                           styleClass="toggle-btn, toggle-left"
                           HBox.hgrow="ALWAYS"
-                          text="Employee"
-                          selected="true" />
+                          text="Employee" />
             <ToggleButton fx:id="btnTraveler"
                           styleClass="toggle-btn, toggle-right"
                           HBox.hgrow="ALWAYS"
-                          text="Visitor" />
+                          text="Traveler"
+                          selected="true" />
         </HBox>
 
         <!-- Separator -->
         <Separator styleClass="card-sep" />
 
         <!-- ── Employee section ─────────────────────────────────── -->
-        <VBox fx:id="employeeSection" styleClass="fields-section" spacing="14">
+        <VBox fx:id="employeeSection" styleClass="fields-section" spacing="14"
+              visible="false" managed="false">
 
             <VBox styleClass="field-group" spacing="4">
                 <Label styleClass="field-label" text="Employee ID" />
@@ -82,15 +83,14 @@
 
         </VBox>
 
-        <!-- ── Traveler section (hidden by default) ─────────────── -->
-        <VBox fx:id="travelerSection" styleClass="fields-section" spacing="14"
-              visible="false" managed="false">
+        <!-- ── Traveler section ────────────────────────────────── -->
+        <VBox fx:id="travelerSection" styleClass="fields-section" spacing="14">
 
             <Label styleClass="section-hint"
                    text="Enter your Israeli ID number to log in or register automatically." />
 
             <VBox styleClass="field-group" spacing="4">
-                <Label styleClass="field-label" text="Israeli ID Number" />
+                <Label styleClass="field-label" text="National ID Login" />
                 <TextField fx:id="txtTravelerId"
                            styleClass="field-input"
                            promptText="9-digit Israeli ID (e.g. 123456789)" />
@@ -117,4 +117,3 @@
 
     </VBox>
 </StackPane>
-

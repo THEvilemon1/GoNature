@@ -11,6 +11,7 @@ import client.ServerResponseListener;
 import client.SessionManager;
 import common.Booking;
 import common.ContactInfoValidator;
+import common.ExitRequest;
 import common.Message;
 import common.Order;
 import common.TravelerProfile;
@@ -99,6 +100,11 @@ public class VisitorHomeController implements ServerResponseListener {
                 @Override
                 public void confirmBooking(Booking booking) {
                     sendConfirmBooking(booking);
+                }
+
+                @Override
+                public void exitBooking(Booking booking) {
+                    confirmAndExitBooking(booking);
                 }
             });
     }
@@ -413,6 +419,14 @@ public class VisitorHomeController implements ServerResponseListener {
     }
 
     @Override
+    public void onCheckOutResult(boolean success) {
+        Platform.runLater(() -> {
+            showBookingsMessage(success ? "Exit recorded successfully." : "Exit failed. Please try again.", !success);
+            requestTravelerBookings();
+        });
+    }
+
+    @Override
     public void onError(String errorMessage) {
         Platform.runLater(() -> {
             btnSubmitBooking.setDisable(false);
@@ -508,6 +522,35 @@ public class VisitorHomeController implements ServerResponseListener {
             client.sendToServer(new Message("CANCEL_BOOKING", booking));
         } catch (IOException e) {
             showBookingsMessage("Failed to cancel booking: " + e.getMessage(), true);
+        }
+    }
+
+    private void confirmAndExitBooking(Booking booking) {
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Exit Park");
+        alert.setHeaderText("Exit the park for this visit?");
+        alert.setContentText(formHelper.getParkName(booking.getParkId()) + " on " + booking.getVisitorTime().format(DATE_TIME_FORMAT));
+        alert.showAndWait().ifPresent(result -> {
+            if (result == javafx.scene.control.ButtonType.OK) {
+                sendExitBooking(booking);
+            }
+        });
+    }
+
+    private void sendExitBooking(Booking booking) {
+        ParkClient client = ParkClient.getInstance();
+        if (client == null || !client.isConnected()) {
+            showBookingsMessage("Client is not connected to the server.", true);
+            return;
+        }
+        int visitorsLeaving = booking.getVisitorsInside() > 0
+            ? booking.getVisitorsInside() : booking.getNumberOfVisitors();
+        try {
+            ExitRequest request = new ExitRequest(String.valueOf(booking.getBookingId()),
+                visitorsLeaving, booking.getParkId());
+            client.sendToServer(new Message("CHECK_OUT_VISITOR", request));
+        } catch (IOException e) {
+            showBookingsMessage("Failed to record exit: " + e.getMessage(), true);
         }
     }
 

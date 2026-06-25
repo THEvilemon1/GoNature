@@ -83,13 +83,6 @@
     -fx-font-size: 18px;
     -fx-font-weight: bold;
     -fx-text-fill: #1c1c1e;
-    -fx-font-family: "Arial";
-}
-
-.field-help {
-    -fx-font-size: 11px;
-    -fx-text-fill: #6b7280;
-    -fx-font-family: "Arial";
 }
 
 .section-title-manual {
@@ -99,6 +92,22 @@
     -fx-font-family: "Arial";
 }
 
+.field-help {
+    -fx-font-size: 11px;
+    -fx-text-fill: #6b7280;
+    -fx-font-family: "Arial";
+}
+
+<<<<<<< HEAD
+.section-title-manual {
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #6b7280;
+    -fx-font-family: "Arial";
+}
+
+=======
+>>>>>>> 9e2a359e3e9b8e8ed04e4a5bd352ebc78839c9db
 .section-subtitle-manual {
     -fx-font-size: 11px;
     -fx-text-fill: #9ca3af;
@@ -111,7 +120,11 @@
     -fx-font-family: "Arial";
 }
 
+<<<<<<< HEAD
 /* â”€â”€ Section labels â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+=======
+/* ── Section labels ─────────────────────────────────────────────── */
+>>>>>>> 9e2a359e3e9b8e8ed04e4a5bd352ebc78839c9db
 .field-label {
     -fx-font-size: 12px;
     -fx-font-weight: bold;

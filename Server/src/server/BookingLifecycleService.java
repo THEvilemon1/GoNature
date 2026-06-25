@@ -180,9 +180,8 @@ public final class BookingLifecycleService {
             return;
         }
 
-        // Fetch all waiting entries in registration order (no LIMIT) so we can fill
-        // multiple bookings when a large cancellation frees enough room for several groups.
-        // FOR UPDATE locks every row so concurrent transitions cannot race on the same entries.
+        // Fetch waiting entries in registration order. We can offer multiple bookings
+        // when capacity allows, but never skip over the head of the queue.
         String sql = "SELECT wle.id, b.* FROM WaitingList wl "
             + "JOIN WaitingListEntry wle ON wle.waitingList_id = wl.waitingList_id "
             + "JOIN booking b ON b.booking_id = wle.booking_id "
@@ -201,14 +200,11 @@ public final class BookingLifecycleService {
             Booking waitingBooking = Utils.mapBooking(rs);
             String waitingEntryId = rs.getString("id");
 
-            // Skip this group if it's too large for what's left — a smaller group
-            // later in the queue might still fit (e.g. freed 3 spots, queue: [4, 1, 2]).
             if (waitingBooking.getNumberOfVisitors() > remainingCapacity) {
-                continue;
+                break;
             }
 
-            // LocalDateTime deadline = now.plusHours(WAITLIST_CONFIRMATION_WINDOW_HOURS);
-            LocalDateTime deadline = now.plusSeconds(10); // For testing purposes, set to 10 seconds instead of 1 hour
+            LocalDateTime deadline = now.plusHours(WAITLIST_CONFIRMATION_WINDOW_HOURS);
             updateBookingStatus(conn,
                 waitingBooking.getBookingId(),
                 Booking.STATUS_PENDING_WAITLIST_CONFIRMATION,

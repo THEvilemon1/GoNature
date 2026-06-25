@@ -3,6 +3,7 @@ package client;
 import java.util.ArrayList;
 
 import common.ParkSubmittedReport;
+import common.ParkSubmittedReportDetails;
 import common.Booking;
 import common.Employee;
 import common.Order;
@@ -32,7 +33,9 @@ public interface ServerResponseListener {
     default void onUpdateBookingResult(Booking booking) {}
     default void onCancelBookingResult(boolean success) {}
     default void onParkVisitorsReportResult(ParkVisitorsReportResult result) {}
+    default void onParkVisitorsReportSubmitResult(boolean success) {}
     default void onParkUsageReportResult(java.util.ArrayList<common.ParkUsageReportResult> results) {}
+    default void onParkUsageReportSubmitResult(boolean success) {}
     default void onConfirmBookingResult(boolean success) {}
 
     // Employee login
@@ -42,6 +45,7 @@ public interface ServerResponseListener {
     // Park worker operations
     default void onParkVisitorsResult(int currentVisitors) {}
     default void onEffectiveAvailableSpotsResult(int spots) {}
+    default void onParkSettingsResult(Integer maxCapacity, Integer gap, Integer defaultStayTime) {}
     default void onBookingResult(Booking booking) {}
     default void onCheckInResult(boolean success) {}
     default void onCheckOutResult(boolean success) {}
@@ -55,12 +59,14 @@ public interface ServerResponseListener {
     default void onParkChangeRequestResult(boolean success) {}
     default void onParkChangeApprovalResult(String requestId, boolean approved) {}
     default void onParkChangeRequestNotification(ParkChangeRequest request) {}
+    default void onParkManagerActivityLogResult(ArrayList<common.ParkManagerActivityLogEntry> entries) {}
     
     default void onPromotionsListResult(java.util.ArrayList<Promotion> promotions) {}
     default void onPromotionRequestResult(boolean success) {}
     default void onPromotionApprovalResult(String requestId, boolean approved) {}
     default void onPromotionRequestNotification(PromotionRequest request) {}
     default void onSubmittedReportsResult(ArrayList<ParkSubmittedReport> reports) {}
+    default void onSubmittedReportDetailsResult(ParkSubmittedReportDetails details) {}
 
     // Department manager reports
     default void onAllParksVisitorsResult(ArrayList<common.ParkVisitorsCount> parks) {}

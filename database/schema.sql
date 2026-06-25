@@ -193,7 +193,12 @@ CREATE TABLE report (
     reportTitle VARCHAR(150) NOT NULL,
     content     TEXT         NULL,
     employee_id INT          NOT NULL,
+    report_type ENUM('VISITORS','USAGE') NULL,
+    from_date   DATE         NULL,
+    to_date     DATE         NULL,
+    submitted_at DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (report_id),
+    UNIQUE KEY uq_report_period (park_id, report_type, from_date, to_date),
     CONSTRAINT fk_report_park
         FOREIGN KEY (park_id) REFERENCES park(park_id),
     CONSTRAINT fk_report_employee
@@ -215,6 +220,7 @@ CREATE TABLE managerRequests (
     parameter_type ENUM('MAX_CAPACITY','GAP','DEFAULT_STAY_TIME','PRICE_PER_PERSON') NOT NULL,
     new_value      INT         NOT NULL,
     park_id        INT         NOT NULL,
+    request_date   DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     approved       TINYINT(1)  NULL,
     PRIMARY KEY (request_Id),
     KEY idx_mr_pending (park_id, approved),

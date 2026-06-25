@@ -11,13 +11,17 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import common.SubscriberRequest;
 
 import common.ParkSubmittedReport;
+import common.ParkSubmittedReportDetails;
 import common.ParkReportRequest;
 import common.ParkVisitorsReportResult;
 import common.ParkUsageReportResult;
 import common.ParkChangeRequest;
+import common.ParkManagerActivityLogEntry;
 import common.Booking;
 import common.ContactInfoValidator;
 import common.Employee;
@@ -40,6 +44,7 @@ import ocsf.server.AbstractServer;
 import ocsf.server.ConnectionToClient;
 
 public class ParkServer extends AbstractServer {
+    private static final java.time.LocalTime BOOKING_CLOSE_TIME = java.time.LocalTime.of(16, 0);
 
     // Thread-safe set to track disconnected clients
     private final Set<ConnectionToClient> disconnectedClients =
@@ -102,7 +107,7 @@ public class ParkServer extends AbstractServer {
                 "FROM booking " +
                 "WHERE park_id = ? " +
                 "AND DATE(visitorTime) BETWEEN ? AND ? " +
-                "AND status IN ('APPROVED', 'CHECKED_IN', 'CHECKED_OUT') " +
+                "AND status IN ('CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT') " +
                 "GROUP BY organizedBooking";
 
         PreparedStatement ps = conn.prepareStatement(sql);
@@ -140,7 +145,7 @@ public class ParkServer extends AbstractServer {
                 "JOIN park p ON b.park_id = p.park_id " +
                 "WHERE b.park_id = ? " +
                 "AND DATE(b.visitorTime) BETWEEN ? AND ? " +
-                "AND b.status IN ('APPROVED', 'CHECKED_IN', 'CHECKED_OUT') " +
+                "AND b.status IN ('CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT') " +
                 "GROUP BY DATE(b.visitorTime), p.maxCapacity " +
                 "HAVING usagePercent < 100 " +
                 "ORDER BY visitDate";
@@ -316,9 +321,13 @@ public class ParkServer extends AbstractServer {
         ArrayList<ParkSubmittedReport> reports = new ArrayList<>();
 
         String sql =
-                "SELECT park_id, reportTitle, content, employee_id " +
-                "FROM report " +
-                "WHERE park_id = ?";
+                "SELECT r.report_id, r.park_id, COALESCE(p.name, 'Unknown Park') AS park_name, " +
+                "r.reportTitle, r.content, r.employee_id, r.report_type, " +
+                "r.from_date, r.to_date, r.submitted_at " +
+                "FROM report r " +
+                "LEFT JOIN park p ON r.park_id = p.park_id " +
+                "WHERE r.park_id = ? " +
+                "ORDER BY r.submitted_at DESC, r.report_id DESC";
 
         Connection conn = DBConnection.getStaticConnection();
         PreparedStatement ps = conn.prepareStatement(sql);
@@ -329,10 +338,16 @@ public class ParkServer extends AbstractServer {
         while (rs.next()) {
 
             reports.add(new ParkSubmittedReport(
+                    rs.getInt("report_id"),
                     rs.getInt("park_id"),
+                    rs.getString("park_name"),
                     rs.getString("reportTitle"),
                     rs.getString("content"),
-                    rs.getInt("employee_id")
+                    rs.getInt("employee_id"),
+                    rs.getString("report_type"),
+                    toLocalDate(rs.getDate("from_date")),
+                    toLocalDate(rs.getDate("to_date")),
+                    toLocalDateTime(rs.getTimestamp("submitted_at"))
             ));
         }
 
@@ -513,6 +528,10 @@ public class ParkServer extends AbstractServer {
                      client.sendToClient(new Message("PARK_VISITORS_RESULT", currentVisitors));
                      break;
 
+                 case "GET_PARK_SETTINGS":
+                     int parkIdForSettings = (int) message.getData();
+                     client.sendToClient(new Message("PARK_SETTINGS_RESULT", getParkSettings(parkIdForSettings)));
+                     break;
                  // Department manager: live visitor counts for every park in the region.
                  case "GET_ALL_PARKS_VISITORS":
                     int managerEmployeeId = (int) message.getData();
@@ -599,6 +618,12 @@ public class ParkServer extends AbstractServer {
                      sendPendingRequestsToManager(parkIdForPending, client);
                      break;
 
+                 case "GET_PARK_MANAGER_ACTIVITY_LOG":
+                     int activityLogEmployeeId = (int) message.getData();
+                     client.sendToClient(new Message("PARK_MANAGER_ACTIVITY_LOG_RESULT",
+                         getParkManagerActivityLog(activityLogEmployeeId)));
+                     break;
+
                  case "PARK_VISITORS_REPORT":
                 	    ParkReportRequest visitorsRequest = (ParkReportRequest) message.getData();
 
@@ -607,17 +632,33 @@ public class ParkServer extends AbstractServer {
                 	                    visitorsRequest.getParkId(),
                 	                    visitorsRequest.getFromDate(),
                 	                    visitorsRequest.getToDate());
-                	    saveParkVisitorsReport(
-                	            visitorsRequest.getParkId(),
-                	            visitorsRequest.getEmployeeId(),
-                	            visitorsRequest.getFromDate(),
-                	            visitorsRequest.getToDate(),
-                	            visitorsResult
-                	    );
 
                 	    client.sendToClient(
                 	            new Message("PARK_VISITORS_REPORT_RESULT", visitorsResult));
                 	    break;
+
+                 case "SUBMIT_PARK_VISITORS_REPORT":
+                     ParkReportRequest submitVisitorsRequest = (ParkReportRequest) message.getData();
+                     ParkVisitorsReportResult submitVisitorsResult =
+                             getParkVisitorsReport(
+                                     submitVisitorsRequest.getParkId(),
+                                     submitVisitorsRequest.getFromDate(),
+                                     submitVisitorsRequest.getToDate());
+
+                     if (submitVisitorsResult.getTotalVisitors() <= 0) {
+                         client.sendToClient(new Message("PARK_VISITORS_REPORT_SUBMIT_RESULT", false));
+                         break;
+                     }
+
+                     saveParkVisitorsReport(
+                             submitVisitorsRequest.getParkId(),
+                             submitVisitorsRequest.getEmployeeId(),
+                             submitVisitorsRequest.getFromDate(),
+                             submitVisitorsRequest.getToDate(),
+                             submitVisitorsResult
+                     );
+                     client.sendToClient(new Message("PARK_VISITORS_REPORT_SUBMIT_RESULT", true));
+                     break;
 
                 	case "PARK_USAGE_REPORT":
                 	    ParkReportRequest usageRequest = (ParkReportRequest) message.getData();
@@ -627,17 +668,33 @@ public class ParkServer extends AbstractServer {
                 	                    usageRequest.getParkId(),
                 	                    usageRequest.getFromDate(),
                 	                    usageRequest.getToDate());
-                	    saveParkUsageReport(
-                	            usageRequest.getParkId(),
-                	            usageRequest.getEmployeeId(),
-                	            usageRequest.getFromDate(),
-                	            usageRequest.getToDate(),
-                	            usageResults
-                	    );
 
                 	    client.sendToClient(
                 	            new Message("PARK_USAGE_REPORT_RESULT", usageResults));
                 	    break;
+
+                 case "SUBMIT_PARK_USAGE_REPORT":
+                     ParkReportRequest submitUsageRequest = (ParkReportRequest) message.getData();
+                     ArrayList<ParkUsageReportResult> submitUsageResults =
+                             getParkUsageReport(
+                                     submitUsageRequest.getParkId(),
+                                     submitUsageRequest.getFromDate(),
+                                     submitUsageRequest.getToDate());
+
+                     if (submitUsageResults == null || submitUsageResults.isEmpty()) {
+                         client.sendToClient(new Message("PARK_USAGE_REPORT_SUBMIT_RESULT", false));
+                         break;
+                     }
+
+                     saveParkUsageReport(
+                             submitUsageRequest.getParkId(),
+                             submitUsageRequest.getEmployeeId(),
+                             submitUsageRequest.getFromDate(),
+                             submitUsageRequest.getToDate(),
+                             submitUsageResults
+                     );
+                     client.sendToClient(new Message("PARK_USAGE_REPORT_SUBMIT_RESULT", true));
+                     break;
 
                  case "GET_VISITS_REPORT":
                      VisitsReportRequest visitsReq = (VisitsReportRequest) message.getData();
@@ -668,6 +725,16 @@ public class ParkServer extends AbstractServer {
                 	    client.sendToClient(new Message("SUBMITTED_REPORTS_RESULT", reports));
                 	    break;
 
+                 case "GET_SUBMITTED_REPORT_DETAILS":
+                     int reportId = (int) message.getData();
+                     ParkSubmittedReportDetails details = getSubmittedReportDetails(reportId);
+                     if (details == null) {
+                         client.sendToClient(new Message("ERROR", "Report details not found."));
+                     } else {
+                         client.sendToClient(new Message("SUBMITTED_REPORT_DETAILS_RESULT", details));
+                     }
+                     break;
+
                  case "GET_TODAY_BOOKINGS":
                 	    int parkIdForToday = (int) message.getData();
                 	    ArrayList<Booking> todayBookings = getTodayBookings(parkIdForToday);
@@ -693,7 +760,7 @@ public class ParkServer extends AbstractServer {
                      break;
 
                 default:
-                    client.sendToClient(new Message("ERROR", "Unknown command"));
+                    client.sendToClient(new Message("ERROR", "Unknown command: " + message.getCommand()));
             }
 
         } catch (Exception e) {
@@ -717,13 +784,19 @@ public class ParkServer extends AbstractServer {
 
             String content = "Visitors Report\n\n" + "Period: " + fromDate + " to " + toDate + "\n" + "Individual Visitors: " + result.getIndividualVisitors() + "\n" + "Organized Groups: " + result.getOrganizedVisitors() + "\n" + "Total Visitors: " + result.getTotalVisitors();
 
-            String sql = "INSERT INTO report (park_id, reportTitle, content, employee_id) " + "VALUES (?, ?, ?, ?)";
+            if (reportAlreadyExists(conn, parkId, "VISITORS", fromDate, toDate)) return;
+
+            String sql = "INSERT INTO report (park_id, reportTitle, content, employee_id, report_type, from_date, to_date) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)";
 
             PreparedStatement ps = conn.prepareStatement(sql);
             ps.setInt(1, parkId);
             ps.setString(2, reportTitle);
             ps.setString(3, content);
             ps.setInt(4, employeeId);
+            ps.setString(5, "VISITORS");
+            ps.setDate(6, java.sql.Date.valueOf(fromDate));
+            ps.setDate(7, java.sql.Date.valueOf(toDate));
 
             ps.executeUpdate();
     }
@@ -743,16 +816,22 @@ public class ParkServer extends AbstractServer {
             for (ParkUsageReportResult r : results) {
                 content.append(r.getDate()).append(": ")
                        .append(r.getVisitorsCount()).append("/").append(r.getMaxCapacity())
-                       .append(" (").append(String.format("%.1f", r.getUsagePercent())).append("%)\n");
+                       .append(" (").append(String.format(java.util.Locale.US, "%.1f", r.getUsagePercent())).append("%)\n");
             }
 
-            String sql = "INSERT INTO report (park_id, reportTitle, content, employee_id) " + "VALUES (?, ?, ?, ?)";
+            if (reportAlreadyExists(conn, parkId, "USAGE", fromDate, toDate)) return;
+
+            String sql = "INSERT INTO report (park_id, reportTitle, content, employee_id, report_type, from_date, to_date) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)";
 
             PreparedStatement ps = conn.prepareStatement(sql);
             ps.setInt(1, parkId);
             ps.setString(2, reportTitle);
             ps.setString(3, content.toString());
             ps.setInt(4, employeeId);
+            ps.setString(5, "USAGE");
+            ps.setDate(6, java.sql.Date.valueOf(fromDate));
+            ps.setDate(7, java.sql.Date.valueOf(toDate));
 
             ps.executeUpdate();
     }
@@ -768,6 +847,149 @@ public class ParkServer extends AbstractServer {
             list.add(Utils.mapBooking(rs));
         }
         return list;
+    }
+    
+    private boolean reportAlreadyExists(Connection conn, int parkId, String reportType,
+            java.time.LocalDate fromDate, java.time.LocalDate toDate) throws SQLException {
+        String sql = "SELECT report_id FROM report WHERE park_id = ? AND report_type = ? " +
+                     "AND from_date = ? AND to_date = ? LIMIT 1";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setInt(1, parkId);
+        ps.setString(2, reportType);
+        ps.setDate(3, java.sql.Date.valueOf(fromDate));
+        ps.setDate(4, java.sql.Date.valueOf(toDate));
+        ResultSet rs = ps.executeQuery();
+        return rs.next();
+    }
+
+    private ParkSubmittedReportDetails getSubmittedReportDetails(int reportId) throws SQLException {
+        Connection conn = DBConnection.getStaticConnection();
+        String sql = "SELECT r.report_id, r.park_id, COALESCE(p.name, 'Unknown Park') AS park_name, " +
+                     "r.reportTitle, r.content, r.employee_id, r.report_type, " +
+                     "r.from_date, r.to_date, r.submitted_at " +
+                     "FROM report r " +
+                     "LEFT JOIN park p ON r.park_id = p.park_id " +
+                     "WHERE r.report_id = ?";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setInt(1, reportId);
+        ResultSet rs = ps.executeQuery();
+        if (!rs.next()) return null;
+
+        ParkSubmittedReport report = new ParkSubmittedReport(
+            rs.getInt("report_id"),
+            rs.getInt("park_id"),
+            rs.getString("park_name"),
+            rs.getString("reportTitle"),
+            rs.getString("content"),
+            rs.getInt("employee_id"),
+            inferReportType(rs.getString("report_type"), rs.getString("reportTitle"), rs.getString("content")),
+            resolveReportFromDate(rs.getDate("from_date"), rs.getString("content")),
+            resolveReportToDate(rs.getDate("to_date"), rs.getString("content")),
+            toLocalDateTime(rs.getTimestamp("submitted_at"))
+        );
+
+        if ("VISITORS".equals(report.getReportType())) {
+            ParkVisitorsReportResult result = parseVisitorsReportResult(report.getContent());
+            if (result == null && report.getFromDate() != null && report.getToDate() != null) {
+                result = getParkVisitorsReport(report.getParkId(), report.getFromDate(), report.getToDate());
+            }
+            return new ParkSubmittedReportDetails(
+                report,
+                result,
+                null
+            );
+        }
+
+        if ("USAGE".equals(report.getReportType())) {
+            ArrayList<ParkUsageReportResult> results = parseUsageReportResults(report.getContent());
+            if (results.isEmpty() && report.getFromDate() != null && report.getToDate() != null) {
+                results = getParkUsageReport(report.getParkId(), report.getFromDate(), report.getToDate());
+            }
+            return new ParkSubmittedReportDetails(
+                report,
+                null,
+                results
+            );
+        }
+
+        return new ParkSubmittedReportDetails(report, null, null);
+    }
+
+    private String inferReportType(String reportType, String reportTitle, String content) {
+        if (reportType != null && !reportType.trim().isEmpty()) {
+            return reportType.trim().toUpperCase();
+        }
+
+        String text = ((reportTitle == null ? "" : reportTitle) + "\n" +
+                       (content == null ? "" : content)).toUpperCase();
+        if (text.contains("USAGE REPORT")) return "USAGE";
+        if (text.contains("VISITORS REPORT") || text.contains("VISITORS")) return "VISITORS";
+        return null;
+    }
+
+    private java.time.LocalDate resolveReportFromDate(java.sql.Date storedDate, String content) {
+        if (storedDate != null) return storedDate.toLocalDate();
+        java.time.LocalDate[] period = parseReportPeriod(content);
+        return period[0];
+    }
+
+    private java.time.LocalDate resolveReportToDate(java.sql.Date storedDate, String content) {
+        if (storedDate != null) return storedDate.toLocalDate();
+        java.time.LocalDate[] period = parseReportPeriod(content);
+        return period[1];
+    }
+
+    private java.time.LocalDate[] parseReportPeriod(String content) {
+        java.time.LocalDate[] period = new java.time.LocalDate[] { null, null };
+        if (content == null) return period;
+
+        Pattern pattern = Pattern.compile("Period:\\s*(\\d{4}-\\d{2}-\\d{2})\\s+to\\s+(\\d{4}-\\d{2}-\\d{2})",
+                Pattern.CASE_INSENSITIVE);
+        Matcher matcher = pattern.matcher(content);
+        if (matcher.find()) {
+            period[0] = java.time.LocalDate.parse(matcher.group(1));
+            period[1] = java.time.LocalDate.parse(matcher.group(2));
+        }
+        return period;
+    }
+
+    private ParkVisitorsReportResult parseVisitorsReportResult(String content) {
+        if (content == null) return null;
+        int individual = parseIntAfterLabel(content, "Individual Visitors:");
+        int organized = parseIntAfterLabel(content, "Organized Groups:");
+        return new ParkVisitorsReportResult(individual, organized);
+    }
+
+    private int parseIntAfterLabel(String content, String label) {
+        int index = content.indexOf(label);
+        if (index < 0) return 0;
+        int start = index + label.length();
+        while (start < content.length() && Character.isWhitespace(content.charAt(start))) start++;
+        int end = start;
+        while (end < content.length() && Character.isDigit(content.charAt(end))) end++;
+        if (end == start) return 0;
+        return Integer.parseInt(content.substring(start, end));
+    }
+
+    private ArrayList<ParkUsageReportResult> parseUsageReportResults(String content) {
+        ArrayList<ParkUsageReportResult> results = new ArrayList<>();
+        if (content == null) return results;
+
+        Pattern pattern = Pattern.compile("^(\\d{4}-\\d{2}-\\d{2}):\\s+(\\d+)/(\\d+)\\s+\\(([-\\d.]+)%\\)$");
+        String[] lines = content.split("\\R");
+        for (String line : lines) {
+            Matcher matcher = pattern.matcher(line.trim());
+            if (matcher.matches()) {
+                results.add(new ParkUsageReportResult(
+                    matcher.group(1),
+                    Integer.parseInt(matcher.group(2)),
+                    Integer.parseInt(matcher.group(3)),
+                    Double.parseDouble(matcher.group(4))
+                ));
+            }
+        }
+
+        return results;
     }
 
     private ArrayList<Booking> getTodayBookings(int parkId) throws SQLException {
@@ -1137,10 +1359,16 @@ public class ParkServer extends AbstractServer {
         if (booking.getNumberOfVisitors() < 1 || booking.getNumberOfVisitors() > 16) {
             throw new IllegalArgumentException("Visitors must be between 1 and 16.");
         }
+        LocalDateTime now = LocalDateTime.now();
+        if (booking.getVisitorTime() != null
+            && booking.getVisitorTime().toLocalDate().isEqual(now.toLocalDate())
+            && !now.toLocalTime().isBefore(BOOKING_CLOSE_TIME)) {
+            throw new IllegalArgumentException("Booking is no longer available for today because the park is already closed.");
+        }
         if (booking.getVisitorTime() == null || !booking.getVisitorTime().isAfter(LocalDateTime.now())) {
             throw new IllegalArgumentException("Booking date and time must be in the future.");
         }
-        if (booking.getVisitorTime().toLocalTime().isAfter(java.time.LocalTime.of(16, 0))) {
+        if (booking.getVisitorTime().toLocalTime().isAfter(BOOKING_CLOSE_TIME)) {
             throw new IllegalArgumentException("Bookings can only be made until 16:00.");
         }
     }
@@ -1482,6 +1710,27 @@ public class ParkServer extends AbstractServer {
         return Utils.getParkCurrentVisitors(conn, parkId);
     }
 
+    private Object[] getParkSettings(int parkId) throws SQLException {
+        Connection conn = DBConnection.getStaticConnection();
+        String sql = "SELECT maxCapacity, gap, defaultStayTime FROM park WHERE park_id = ?";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setInt(1, parkId);
+        ResultSet rs = ps.executeQuery();
+        if (!rs.next()) {
+            throw new IllegalArgumentException("Selected park does not exist in the database.");
+        }
+        return new Object[]{
+            getNullableInt(rs, "maxCapacity"),
+            getNullableInt(rs, "gap"),
+            getNullableInt(rs, "defaultStayTime")
+        };
+    }
+
+    private Integer getNullableInt(ResultSet rs, String columnName) throws SQLException {
+        int value = rs.getInt(columnName);
+        return rs.wasNull() ? null : value;
+    }
+
     private int getEffectiveAvailableSpots(int parkId) throws SQLException {
         Connection conn = DBConnection.getStaticConnection();
         return Utils.getEffectiveAvailableSpots(conn, parkId);
@@ -1740,6 +1989,14 @@ public class ParkServer extends AbstractServer {
             Booking.STATUS_CHECKED_IN, false, price);
     }
 
+    private LocalDateTime toLocalDateTime(Timestamp timestamp) {
+        return timestamp == null ? null : timestamp.toLocalDateTime();
+    }
+
+    private java.time.LocalDate toLocalDate(java.sql.Date date) {
+        return date == null ? null : date.toLocalDate();
+    }
+
     private void sendPendingRequestsToManager(int parkId, ConnectionToClient client) {
         try {
             Connection conn = DBConnection.getStaticConnection();
@@ -1760,7 +2017,8 @@ public class ParkServer extends AbstractServer {
                     paramRs.getInt("employee_id"),
                     paramRs.getInt("dep_manager_id"),
                     paramRs.getString("request_Id"),
-                    paramRs.getString("requestTitle")
+                    paramRs.getString("requestTitle"),
+                    toLocalDateTime(paramRs.getTimestamp("request_date"))
                 );
                 client.sendToClient(new Message("PARK_CHANGE_REQUEST_NOTIFICATION", req));
             }
@@ -1804,6 +2062,35 @@ public class ParkServer extends AbstractServer {
         }
     }
 
+    private ArrayList<ParkManagerActivityLogEntry> getParkManagerActivityLog(int employeeId) throws SQLException {
+        ArrayList<ParkManagerActivityLogEntry> entries = new ArrayList<>();
+        Connection conn = DBConnection.getStaticConnection();
+
+        String sql = "SELECT request_Id, requestTitle, request_date, parameter_type, new_value, approved " +
+                     "FROM managerRequests " +
+                     "WHERE employee_id = ? " +
+                     "ORDER BY request_date DESC, request_Id DESC";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setInt(1, employeeId);
+        ResultSet rs = ps.executeQuery();
+
+        while (rs.next()) {
+            int approvedValue = rs.getInt("approved");
+            Boolean approved = rs.wasNull() ? null : approvedValue == 1;
+
+            entries.add(new ParkManagerActivityLogEntry(
+                rs.getString("request_Id"),
+                rs.getString("requestTitle"),
+                toLocalDateTime(rs.getTimestamp("request_date")),
+                ParkChangeRequest.ParameterType.valueOf(rs.getString("parameter_type")),
+                rs.getInt("new_value"),
+                approved
+            ));
+        }
+
+        return entries;
+    }
+
     private String getUsernameForEmployeeId(Connection conn, int employeeId) throws SQLException {
         String sql = "SELECT u.username FROM employee e " +
                      "JOIN `user` u ON e.user_id = u.user_id " +
@@ -1817,18 +2104,35 @@ public class ParkServer extends AbstractServer {
 
     private void handleParkChangeRequest(ParkChangeRequest request, ConnectionToClient client) throws Exception {
         Connection conn = DBConnection.getStaticConnection();
+        Integer depManagerId = getDepartmentManagerIdForPark(conn, request.getParkId());
+        LocalDateTime requestDate = request.getRequestDate() != null
+                ? request.getRequestDate()
+                : LocalDateTime.now();
         String sql = "INSERT INTO managerRequests (request_Id, employee_id, dep_manager_id, " +
-                     "requestTitle, parameter_type, new_value, park_id, approved) " +
-                     "VALUES (?, ?, ?, ?, ?, ?, ?, NULL)";
+                     "requestTitle, parameter_type, new_value, park_id, request_date, approved) " +
+                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)";
         PreparedStatement ps = conn.prepareStatement(sql);
         ps.setString(1, request.getRequestId());
         ps.setInt(2, request.getEmployeeId());
-        ps.setInt(3, request.getDepManagerId());
+        ps.setInt(3, getDepartmentManagerIdForPark(conn, request.getParkId()));
         ps.setString(4, request.getRequestTitle());
         ps.setString(5, request.getParameterType().name());
         ps.setInt(6, request.getNewValue());
         ps.setInt(7, request.getParkId());
+        ps.setTimestamp(8, Timestamp.valueOf(requestDate));
         ps.executeUpdate();
+
+        ParkChangeRequest notificationRequest = new ParkChangeRequest(
+            request.getParkId(),
+            request.getParameterType(),
+            request.getNewValue(),
+            request.getRequestedByUsername(),
+            request.getEmployeeId(),
+            depManagerId == null ? 0 : depManagerId,
+            request.getRequestId(),
+            request.getRequestTitle(),
+            requestDate
+        );
 
         boolean depManagerOnline = false;
         for (Thread t : getClientConnections()) {
@@ -1838,7 +2142,7 @@ public class ParkServer extends AbstractServer {
             Object parkId = c.getInfo("EMPLOYEE_PARK_ID");
             if ("department_manager".equals(role) &&
                 parkId != null && (int) parkId == request.getParkId()) {
-                c.sendToClient(new Message("PARK_CHANGE_REQUEST_NOTIFICATION", request));
+                c.sendToClient(new Message("PARK_CHANGE_REQUEST_NOTIFICATION", notificationRequest));
                 depManagerOnline = true;
                 break;
             }
@@ -1851,14 +2155,30 @@ public class ParkServer extends AbstractServer {
         }
     }
 
+    private Integer getDepartmentManagerIdForPark(Connection conn, int parkId) throws SQLException {
+        String sql = "SELECT department_manager_id FROM park WHERE park_id = ?";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setInt(1, parkId);
+        ResultSet rs = ps.executeQuery();
+        if (!rs.next()) {
+            throw new IllegalArgumentException("Selected park does not exist in the database.");
+        }
+        int depManagerId = rs.getInt("department_manager_id");
+        return rs.wasNull() ? null : depManagerId;
+    }
+
     private void handleParkChangeApproval(String requestId, boolean approved, ConnectionToClient client) throws Exception {
         Connection conn = DBConnection.getStaticConnection();
 
-        String updateSql = "UPDATE managerRequests SET approved = ? WHERE request_Id = ?";
+        String updateSql = "UPDATE managerRequests SET approved = ? WHERE request_Id = ? AND approved IS NULL";
         PreparedStatement updatePs = conn.prepareStatement(updateSql);
         updatePs.setInt(1, approved ? 1 : 0);
         updatePs.setString(2, requestId);
-        updatePs.executeUpdate();
+        int updatedRows = updatePs.executeUpdate();
+        if (updatedRows == 0) {
+            client.sendToClient(new Message("ERROR", "This request has already been processed."));
+            return;
+        }
 
         if (approved) {
             String getSql = "SELECT park_id, parameter_type, new_value FROM managerRequests WHERE request_Id = ?";

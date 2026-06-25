@@ -7,6 +7,7 @@ import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.chart.PieChart;
+import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.TextArea;
 import javafx.stage.Stage;
@@ -27,8 +28,11 @@ public class ParkVisitorsReportViewController implements ServerResponseListener 
     @FXML private ComboBox<Integer> yearComboBox;
     @FXML private TextArea reportArea;
     @FXML private PieChart visitorsPieChart;
+    @FXML private Button btnSendReport;
 
     private final Map<String, Integer> monthMap = new HashMap<>();
+    private ParkReportRequest lastGeneratedRequest;
+    private ParkVisitorsReportResult lastGeneratedResult;
 
     @FXML
     public void initialize() {
@@ -50,19 +54,30 @@ public class ParkVisitorsReportViewController implements ServerResponseListener 
 
         monthComboBox.setValue("June");
         yearComboBox.setValue(2026);
+        btnSendReport.setDisable(true);
     }
 
     @FXML
     public void handleGenerateReport(ActionEvent event) {
-    	System.out.println("Employee ID = " + employee.getEmployeeId());
-    	System.out.println("Park ID = " + employee.getParkId());
         if (monthComboBox.getValue() == null || yearComboBox.getValue() == null) {
             reportArea.setText("Please select month and year.");
             return;
         }
 
         try {
+            if (employee == null) {
+                reportArea.setText("Employee details are missing.");
+                return;
+            }
+            if (ParkClient.getInstance() == null || !ParkClient.getInstance().isConnected()) {
+                reportArea.setText("Not connected to server.");
+                return;
+            }
+
             ParkClient.getInstance().setListener(this);
+            btnSendReport.setDisable(true);
+            lastGeneratedRequest = null;
+            lastGeneratedResult = null;
 
             int month = monthMap.get(monthComboBox.getValue());
             int year = yearComboBox.getValue();
@@ -76,6 +91,7 @@ public class ParkVisitorsReportViewController implements ServerResponseListener 
                     fromDate,
                     toDate
             );
+            lastGeneratedRequest = request;
 
             ParkClient.getInstance().sendToServer(
                     new Message("PARK_VISITORS_REPORT", request)
@@ -86,12 +102,42 @@ public class ParkVisitorsReportViewController implements ServerResponseListener 
         }
     }
 
+    @FXML
+    public void handleSendReport(ActionEvent event) {
+        if (lastGeneratedRequest == null || lastGeneratedResult == null) {
+            reportArea.setText("Generate a report before sending it.");
+            return;
+        }
+        if (lastGeneratedResult.getTotalVisitors() <= 0) {
+            btnSendReport.setDisable(true);
+            reportArea.setText(reportArea.getText() + "\n\nCannot send an empty report.");
+            return;
+        }
+
+        try {
+            if (ParkClient.getInstance() == null || !ParkClient.getInstance().isConnected()) {
+                reportArea.setText("Not connected to server.");
+                return;
+            }
+
+            ParkClient.getInstance().setListener(this);
+            btnSendReport.setDisable(true);
+            ParkClient.getInstance().sendToServer(
+                    new Message("SUBMIT_PARK_VISITORS_REPORT", lastGeneratedRequest)
+            );
+        } catch (Exception e) {
+            btnSendReport.setDisable(false);
+            reportArea.setText("Error sending report: " + e.getMessage());
+        }
+    }
+
     @Override
     public void onParkVisitorsReportResult(ParkVisitorsReportResult result) {
         Platform.runLater(() -> {
             int individual = result.getIndividualVisitors();
             int organized = result.getOrganizedVisitors();
             int total = result.getTotalVisitors();
+            lastGeneratedResult = result;
 
             reportArea.setText(
                     "Visitors Report\n\n" +
@@ -103,6 +149,24 @@ public class ParkVisitorsReportViewController implements ServerResponseListener 
             visitorsPieChart.getData().clear();
             visitorsPieChart.getData().add(new PieChart.Data("Individual Visitors", individual));
             visitorsPieChart.getData().add(new PieChart.Data("Organized Groups", organized));
+            btnSendReport.setDisable(total <= 0);
+            if (total <= 0) {
+                reportArea.setText(reportArea.getText() +
+                        "\n\nNo bookings or walk-in visitors found for the selected period.");
+            }
+        });
+    }
+
+    @Override
+    public void onParkVisitorsReportSubmitResult(boolean success) {
+        Platform.runLater(() -> {
+            if (success) {
+                reportArea.setText(reportArea.getText() + "\n\nReport sent to Department Manager.");
+            } else {
+                reportArea.setText(reportArea.getText() + "\n\nReport was not sent because it has no visitors.");
+            }
+            btnSendReport.setDisable(success || lastGeneratedResult == null ||
+                    lastGeneratedResult.getTotalVisitors() <= 0);
         });
     }
 

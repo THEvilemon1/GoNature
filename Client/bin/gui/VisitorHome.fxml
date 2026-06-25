@@ -130,9 +130,9 @@
                         <Label styleClass="field-label" text="Date" />
                         <DatePicker fx:id="dateVisit" maxWidth="Infinity" />
                     </VBox>
-                    <VBox spacing="5" HBox.hgrow="ALWAYS">
+                    <VBox spacing="5" HBox.hgrow="NEVER" prefWidth="170" maxWidth="170">
                         <Label styleClass="field-label" text="Time" />
-                        <ComboBox fx:id="cmbTime" maxWidth="Infinity" promptText="Choose time" />
+                        <ComboBox fx:id="cmbTime" styleClass="booking-time-combo" promptText="Choose time" />
                     </VBox>
                 </HBox>
 

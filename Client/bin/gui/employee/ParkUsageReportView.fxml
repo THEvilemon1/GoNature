@@ -24,13 +24,15 @@
 
             <!-- Filters -->
             <HBox spacing="12" alignment="CENTER_LEFT">
-                <Label styleClass="field-label" text="From:" />
-                <DatePicker fx:id="fromDatePicker" />
-                <Label styleClass="field-label" text="To:" />
-                <DatePicker fx:id="toDatePicker" />
+                <Label styleClass="field-label" text="Month:" />
+                <ComboBox fx:id="monthComboBox" promptText="Select Month" prefWidth="160" />
+                <Label styleClass="field-label" text="Year:" />
+                <ComboBox fx:id="yearComboBox" promptText="Select Year" prefWidth="120" />
                 <Region HBox.hgrow="ALWAYS" />
                 <Button styleClass="btn-primary" text="Generate Report"
                         onAction="#handleGenerateReport" prefWidth="170" />
+                <Button fx:id="btnSendReport" styleClass="btn-secondary" text="Send to Department Manager"
+                        onAction="#handleSendReport" prefWidth="220" />
             </HBox>
 
             <Separator styleClass="card-sep" />

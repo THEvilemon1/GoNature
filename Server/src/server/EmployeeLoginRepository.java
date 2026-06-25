@@ -29,10 +29,13 @@ public class EmployeeLoginRepository {
         }
 
         Connection conn = DBConnection.getStaticConnection();
-String sql = "SELECT e.employee_id, e.salary, e.park_id, u.username, e.role, e.user_id, " +
-             "u.firstName, u.lastName, u.email, u.phoneNumber " +
-             "FROM employee e, user u " +
-             "WHERE e.user_id = u.user_id AND u.username = ? AND u.password = ?";
+        String sql = "SELECT e.employee_id, e.salary, e.park_id, u.username, e.role, e.user_id, " +
+             "u.firstName, u.lastName, u.email, u.phoneNumber, " +
+             "p.maxCapacity AS maxCapacity, p.gap AS gap, p.defaultStayTime AS defaultStayTime " +
+             "FROM employee e " +
+             "JOIN user u ON e.user_id = u.user_id " +
+             "LEFT JOIN park p ON e.park_id = p.park_id " +
+             "WHERE u.username = ? AND u.password = ?";
         PreparedStatement ps = conn.prepareStatement(sql);
         ps.setString(1, username);
         ps.setString(2, password);
@@ -49,7 +52,10 @@ String sql = "SELECT e.employee_id, e.salary, e.park_id, u.username, e.role, e.u
                 rs.getString("firstName"),
                 rs.getString("lastName"),
                 rs.getString("email"),
-                rs.getString("phoneNumber")
+                rs.getString("phoneNumber"),
+                getNullableInt(rs, "maxCapacity"),
+                getNullableInt(rs, "gap"),
+                getNullableInt(rs, "defaultStayTime")
             );
             loggedInEmployees.add(username);
             System.out.println("[EmployeeLoginRepository] Employee logged in: " + username);
@@ -71,5 +77,10 @@ String sql = "SELECT e.employee_id, e.salary, e.park_id, u.username, e.role, e.u
      */
     public static boolean isLoggedIn(String username) {
         return loggedInEmployees.contains(username);
+    }
+
+    private static Integer getNullableInt(ResultSet rs, String columnName) throws SQLException {
+        int value = rs.getInt(columnName);
+        return rs.wasNull() ? null : value;
     }
 }

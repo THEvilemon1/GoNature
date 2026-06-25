@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 
 import common.ParkSubmittedReport;
+import common.ParkSubmittedReportDetails;
 import common.ParkChangeRequest;
 import common.Booking;
 import common.Employee;
@@ -187,6 +188,10 @@ public class ParkClient extends AbstractClient {
                 case "EFFECTIVE_AVAILABLE_SPOTS_RESULT":
                     listener.onEffectiveAvailableSpotsResult((int) message.getData());
                     break;
+                case "PARK_SETTINGS_RESULT":
+                    Object[] parkSettings = (Object[]) message.getData();
+                    listener.onParkSettingsResult((Integer) parkSettings[0], (Integer) parkSettings[1], (Integer) parkSettings[2]);
+                    break;
                 case "BOOKING_RESULT":
                     listener.onBookingResult((common.Booking) message.getData());
                     break;
@@ -225,6 +230,11 @@ public class ParkClient extends AbstractClient {
                     listener.onParkChangeRequestNotification(incomingRequest);
                     break;
 
+                case "PARK_MANAGER_ACTIVITY_LOG_RESULT":
+                    listener.onParkManagerActivityLogResult(
+                        (ArrayList<common.ParkManagerActivityLogEntry>) message.getData());
+                    break;
+
                 case "PROMOTIONS_LIST_RESULT":
                     listener.onPromotionsListResult((java.util.ArrayList<Promotion>) message.getData());
                     break;
@@ -244,11 +254,20 @@ public class ParkClient extends AbstractClient {
                 case "PARK_VISITORS_REPORT_RESULT":
                     listener.onParkVisitorsReportResult((ParkVisitorsReportResult) message.getData());
                     break;
+                case "PARK_VISITORS_REPORT_SUBMIT_RESULT":
+                    listener.onParkVisitorsReportSubmitResult((boolean) message.getData());
+                    break;
                 case "PARK_USAGE_REPORT_RESULT":
                     listener.onParkUsageReportResult((ArrayList<common.ParkUsageReportResult>) message.getData());
                     break;
+                case "PARK_USAGE_REPORT_SUBMIT_RESULT":
+                    listener.onParkUsageReportSubmitResult((boolean) message.getData());
+                    break;
                 case "SUBMITTED_REPORTS_RESULT":
                     listener.onSubmittedReportsResult((ArrayList<ParkSubmittedReport>) message.getData());
+                    break;
+                case "SUBMITTED_REPORT_DETAILS_RESULT":
+                    listener.onSubmittedReportDetailsResult((ParkSubmittedReportDetails) message.getData());
                     break;
                     
                 case "ALL_PARKS_VISITORS_RESULT":

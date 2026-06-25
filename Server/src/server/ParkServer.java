@@ -440,7 +440,9 @@ public class ParkServer extends AbstractServer {
 
                 case "CANCEL_BOOKING":
                     Booking bookingToCancel = (Booking) message.getData();
-                    client.sendToClient(new Message("CANCEL_BOOKING_RESULT", cancelBooking(bookingToCancel)));
+                    boolean cancelledOk = cancelBooking(bookingToCancel);
+                    client.sendToClient(new Message("CANCEL_BOOKING_RESULT", cancelledOk));
+                    if (cancelledOk) pushLiveParkState(bookingToCancel.getParkId());
                     break;
 
                 case "CONFIRM_BOOKING":
@@ -564,6 +566,17 @@ public class ParkServer extends AbstractServer {
                      Booking walkInBooking = processWalkIn(walkInRequest);
                      client.sendToClient(new Message("WALK_IN_RESULT", walkInBooking));
                      pushLiveParkState(walkInRequest.getParkId());
+                     break;
+
+                 case "CANCEL_WALK_IN":
+                     Booking cancelWalkInBooking = (Booking) message.getData();
+                     Integer parkIdForCancel = (Integer) client.getInfo("EMPLOYEE_PARK_ID");
+                     if (parkIdForCancel == null) {
+                         throw new IllegalArgumentException("Employee park is missing. Please log in again.");
+                     }
+                     boolean cancelWalkInSuccess = cancelWalkIn(cancelWalkInBooking, parkIdForCancel);
+                     client.sendToClient(new Message("CANCEL_WALK_IN_RESULT", cancelWalkInSuccess));
+                     if (cancelWalkInSuccess) pushLiveParkState(parkIdForCancel);
                      break;
 
                  case "PARK_CHANGE_REQUEST":
@@ -1578,6 +1591,41 @@ public class ParkServer extends AbstractServer {
                 BookingLifecycleService.handleSpotFreed(conn, updatedBooking.getParkId(), updatedBooking.getVisitorTime());
             }
         }
+
+        return true;
+    }
+
+
+    private boolean cancelWalkIn(Booking booking, int employeeParkId) throws SQLException {
+        Connection conn = DBConnection.getStaticConnection();
+
+        String getSql = "SELECT status, park_id FROM booking WHERE booking_id = ?";
+        PreparedStatement getPs = conn.prepareStatement(getSql);
+        getPs.setInt(1, booking.getBookingId());
+        ResultSet rs = getPs.executeQuery();
+
+        if (!rs.next()) {
+            throw new IllegalArgumentException("Booking not found.");
+        }
+
+        String status = rs.getString("status");
+        int parkId = rs.getInt("park_id");
+
+        if (parkId != employeeParkId) {
+            throw new IllegalArgumentException("This booking belongs to another park.");
+        }
+        if (!Booking.STATUS_CHECKED_IN.equals(status)) {
+            throw new IllegalArgumentException("This booking is not checked in. Status: " + status);
+        }
+
+        String updateSql = "UPDATE booking SET visitorsInside = 0, status = ?, exitTime = NOW() WHERE booking_id = ?";
+        PreparedStatement updatePs = conn.prepareStatement(updateSql);
+        updatePs.setString(1, Booking.STATUS_CANCELLED);
+        updatePs.setInt(2, booking.getBookingId());
+        updatePs.executeUpdate();
+
+        Utils.syncParkCurrentVisitors(conn, employeeParkId);
+        pushLiveParkState(employeeParkId);
 
         return true;
     }

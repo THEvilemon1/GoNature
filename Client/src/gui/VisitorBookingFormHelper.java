@@ -170,7 +170,7 @@ class VisitorBookingFormHelper {
 
     String getParkName(int parkId) {
         ParkOption option = findParkOption(parkId);
-        return option == null ? "Park #" + parkId : option.getName();
+        return option == null ? "Unknown Park" : option.getName();
     }
 
     private void setupGuideMode() {

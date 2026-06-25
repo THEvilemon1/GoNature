@@ -122,6 +122,9 @@ class VisitorBookingsViewHelper {
         HBox header = new HBox(10, title, spacer, status);
         header.getStyleClass().add("booking-row-header");
 
+        Label bookingId = new Label("Booking ID: " + booking.getBookingId());
+        bookingId.getStyleClass().add("booking-row-id");
+
         Label details = new Label(booking.getVisitorTime().format(DATE_TIME_FORMAT)
             + " | Visitors: " + booking.getNumberOfVisitors()
             + " | Price: " + String.format("%.2f", booking.getPrice()) + " ILS");
@@ -157,7 +160,7 @@ class VisitorBookingsViewHelper {
 
             actions.getChildren().addAll(edit, cancel);
         }
-        row.getChildren().addAll(header, details, description, actions);
+        row.getChildren().addAll(header, bookingId, details, description, actions);
         return row;
     }
 

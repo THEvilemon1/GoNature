@@ -261,6 +261,12 @@
     -fx-text-fill: #1c1c1e;
 }
 
+.booking-row-id {
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #2e7d32;
+}
+
 .booking-row-details {
     -fx-font-size: 12px;
     -fx-text-fill: #4b5563;

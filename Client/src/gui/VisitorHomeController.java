@@ -77,6 +77,7 @@ public class VisitorHomeController implements ServerResponseListener {
     private VisitorBookingFormHelper formHelper;
     private VisitorBookingsViewHelper bookingsHelper;
     private Timer bookingsRefreshTimer;
+    private ArrayList<Booking> currentBookings;
 
     @FXML
     private void initialize() {
@@ -286,12 +287,20 @@ public class VisitorHomeController implements ServerResponseListener {
 
     @Override
     public void onTravelerBookingsResult(ArrayList<Booking> bookings) {
-        Platform.runLater(() -> bookingsHelper.render(bookings));
+        Platform.runLater(() -> {
+            currentBookings = bookings;
+            bookingsHelper.render(currentBookings);
+        });
     }
 
     @Override
     public void onParksResult(ArrayList<ParkOption> parks) {
-        Platform.runLater(() -> formHelper.setParks(parks));
+        Platform.runLater(() -> {
+            formHelper.setParks(parks);
+            if (bookingsListView != null && bookingsListView.isVisible() && currentBookings != null) {
+                bookingsHelper.render(currentBookings);
+            }
+        });
     }
 
     @Override
@@ -613,6 +622,7 @@ public class VisitorHomeController implements ServerResponseListener {
         bookingsListView.setManaged(true);
         profileForm.setVisible(false);
         profileForm.setManaged(false);
+        requestParks();
         startBookingsAutoRefresh();
     }
 

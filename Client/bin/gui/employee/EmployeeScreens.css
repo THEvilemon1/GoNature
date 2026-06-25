@@ -1,15 +1,15 @@
 /*
- * EmployeeScreens.css — GoNature Employee Screens
+ * EmployeeScreens.css â€” GoNature Employee Screens
  * Matches the "Forest Clarity" design language from LoginPage.css
  */
 
-/* ── Root / background ─────────────────────────────────────────── */
+/* â”€â”€ Root / background â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .root-pane {
     -fx-background-color: linear-gradient(to bottom right, #1a2e1a, #2d4a2d);
     -fx-padding: 32;
 }
 
-/* ── Card ──────────────────────────────────────────────────────── */
+/* â”€â”€ Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .screen-card {
     -fx-background-color: #f8f6f0;
     -fx-background-radius: 16;
@@ -18,7 +18,7 @@
     -fx-spacing: 0;
 }
 
-/* ── Top bar ────────────────────────────────────────────────────── */
+/* â”€â”€ Top bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .top-bar {
     -fx-background-color: #2e7d32;
     -fx-background-radius: 16 16 0 0;
@@ -66,32 +66,19 @@
     -fx-font-family: "Arial";
 }
 
-/* ── Content area ──────────────────────────────────────────────── */
+/* â”€â”€ Content area â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .content-area {
     -fx-padding: 32 44 32 44;
     -fx-spacing: 18;
 }
 
-/* ── Welcome label ──────────────────────────────────────────────── */
+/* â”€â”€ Welcome label â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .welcome-label {
     -fx-font-size: 13px;
     -fx-text-fill: #6b7280;
     -fx-font-family: "Arial";
 }
 
-<<<<<<< HEAD
-/* ── Section titles ─────────────────────────────────────────────── */
-.section-title {
-    -fx-font-size: 13px;
-    -fx-font-weight: bold;
-    -fx-text-fill: #1f2937;
-    -fx-font-family: "Arial";
-}
-
-.section-title-manual {
-    -fx-font-size: 11px;
-    -fx-font-weight: bold;
-=======
 .section-title {
     -fx-font-size: 18px;
     -fx-font-weight: bold;
@@ -101,28 +88,30 @@
 
 .field-help {
     -fx-font-size: 11px;
->>>>>>> 62e31b68b58492e61cba4b83d2fcedd2e96c7b26
     -fx-text-fill: #6b7280;
     -fx-font-family: "Arial";
 }
 
-<<<<<<< HEAD
+.section-title-manual {
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #6b7280;
+    -fx-font-family: "Arial";
+}
+
 .section-subtitle-manual {
     -fx-font-size: 11px;
     -fx-text-fill: #9ca3af;
     -fx-font-family: "Arial";
 }
 
-/* ── List column sub-headers ────────────────────────────────────── */
 .list-header-sub {
     -fx-font-size: 11px;
     -fx-text-fill: #9ca3af;
     -fx-font-family: "Arial";
 }
 
-=======
->>>>>>> 62e31b68b58492e61cba4b83d2fcedd2e96c7b26
-/* ── Section labels ─────────────────────────────────────────────── */
+/* â”€â”€ Section labels â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .field-label {
     -fx-font-size: 12px;
     -fx-font-weight: bold;
@@ -130,7 +119,7 @@
     -fx-font-family: "Arial";
 }
 
-/* ── Input fields ───────────────────────────────────────────────── */
+/* â”€â”€ Input fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .field-input {
     -fx-pref-height: 40;
     -fx-font-size: 14px;
@@ -148,7 +137,7 @@
     -fx-effect: dropshadow(gaussian, rgba(46,125,50,0.25), 6, 0, 0, 0);
 }
 
-/* ── Search input (compact variant) ────────────────────────────── */
+/* â”€â”€ Search input (compact variant) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .field-input-search {
     -fx-pref-height: 35;
     -fx-font-size: 13px;
@@ -166,7 +155,7 @@
     -fx-effect: dropshadow(gaussian, rgba(46,125,50,0.20), 4, 0, 0, 0);
 }
 
-/* ── Primary button (green) ─────────────────────────────────────── */
+/* â”€â”€ Primary button (green) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .btn-primary {
     -fx-pref-height: 44;
     -fx-font-size: 14px;
@@ -182,7 +171,7 @@
     -fx-background-color: #1b5e20;
 }
 
-/* ── Action button (amber - for enter/check-in) ─────────────────── */
+/* â”€â”€ Action button (amber - for enter/check-in) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .btn-action {
     -fx-pref-height: 44;
     -fx-font-size: 14px;
@@ -198,7 +187,7 @@
     -fx-background-color: #bf360c;
 }
 
-/* ── Danger button (red - for exit) ─────────────────────────────── */
+/* â”€â”€ Danger button (red - for exit) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .btn-danger {
     -fx-pref-height: 44;
     -fx-font-size: 14px;
@@ -213,7 +202,7 @@
     -fx-background-color: #8e0000;
 }
 
-/* ── Refresh button ─────────────────────────────────────────────── */
+/* â”€â”€ Refresh button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .btn-refresh {
     -fx-pref-height: 30;
     -fx-font-size: 12px;
@@ -228,7 +217,7 @@
     -fx-background-color: #d4e6d4;
 }
 
-/* ── Secondary button (grey - back/logout) ──────────────────────── */
+/* â”€â”€ Secondary button (grey - back/logout) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .btn-secondary {
     -fx-pref-height: 38;
     -fx-font-size: 13px;
@@ -243,7 +232,7 @@
     -fx-text-fill: #2e7d32;
 }
 
-/* ── Big action buttons (main screen) ──────────────────────────── */
+/* â”€â”€ Big action buttons (main screen) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .btn-big {
     -fx-pref-height: 120;
     -fx-font-size: 16px;
@@ -252,7 +241,7 @@
     -fx-cursor: hand;
 }
 
-/* ── Status messages ────────────────────────────────────────────── */
+/* â”€â”€ Status messages â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .lbl-message {
     -fx-font-size: 13px;
     -fx-padding: 10 14 10 14;
@@ -276,7 +265,7 @@
     -fx-border-width: 1;
 }
 
-/* ── Booking details box ─────────────────────────────────────────── */
+/* â”€â”€ Booking details box â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .details-box {
     -fx-background-color: white;
     -fx-background-radius: 10;
@@ -370,7 +359,7 @@
     -fx-alignment: CENTER;
 }
 
-/* ── Manual entry buttons (secondary — smaller than btn-big) ────── */
+/* â”€â”€ Manual entry buttons (secondary â€” smaller than btn-big) â”€â”€â”€â”€â”€â”€ */
 .btn-manual-enter {
     -fx-pref-height: 58;
     -fx-font-size: 13px;
@@ -401,7 +390,7 @@
     -fx-background-color: #8e0000;
 }
 
-/* ── Separator ──────────────────────────────────────────────────── */
+/* â”€â”€ Separator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .card-sep .line {
     -fx-border-color: #d1d5db;
     -fx-border-width: 1 0 0 0;

@@ -1083,7 +1083,7 @@ public class ParkServer extends AbstractServer {
                     "You already have a booking at this date and time. Please choose a different time slot.");
             }
 
-            int bookingId = 1000000 + new java.util.Random().nextInt(9000000);
+            int bookingId = generateUniqueBookingId(conn);
             int capacity = Utils.getParkEffectiveCapacity(conn, booking.getParkId());
             int confirmedVisitors = getConfirmedVisitorsForSlot(conn, booking.getParkId(), booking.getVisitorTime());
             boolean isFull = confirmedVisitors + booking.getNumberOfVisitors() > capacity;
@@ -1124,9 +1124,11 @@ public class ParkServer extends AbstractServer {
             }
 
             conn.commit();
-            return new BookingAvailabilityResult(false, new Booking(bookingId, booking.getTravelerId(), booking.getTravelerName(),
-                booking.getTravelerEmail(), booking.getTravelerPhoneNumber(),
-                booking.getParkId(), booking.getNumberOfVisitors(), booking.getVisitorTime(), status, false, price));
+            Booking savedBooking = getBookingById(conn, bookingId);
+            if (savedBooking == null) {
+                throw new SQLException("Booking was saved but could not be loaded: " + bookingId);
+            }
+            return new BookingAvailabilityResult(false, savedBooking);
         } catch (SQLException | RuntimeException e) {
             conn.rollback();
             throw e;
@@ -1137,6 +1139,25 @@ public class ParkServer extends AbstractServer {
 
     private synchronized Booking createBooking(Booking booking) throws SQLException {
         return createBooking(booking, true).booking;
+    }
+
+    private int generateUniqueBookingId(Connection conn) throws SQLException {
+        java.util.Random random = new java.util.Random();
+        for (int attempt = 0; attempt < 20; attempt++) {
+            int bookingId = 1000000 + random.nextInt(9000000);
+            if (!bookingIdExists(conn, bookingId)) {
+                return bookingId;
+            }
+        }
+        throw new SQLException("Could not generate a unique booking ID.");
+    }
+
+    private boolean bookingIdExists(Connection conn, int bookingId) throws SQLException {
+        String sql = "SELECT booking_id FROM booking WHERE booking_id = ?";
+        PreparedStatement ps = conn.prepareStatement(sql);
+        ps.setInt(1, bookingId);
+        ResultSet rs = ps.executeQuery();
+        return rs.next();
     }
 
     // Check the capacity - how many confirmed bookings are there.
@@ -1761,6 +1782,10 @@ public class ParkServer extends AbstractServer {
 
     private Booking getBookingById(int bookingId) throws SQLException {
         Connection conn = DBConnection.getStaticConnection();
+        return getBookingById(conn, bookingId);
+    }
+
+    private Booking getBookingById(Connection conn, int bookingId) throws SQLException {
         String sql = "SELECT * FROM booking WHERE booking_id = ?";
         PreparedStatement ps = conn.prepareStatement(sql);
         ps.setInt(1, bookingId);
